@@ -1,0 +1,142 @@
+---
+description: SMKB Design System — enforce token & component usage for all UI work
+globs: "**/*.vue,**/*.ts,**/*.tsx,**/*.css,**/*.scss"
+alwaysApply: true
+# @smkb-generated — auto-updated on every `pnpm install`. Remove this line to opt out of auto-updates.
+---
+
+# SMKB Design System — AI Agent Rules
+
+This project uses the **@smkb/design-ui** component library (including design tokens) built for Seminar Hakibutzim College (סמינר הקיבוצים).
+
+---
+
+## Rule 1 — Always use SMKB tokens for styling
+
+Never write raw hex colors, pixel values, font sizes, or z-index numbers.
+Always use CSS custom properties from the token system.
+
+```css
+/* ✅ correct */
+color: var(--smkb-color-foreground);
+padding: var(--smkb-space-4);
+font-size: var(--smkb-font-size-md);
+border-radius: var(--smkb-radius-md);
+box-shadow: var(--smkb-shadow-sm);
+z-index: var(--smkb-z-dropdown);
+
+/* ❌ wrong */
+color: #0f172a;
+padding: 16px;
+font-size: 1rem;
+```
+
+**Token categories available:**
+- Colors: `--smkb-color-primary`, `--smkb-color-foreground`, `--smkb-color-surface`, `--smkb-color-border`, `--smkb-color-danger`, `--smkb-color-success`, `--smkb-color-warning`
+- Spacing: `--smkb-space-1` through `--smkb-space-24` (0.25 rem increments)
+- Typography: `--smkb-font-size-xs/sm/md/lg/xl/2xl`, `--smkb-font-weight-normal/medium/semibold/bold`
+- Radius: `--smkb-radius-sm/md/lg/xl/full` — override `--smkb-radius-md` to change all corners at once
+- Shadows: `--smkb-shadow-xs/sm/md/lg/xl`
+- Motion: `--smkb-motion-duration-fast/normal/slow`, `--smkb-motion-easing-default/spring`
+- Z-index: `--smkb-z-dropdown/sticky/overlay/modal/dialog/tooltip/toast`
+
+→ Full token reference: **SMKB-UI.md § Token Reference**
+
+---
+
+## Rule 2 — Always use SMKB components when a suitable one exists
+
+Before writing any UI element, check the component list below. If a suitable component exists, use it. Only build a custom component if nothing in the library fits the need — and document why.
+
+### Component Quick Reference
+
+| Component | Use for | Key props |
+|---|---|---|
+| `SmkbButton` | Any clickable action | `variant` (primary/secondary/ghost/danger/on-primary/neutral-ghost), `size`, `loading`, `disabled`, `tag` |
+| `SmkbIconButton` | Circular icon-only control (toolbar / header) | `icon` or default slot (SVG), `ariaLabel` (required), `variant`, `size`, `loading` |
+| `SmkbBackButton` | Back navigation (icon follows `<html dir>`) | `ariaLabel` (required), `size`, `tag`, `href` (when `tag="a"`) — uses `neutral-ghost` icon button |
+| `SmkbSegmentedControl` | Pill radiogroup for a single choice among options | `v-model`, `options` (`SmkbSegmentedOption`), `variant`, `showShortLabel` |
+| `SmkbInput` | Text / number / email / password fields | `v-model`, `type`, `status`, `message`, `size`, `iconLeft/Right` |
+| `SmkbSelect` | Dropdown option picker | `v-model`, `options`, `placeholder`, `status`, `message` |
+| `SmkbAutocomplete` | Type-ahead / combobox | `v-model`, `options`, `minChars`, `openOnFocus`, `status` |
+| `SmkbCheckbox` | Boolean or grouped checkboxes | `v-model`, `value`, `label`, `indeterminate` |
+| `SmkbRadio` | Single-selection radio group | `v-model`, `value`, `label`, `name` |
+| `SmkbSwitch` | Toggle on/off | `v-model`, `label`, `size` |
+| `SmkbSlider` | Numeric range input | `v-model`, `min`, `max`, `step` |
+| `SmkbField` | Label + control + message wrapper | `label`, `message`, `status`, `required`, `horizontal` |
+| `SmkbDialog` | Modal dialogs / confirmations | `v-model:open`, `title`, `size`, `closable`, slots: `footer({close})` |
+| `SmkbModal` | Alias for SmkbDialog | Same as SmkbDialog |
+| `SmkbTable` | Data tables | `data`, `columns`, `loading`, `paginated`, `striped`, `hoverable` |
+| `SmkbPagination` | Page navigation | `v-model:currentPage`, `total`, `perPage` |
+| `SmkbTabs` | Tab navigation | `v-model`, `tabs` (array of {label, value}) |
+| `SmkbSteps` | Step/progress indicator | `v-model`, `steps` (array of {label}), `clickable` |
+| `SmkbCollapse` | Accordion / expand-collapse | `v-model:open`, `title`, slot: `trigger` |
+| `SmkbDropdown` | Contextual menus / dropdowns | `v-model:open`, `closeOnClick`, slots: `trigger`, `default` |
+| `SmkbTooltip` | Hover/focus tooltip | `label`, `position` (top/bottom/left/right), `delay` |
+| `SmkbSidebar` | Off-canvas sidebar / drawer | `v-model:open`, `position` (left/right), `closable` |
+| `SmkbNotification` | Toast / banner alerts | `variant`, `closable`, `duration`, `message` |
+| `SmkbLoading` | Loading overlay / spinner | `active`, `fullPage`, `label` |
+| `SmkbSkeleton` | Content placeholder while loading | `count`, `width`, `height`, `circle`, `animated` |
+| `SmkbIcon` | SVG icons from files in the library (`src/icons/svg/`) | `icon` (id matching `*.svg`), `size`, or **default slot** for custom SVG |
+| `SmkbLogo` | SMKB brand logo | `lang` (heb/eng), `layout` (horizontal/vertical/icon), `theme` (auto/light/dark), `width` |
+| `SmkbAppHeader` | Fixed application header | `headerItems`, `menuItems`, `v-model` (lang), `languages`, `showLanguage`, `showAccessibility`, slots: `logo`, `actions` |
+| `SmkbAccessibility` | Accessibility toolbar (trigger + side panel) | `lang` (he/en), `showTrigger` (true), `v-model:open` |
+| `SmkbTableColumn` | Column definition child for SmkbTable | `field`, `label`, `sortable`, `width`, `align` |
+
+→ Full API (all props, emits, slots): **SMKB-UI.md § Component Catalog**
+
+---
+
+## Rule 2b — Icons (SVG files in the library)
+
+Icons are **SVG files** shipped inside `@smkb/design-ui` (`src/icons/svg/*.svg`). There is **no** Iconify or icon CDN at runtime.
+
+- **See every id:** Storybook → **Components → SmkbIcon → Icon Gallery**. In code, import `SMKB_ICON_NAMES` from `@smkb/design-ui`.
+- **Usage:** Pass `icon="home"`, `iconLeft="search"`. Underscores normalize to match filenames (`arrow_back` → `arrow-back.svg`).
+- **Custom SVG:** Use the **default slot** on `SmkbIcon` with inline `<svg>…</svg>` when you don’t need a shared library icon.
+- **New icon:** Add `your-icon.svg` under the library’s `src/icons/svg/`, then rebuild `@smkb/design-ui`. Optional maintainer script: `pnpm run generate-svg-icons` in that package (refreshes SVG bodies from Iconify’s API; requires network).
+
+---
+
+## Rule 3 — Read the documentation before UI work
+
+At the start of any task that involves UI, forms, layout, or styling:
+
+1. Read **SMKB-UI.md** (in this project root) — it contains the full token reference and complete component API
+2. Confirm which components and tokens are relevant to the task
+3. Proceed with implementation using only SMKB components and tokens
+
+---
+
+## Rule 4 — Setup requirements
+
+Every app that uses this library must import these in order in the entry point (`main.ts`):
+
+```ts
+import '@smkb/design-ui/tokens.css'       // Layer 1+2 tokens (light theme, custom fonts)
+import '@smkb/design-ui/tokens-dark.css'  // Dark theme overrides
+import '@smkb/design-ui/styles'           // Component styles + base CSS
+
+import { createApp } from 'vue'
+import { createSmkb } from '@smkb/design-ui'  // Registers all components globally
+
+const app = createApp(App)
+app.use(createSmkb())
+app.mount('#app')
+```
+
+**Power Apps / strict CSP environments:** Replace `tokens.css` with `tokens-nofonts.css` to skip custom font loading (Power Apps blocks binary font assets):
+
+```ts
+import '@smkb/design-ui/tokens-nofonts.css'  // ← no @font-face, system fonts only
+import '@smkb/design-ui/tokens-dark.css'
+import '@smkb/design-ui/styles'
+```
+
+---
+
+## Rule 5 — Dark mode & RTL
+
+- **Dark mode**: Add `data-theme="dark"` to `<html>` or any ancestor element
+- **RTL**: Set `dir="rtl"` on `<html>` — all components use CSS logical properties and will flip automatically
+- `SmkbAppHeader` handles both: its language toggle sets `document.documentElement.lang` and `dir` automatically

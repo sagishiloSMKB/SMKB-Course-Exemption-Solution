@@ -1,0 +1,14 @@
+- adx_managecontentsnippets: true
+  adx_managesitemarkers: true
+  adx_manageweblinksets: true
+  adx_name: Administrative access
+  adx_previewunpublishedentities: true
+  adx_websiteaccess_webrole:
+  - 3cd9d569-a0e4-43c9-b8cc-d58a9d8c88c8
+  adx_websiteaccessid: 391bfe84-99a9-4887-831f-773cb246cbe3
+- adx_managecontentsnippets: false
+  adx_managesitemarkers: false
+  adx_manageweblinksets: false
+  adx_name: Preview access
+  adx_previewunpublishedentities: true
+  adx_websiteaccessid: 8b4fcfa8-5e38-46a4-887b-6f2a82e18b2f
