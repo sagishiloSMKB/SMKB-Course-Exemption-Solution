@@ -1,26 +1,26 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <forms xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <systemform>
-    <formid>{bb000002-0000-0000-0000-000000000000}</formid>
+    <formid>{8595077e-7d34-4620-9a12-517e1faf9243}</formid>
     <IntroducedVersion>1.0</IntroducedVersion>
     <FormPresentation>1</FormPresentation>
     <FormActivationState>1</FormActivationState>
     <form>
       <tabs>
-        <tab verticallayout="true" id="{bb000002-0000-0000-0000-000000000010}" IsUserDefined="0">
+        <tab verticallayout="true" id="{33c62bf9-1db5-4cc0-8651-327daebded86}" IsUserDefined="0">
           <labels>
             <label description="CardTab" languagecode="1033" />
           </labels>
           <columns>
             <column width="100%">
               <sections>
-                <section showlabel="false" showbar="false" IsUserDefined="0" id="{bb000002-0000-0000-0000-000000000020}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardHeader">
+                <section showlabel="false" showbar="false" IsUserDefined="0" id="{aa000002-0000-0000-0000-000000000020}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardHeader">
                   <labels>
                     <label description="CardHeader" languagecode="1033" />
                   </labels>
                   <rows>
                     <row>
-                      <cell id="{bb000002-0000-0000-0000-000000000030}">
+                      <cell id="{aa000002-0000-0000-0000-000000000030}">
                         <labels>
                           <label description="Status Reason" languagecode="1033" />
                         </labels>
@@ -29,13 +29,13 @@
                     </row>
                   </rows>
                 </section>
-                <section showlabel="false" showbar="false" IsUserDefined="0" id="{bb000002-0000-0000-0000-000000000021}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardDetails">
+                <section showlabel="false" showbar="false" IsUserDefined="0" id="{aa000002-0000-0000-0000-000000000021}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardDetails">
                   <labels>
                     <label description="CardDetails" languagecode="1033" />
                   </labels>
                   <rows>
                     <row>
-                      <cell id="{bb000002-0000-0000-0000-000000000031}">
+                      <cell id="{aa000002-0000-0000-0000-000000000031}">
                         <labels>
                           <label description="Name" languagecode="1033" />
                         </labels>
@@ -44,13 +44,13 @@
                     </row>
                   </rows>
                 </section>
-                <section showlabel="false" showbar="false" IsUserDefined="0" id="{bb000002-0000-0000-0000-000000000022}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardLineItem1">
+                <section showlabel="false" showbar="false" IsUserDefined="0" id="{aa000002-0000-0000-0000-000000000022}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardLineItem1">
                   <labels>
                     <label description="CardLineItem1" languagecode="1033" />
                   </labels>
                   <rows>
                     <row>
-                      <cell id="{bb000002-0000-0000-0000-000000000032}" colspan="1">
+                      <cell id="{aa000002-0000-0000-0000-000000000032}" colspan="1">
                         <labels>
                           <label description="" languagecode="1033" />
                         </labels>
@@ -58,13 +58,13 @@
                     </row>
                   </rows>
                 </section>
-                <section showlabel="false" showbar="false" IsUserDefined="0" id="{bb000002-0000-0000-0000-000000000023}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardLineItem2">
+                <section showlabel="false" showbar="false" IsUserDefined="0" id="{aa000002-0000-0000-0000-000000000023}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardLineItem2">
                   <labels>
                     <label description="CardLineItem2" languagecode="1033" />
                   </labels>
                   <rows>
                     <row>
-                      <cell id="{bb000002-0000-0000-0000-000000000033}" colspan="1">
+                      <cell id="{aa000002-0000-0000-0000-000000000033}" colspan="1">
                         <labels>
                           <label description="" languagecode="1033" />
                         </labels>

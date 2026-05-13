@@ -21,13 +21,13 @@
 # that contains the flow. It is NOT the same as the Power Automate flow ID in
 # the browser URL (v1/{envId}/{flowId}).
 # To add an existing (non-solution-aware) flow to this solution without re-importing:
-#   pac solution add-solution-component --environment $targetEnv \
-#       --solutionUniqueName YourSolutionName \
+#   pac solution add-solution-component --environment $targetEnv `
+#       --solutionUniqueName YourSolutionName `
 #       --component <Dataverse-GUID> --componentType 29
 #
 # PREREQUISITES
 # =============
-# pac CLI installed and authenticated (pac auth select --name SMKB-Apps-Dev profile).
+# pac CLI installed and authenticated to https://org229c958d.crm4.dynamics.com/
 
 param(
     [string]$TargetEnv = "https://org229c958d.crm4.dynamics.com/"
@@ -35,18 +35,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ── Environment guard ─────────────────────────────────────────────────────────
+# -- Environment guard --------------------------------------------------------
 # Direct deployment is allowed to SMKB-Apps-Dev only.
-# Stage and Production are promoted via Power Platform Pipeline — never via this script.
+# Stage and Production are promoted via Power Platform Pipeline - never via this script.
 $allowedEnv = "https://org229c958d.crm4.dynamics.com/"
 if ($TargetEnv -ne $allowedEnv) {
-    Write-Host "`nDEPLOY BLOCKED — This script only deploys to SMKB-Apps-Dev." -ForegroundColor Red
+    Write-Host "`nDEPLOY BLOCKED -- This script only deploys to SMKB-Apps-Dev." -ForegroundColor Red
     Write-Host "  Allowed:   $allowedEnv" -ForegroundColor Cyan
     Write-Host "  Attempted: $TargetEnv" -ForegroundColor Yellow
     Write-Host "`nStage and Production are promoted via Power Platform Pipeline only." -ForegroundColor Cyan
     exit 1
 }
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -55,7 +55,7 @@ $scriptDir = $PSScriptRoot
 $distDir   = Join-Path $scriptDir "_dist"
 $zipPath   = Join-Path $distDir "solution.zip"
 
-# ── Placeholder safety check ──────────────────────────────────────────────────
+# -- Placeholder safety check -------------------------------------------------
 # Blocks deployment if any template placeholders remain unreplaced.
 $placeholders = @(
     'YourSolutionName',
@@ -69,20 +69,20 @@ $placeholders = @(
     'sol_FLOW_ERROR_EMAILS'
 )
 $violations = @()
-Get-ChildItem $scriptDir -Recurse -File -Include "*.xml","*.json" |
+Get-ChildItem $scriptDir -Recurse -File -Include "*.xml","*.json" -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -notmatch '_dist' } | ForEach-Object {
-        $c = Get-Content $_.FullName -Raw
+        $c = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
         foreach ($p in $placeholders) {
             if ($c -match $p) { $violations += "  '$p'  in  $($_.Name)" }
         }
     }
 if ($violations) {
-    Write-Host "`nDEPLOY BLOCKED — Unreplaced placeholders found:" -ForegroundColor Red
+    Write-Host "`nDEPLOY BLOCKED -- Unreplaced placeholders found:" -ForegroundColor Red
     $violations | Select-Object -Unique | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
     Write-Host "`nComplete the Activation Guide in README.md before deploying.`n" -ForegroundColor Cyan
     exit 1
 }
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 if (-not (Test-Path $distDir)) { New-Item -ItemType Directory -Path $distDir | Out-Null }
 if (Test-Path $zipPath) { Remove-Item $zipPath }
@@ -109,7 +109,7 @@ Add-ZipText $archive "[Content_Types].xml" @'
 </Types>
 '@
 
-# customizations.xml — Workflows section MUST be childless for Cloud Flows
+# customizations.xml -- Workflows section MUST be childless for Cloud Flows
 Add-ZipText $archive "customizations.xml" @'
 <?xml version="1.0" encoding="utf-8"?>
 <ImportExportXml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">

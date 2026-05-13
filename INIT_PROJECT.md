@@ -20,11 +20,38 @@ This guide walks through the **one-time setup** required when you clone this sta
 
 ---
 
+## Before You Start — Prerequisites
+
+Verify all tools are installed before beginning:
+
+```powershell
+node --version    # Must be 20+
+pnpm --version    # Must be 8+  (npm i -g pnpm if missing)
+pac --version     # PAC CLI     (download from Microsoft if missing)
+```
+
+**PAC CLI authentication:**
+
+```powershell
+pac auth list
+```
+
+The active profile (`*`) must target `https://org229c958d.crm4.dynamics.com/` (SMKB-Apps-Dev). If no profile exists:
+
+```powershell
+pac auth create --url https://org229c958d.crm4.dynamics.com/
+```
+
+> **Warning:** The PAC profile named "SMKB-Apps-Dev" incorrectly targets `org1dce1895` (Seminar Hakibutzim College), NOT SMKB-Apps-Dev. Always verify the active profile URL before proceeding. If the wrong profile is active: `pac auth select --index <N>` where N is the index from `pac auth list`.
+
+---
+
 ## The Steps
 
 ### Step 1 — Confirm this is a fresh clone
 
-Run:
+First, record the current remote URL so you know exactly what you're removing:
+
 ```powershell
 git remote get-url origin
 ```
@@ -125,19 +152,21 @@ git remote -v
 
 ---
 
-### Step 6 — Select which starters to activate
+### Step 6 — Starters are determined by specifications
 
-Ask the developer which of the 5 starters this solution needs:
+Do NOT select starters before gathering specifications — choosing starters from a generic checklist before understanding the solution leads to wrong activations (e.g. activating Flows before confirming any flows are actually needed).
 
-| Starter | Activate when… |
-|---------|---------------|
-| Dataverse Tables | The solution stores data in custom Dataverse tables |
-| Environmental Variables | The solution has config values that differ per environment |
-| Cloud Flows | The solution includes automated flows or Power Pages-triggered logic |
-| Power App | The solution needs a staff/admin-facing interface inside Power Apps |
-| Power Pages | The solution includes a public-facing or internal web portal |
+**Starters are activated in Step 9, after specifications are gathered in Step 8.** The agent derives which starters to activate from the spec content:
 
-Starters that are NOT selected must remain completely untouched — do not rename them, do not modify any files, do not deploy them.
+| If the solution needs... | Activate... |
+|--------------------------|------------|
+| Custom Dataverse tables | Dataverse Tables Starter |
+| Config values that differ per environment | Environmental Variables Starter |
+| Automated flows or Power Pages-triggered logic | Cloud Flows Starter |
+| Staff/admin-facing interface inside Power Apps | Power Apps Starter |
+| Public-facing or internal web portal | Power Pages Starter |
+
+Starters that are NOT activated must remain completely untouched — do not rename them, do not modify any files, do not deploy them.
 
 ---
 
@@ -179,9 +208,9 @@ The Component Name you choose here must be consistent across three places:
 **Multiple sites and apps:** A solution can have more than one Power Pages starter and more than one Power Apps starter. Each gets its own descriptive name — never reuse the same folder for two different functions:
 
 ```
-SMKB - Events RSVP - Power Page          ← public registration form
-SMKB - Events Admin Portal - Power Page  ← staff event management portal
-SMKB - Events Backoffice - Power App     ← internal management app
+SMKB - Events RSVP - Power Page          <- public registration form
+SMKB - Events Admin Portal - Power Page  <- staff event management portal
+SMKB - Events Backoffice - Power App     <- internal management app
 ```
 
 Renaming does not break any deploy script — all scripts use `$PSScriptRoot`.
@@ -193,7 +222,7 @@ Renaming does not break any deploy script — all scripts use `$PSScriptRoot`.
 For each activated starter, collect enough detail to drive placeholder replacements and implementation. Ask the developer:
 
 **For each Table:**
-- Entity name and display name (e.g., `evt_session`, "Session")
+- Entity name and display name (e.g., `evt_session`, "CIF Session" — include a solution prefix in the display name to avoid ambiguity in shared environments)
 - Key fields: name, type, required/optional
 - Relationships to other tables (if any)
 
@@ -230,17 +259,61 @@ For each activated starter, collect enough detail to drive placeholder replaceme
 Using the specifications from Step 8, build a structured plan covering:
 
 1. **Solution identity summary** — all the values gathered in Step 2 in one place
-2. **Per-starter replacement checklist** — exact string-by-string placeholder replacements for each activated starter
-3. **Schema details** — table column definitions, flow logic pseudocode, env var defaults
-4. **Development sequence** — which starter to implement first (follow Critical Rule 4 in CLAUDE.md: Tables → Env Vars → Flows → Power Pages)
+2. **Starters to activate** — derived from Step 8 specs, with the folder rename for each
+3. **Per-starter replacement checklist** — exact string-by-string placeholder replacements for each activated starter
+4. **Schema details** — table column definitions, flow logic pseudocode, env var defaults
+5. **Development sequence** — which starter to implement first (follow Critical Rule 4 in CLAUDE.md: Tables -> Env Vars -> Flows -> Power Pages)
 
 Present the complete plan to the developer for confirmation before beginning any implementation.
 
 ---
 
-### Step 10 — Commit the initialized state
+### Step 10 — Post-implementation placeholder scan
 
-After folder renames are done (Step 7) and the developer has confirmed the plan (Step 9):
+After all placeholder replacements are done for every activated starter, run a full scan to verify nothing was missed:
+
+```powershell
+$patterns = @(
+    'YourSolutionName', 'Your Solution Name',
+    'sol_example_table', 'sol_EXAMPLE_VAR', 'your-default-value-here',
+    'sol_example_flow', '00000000-0000-0000-0000-000000000001',
+    '\[yourid\]', '\[REPLACE', '\[sol\]',
+    'sol_example_item', 'Your App Display Name',
+    'TODO-your-portal', 'TODO-get-from-pac-pages-list'
+)
+Get-ChildItem "." -Recurse -File -Include "*.xml","*.json","*.ts","*.vue","*.ps1","*.html","*.yml" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch '_dist|node_modules|\.git' } |
+    ForEach-Object {
+        $file = $_
+        foreach ($p in $patterns) {
+            if ((Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue) -match $p) {
+                Write-Host "PLACEHOLDER FOUND: '$p' in $($file.Name)"
+            }
+        }
+    }
+```
+
+If the command outputs nothing, all placeholders are replaced.
+
+---
+
+### Step 11 — Add Power Pages site to solution (if Power Pages was activated)
+
+After `pnpm deploy` for the Power Pages starter, the site record exists in Dataverse but is NOT yet linked to the Power Platform solution. Without this step, the site will not travel through the pipeline to Stage and Prod.
+
+In Power Apps Maker ([make.powerapps.com](https://make.powerapps.com)):
+1. Open your solution
+2. Click **Add Existing**
+3. Select **Power Pages** -> select your newly deployed site
+4. Save
+
+This links the site record to the solution so it is included in the next pipeline promotion.
+
+---
+
+### Step 12 — Commit the initialized state
+
+After folder renames are done (Step 7), the scan is clean (Step 10), and the Power Pages linkage is done (Step 11):
 
 ```powershell
 git add -A

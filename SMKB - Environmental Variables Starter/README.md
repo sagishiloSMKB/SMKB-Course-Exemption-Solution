@@ -65,6 +65,15 @@ For **each variable** your solution needs:
 
 4. After creating all your real variable folders, **delete** the `sol_EXAMPLE_VAR` template folder (it should not be deployed).
 5. If your solution uses Cloud Flows, **rename** (do not delete) `sol_ENVIRONMENT_NAME` and `sol_FLOW_ERROR_EMAILS` to your prefix — they are required by the example flow and should be kept. See the "ALM-Required Variables" section below.
+6. **For every variable folder you created**, add a `<RootComponent>` entry to `Other/Solution.xml`:
+
+```xml
+<RootComponent type="380" schemaName="EVT_PORTAL_BASE_URL" behavior="0" />
+```
+
+The `schemaName` must exactly match the folder name under `environmentvariabledefinitions/`. A template comment in `Other/Solution.xml` shows the format.
+
+> **Why this matters:** Without this entry, the definition is imported to Dataverse but is **not linked to the solution**. When the solution is promoted through the pipeline, the env var definition does not travel with it — Stage and Prod environments never receive the definition.
 
 ### Step 4 — Verify no placeholders remain
 

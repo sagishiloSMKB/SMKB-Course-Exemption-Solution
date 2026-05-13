@@ -1,22 +1,27 @@
 import { getClient } from "@microsoft/power-apps/data";
-import type { ExampleItem } from "../types/ExampleItem";
 
-// Replace 'sol_example_items' below with your table's OData entity set name.
-// The entity set name is usually the table logical name + 's' (e.g. evt_sessions).
-// You can confirm it from the table definition in the Power Platform admin center.
+// Replace TABLE with your table's OData entity set name.
+// The entity set name is the table logical name + 's' (e.g. evt_sessions).
+// Confirm it from the table definition in Power Platform admin center.
 const TABLE = "sol_example_items";
 
-export async function getItems(): Promise<ExampleItem[]> {
-  const client = getClient();
-  const result = await client.executeAsync({
-    method: "GET",
-    entitySetName: TABLE,
-    queryParameters: "$orderby=createdon desc",
-  });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (result.value as any[]).map((r) => ({
-    id: r.sol_example_itemid,
-    name: r.sol_name ?? "",
-    createdAt: r.createdon ?? "",
-  }));
+const client = getClient({});
+
+// Replace ExampleItem with your actual record type.
+// Field names must match the Dataverse column logical names (e.g. sol_name, sol_status).
+export async function getItems<T = Record<string, unknown>>(): Promise<T[]> {
+  const result = await client.retrieveMultipleRecordsAsync<T>(TABLE);
+  return result.data;
+}
+
+export async function getItem<T = Record<string, unknown>>(id: string): Promise<T> {
+  return client.retrieveRecordAsync<T>(TABLE, id);
+}
+
+export async function createItem(data: Record<string, unknown>): Promise<void> {
+  await client.createRecordAsync(TABLE, data);
+}
+
+export async function updateItem(id: string, data: Record<string, unknown>): Promise<void> {
+  await client.updateRecordAsync(TABLE, id, data);
 }

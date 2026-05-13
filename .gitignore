@@ -26,6 +26,9 @@ _temp_*/
 # ── Editor / IDE ──────────────────────────────────────────────────────────────
 .vscode/
 .idea/
+.cursor/
+.fleet/
+*.code-workspace
 *.suo
 *.ntvs*
 *.njsproj

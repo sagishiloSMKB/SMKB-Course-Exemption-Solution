@@ -56,64 +56,46 @@ Before activating, confirm you have:
 ```
 Contact the platform team if you don't have this configured.
 
-### Step 3 — Create the app record in Power Apps portal
+### Step 3 — Create the app record using PAC CLI
 
-> **Critical:** `pac code push` updates an existing app record. It does NOT create one.
-> If you skip this step and run `deploy.ps1`, it will fail.
+> **Critical:** `pac code push` updates an existing app record. It does NOT create one.  
+> There is **no "New Code App" option** in the Power Apps portal. The correct way to create a Code App record is via `pac code init`.
 
-1. Go to [make.powerapps.com](https://make.powerapps.com) and select the **SMKB-Apps-Dev** environment.
-2. Open your main solution (or create one if this is a new solution).
-3. Click **New → App → Canvas app** → name it (e.g. `SMKB Events Backoffice`) → Create.
-4. Close the Power Apps Studio — you don't need to build anything here.
-5. Get the **App ID** from the URL:
-   ```
-   https://make.powerapps.com/environments/{environmentId}/apps/{appId}/edit
-   ```
-   Copy `{appId}` (the GUID after `/apps/`).
+Run `pac code init` in the starter folder. This creates the Dataverse app record in SMKB-Apps-Dev and writes the real values into `power.config.json` automatically:
 
-### Step 4 — Run `pac code sync` (recommended) or manually update config
-
-**Recommended path — `pac code sync`:**
-
-After creating the app and connecting Dataverse to it, run:
 ```powershell
-pac auth select --environment "https://org229c958d.crm4.dynamics.com/"
-pac code sync
+pac auth list
+# Confirm the active profile targets https://org229c958d.crm4.dynamics.com/
+# If not: pac auth select --index <N>
+
+pac code init --environment "https://org229c958d.crm4.dynamics.com/"
 ```
-This rewrites `power.config.json` automatically with the real `appId`, `environmentId`, and `connectionReferences` values. No manual editing needed.
 
-**Manual path — edit `power.config.json` directly:**
+When prompted, enter:
+- **App display name**: `SMKB - [Component Name] - Dev` (e.g. `SMKB - Events Backoffice - Dev`)
+- **Solution unique name**: your solution's unique name (e.g. `SMKBEventsTickets`)
 
-Replace every `[REPLACE: ...]` and placeholder GUID in `power.config.json`:
+`pac code init` overwrites `power.config.json` with the real `appId`, `environmentId`, and `connectionReferences` values. Do not edit `power.config.json` manually after this step.
 
-| Find | Replace with |
-|------|-------------|
-| `"appId": "00000000-0000-0000-0000-000000000000"` | Your App GUID from Step 3 |
-| `"appDisplayName": "Your App Display Name"` | Your app's display name (e.g. `SMKB Events Backoffice`) |
-| `"environmentId": "00000000-0000-0000-0000-000000000001"` | Your environment GUID |
-| `"00000000-0000-0000-0000-000000000002"` (connection key) | Your Dataverse connection reference key |
-| `[REPLACE: connection-id]` in `sharedConnectionId` | Your Dataverse connection instance ID |
+### Step 4 — `deploy.config.json` and `pac code sync` warning
 
-### Step 5 — Update `deploy.config.json`
-
-Replace the solution name placeholder:
+After `pac code init`, update `deploy.config.json`:
 
 | Find | Replace with |
 |------|-------------|
-| `"solutionName": "YourSolutionName"` | Your solution's unique name (e.g. `SMKBEvents`) |
+| `"solutionName": "YourSolutionName"` | Your solution's unique name (e.g. `SMKBEventsTickets`) |
 
-The `targetEnv` is locked to `https://org229c958d.crm4.dynamics.com/` (SMKB-Apps-Dev) — the deploy script will block any other value.
+> **Warning — `pac code sync` is destructive:** Running `pac code sync` overwrites `power.config.json` with values pulled from the platform. Only run it intentionally (e.g., after the app record is recreated). Never run it as a routine step — it will overwrite any manual edits you have made.
 
-### Step 6 — Replace source-level placeholders
+### Step 5 — Replace source-level placeholders and clean up starter files
 
-In the service and type files, replace the placeholder table name:
+**Replace placeholder table names** in the service and type files:
 
 | Find | Replace with | Files |
 |------|-------------|-------|
 | `sol_example_item` | Your table's logical name (e.g. `evt_session`) | `src/services/dataService.ts`, `src/types/ExampleItem.ts` |
 | `sol_example_items` | Your table's entity set name (usually logical name + `s`) | `src/services/dataService.ts` |
-| `sol_example_itemid` | Your table's primary key column name | `src/services/dataService.ts` |
-| `ExampleItem` | Your own type name (e.g. `Session`) | `src/types/ExampleItem.ts`, `src/views/HomePage.vue` |
+| `ExampleItem` | Your own type name (e.g. `Session`) | `src/types/ExampleItem.ts` |
 
 You can do the bulk rename with PowerShell:
 ```powershell
@@ -123,11 +105,22 @@ Get-ChildItem ".\src" -Recurse -File -Include "*.ts","*.vue" | ForEach-Object {
 }
 ```
 
-### Step 7 — Install dependencies
+**Important — rename or delete placeholder files:**
+
+The deploy.ps1 placeholder guard scans `src/` for the string `sol_example_item`. This means:
+- `src/types/ExampleItem.ts` — rename to your real type file (e.g. `Session.ts`), or delete it and create your own
+- `src/services/dataService.ts` — update the `TABLE` constant and function signatures to match your schema
+- `src/views/HomePage.vue` — update to use your real data types; the starter version has been left as a blank placeholder
+
+Do not leave `sol_example_item` anywhere in `src/` when you run `deploy.ps1` — it will be blocked.
+
+### Step 6 — Install dependencies
 
 ```powershell
 pnpm install
 ```
+
+> If `pnpm install` fails with `ERR_PNPM_IGNORED_BUILDS`, delete `pnpm-lock.yaml` and re-run `pnpm install`.
 
 ### Step 8 — Verify no placeholders remain
 
@@ -135,11 +128,11 @@ Run this before deploying:
 
 ```powershell
 $patterns = '00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000001','\[REPLACE','YourSolutionName','Your App Display Name','sol_example_item'
-Get-ChildItem "." -Recurse -File -Include "*.json","*.ts","*.vue" |
+Get-ChildItem "." -Recurse -File -Include "*.json","*.ts","*.vue" -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -notmatch 'node_modules|dist' } | ForEach-Object {
         $file = $_
         foreach ($p in $patterns) {
-            if ((Get-Content $file.FullName -Raw) -match $p) {
+            if ((Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue) -match $p) {
                 Write-Host "PLACEHOLDER FOUND: '$p' in $($file.Name)"
             }
         }
@@ -356,7 +349,7 @@ This script deploys to **SMKB-Apps-Dev only**. Stage and Production are promoted
 3. **Build** — Runs `pnpm run build` (`vue-tsc` type check + Vite production build → `dist/`).
 4. **Push** — Runs `pac code push --solutionName <name> --environment <url>` which uploads `dist/` into the existing Power Apps Code App record.
 
-> **Important:** `pac code push` updates an existing app. If the app record does not exist yet in the target environment, create it first (Step 3 in the Activation Guide above).
+> **Important:** `pac code push` updates an existing app. If the app record does not exist yet in the target environment, create it first using `pac code init --environment <url>` (see Step 3 in the Activation Guide above). There is no portal UI option to create a Code App — `pac code init` is the only supported method.
 
 ---
 

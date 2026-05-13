@@ -1,13 +1,13 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <forms xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <systemform>
-    <formid>{bb000003-0000-0000-0000-000000000000}</formid>
+    <formid>{08f54373-7133-4436-ad7e-b1bbc3cb245f}</formid>
     <IntroducedVersion>1.0</IntroducedVersion>
     <FormPresentation>1</FormPresentation>
     <FormActivationState>1</FormActivationState>
     <form>
       <tabs>
-        <tab verticallayout="true" id="{bb000003-0000-0000-0000-000000000010}" IsUserDefined="1">
+        <tab verticallayout="true" id="{6dfcda34-5302-4cc4-964d-ace0b7b9a289}" IsUserDefined="1">
           <labels>
             <label description="General" languagecode="1033" />
           </labels>

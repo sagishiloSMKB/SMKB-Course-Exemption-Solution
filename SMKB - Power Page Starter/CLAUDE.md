@@ -254,6 +254,36 @@ Routes:
 
 ---
 
+## Writing to Dataverse from Power Pages (CSRF Token)
+
+All anonymous POST and PATCH calls to the Dataverse OData API (`/_api/...`) require the `__RequestVerificationToken` header. Without it, Power Pages silently returns 403.
+
+**Step 1 — Inject the token via the Liquid shell** (`SMKB-App.webtemplate.source.html`):
+
+```liquid
+<script>
+  window.__SMKB_TOKEN = {{ request.request_verification_token | json }};
+</script>
+```
+
+**Step 2 — Use the scaffold** in `client/src/services/dataService.ts`:
+
+```typescript
+import { createRecord, updateRecord } from "./services/dataService";
+
+// Create a Dataverse record (anonymous — no auth required if table allows it)
+await createRecord("evt_applications", {
+  evt_name: "Jane Doe",
+  evt_email: "jane@example.com",
+});
+```
+
+The `createRecord` and `updateRecord` functions in the scaffold automatically attach `__RequestVerificationToken` to every request.
+
+**Note:** This pattern applies to anonymous writes (public portal users). Authenticated writes for logged-in users follow the same pattern — the token is still required.
+
+---
+
 ## First Deploy to a New Environment
 
 ```bash

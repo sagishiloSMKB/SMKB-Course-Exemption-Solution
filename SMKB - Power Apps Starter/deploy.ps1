@@ -6,9 +6,9 @@
 #
 # HOW IT WORKS
 # ============
-# 1. Scans all source files for unreplaced template placeholders — aborts if any are found.
+# 1. Scans all source files for unreplaced template placeholders -- aborts if any are found.
 # 2. Reads solutionName and targetEnv from deploy.config.json.
-# 3. Runs `pnpm build` (TypeScript check + Vite production build → dist/).
+# 3. Runs `pnpm build` (TypeScript check + Vite production build -> dist/).
 # 4. Runs `pac code push` to upload the built app into the existing Power Apps record.
 #
 # PREREQUISITES
@@ -16,13 +16,13 @@
 # - Node 20+ and pnpm 9+ installed
 # - PAC CLI installed and authenticated for the target environment
 # - The Power Apps Code App record must already exist in the target environment
-#   (pac code push updates an existing app — it does NOT create one)
+#   (pac code push updates an existing app -- it does NOT create one)
 # - All placeholders in power.config.json, deploy.config.json, and src/ replaced
 
 $ErrorActionPreference = "Stop"
 $scriptDir = $PSScriptRoot
 
-# ── Placeholder safety check ──────────────────────────────────────────────────
+# -- Placeholder safety check -------------------------------------------------
 # Blocks deployment if any template placeholders remain unreplaced.
 $placeholders = @(
     '00000000-0000-0000-0000-000000000000',
@@ -33,38 +33,38 @@ $placeholders = @(
     'sol_example_item'
 )
 $violations = @()
-Get-ChildItem $scriptDir -Recurse -File -Include "*.json","*.ts","*.vue" |
+Get-ChildItem $scriptDir -Recurse -File -Include "*.json","*.ts","*.vue" -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -notmatch 'node_modules|\\dist\\|_dist' } | ForEach-Object {
-        $c = Get-Content $_.FullName -Raw
+        $c = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
         foreach ($p in $placeholders) {
             if ($c -match $p) { $violations += "  '$p'  in  $($_.Name)" }
         }
     }
 if ($violations) {
-    Write-Host "`nDEPLOY BLOCKED — Unreplaced placeholders found:" -ForegroundColor Red
+    Write-Host "`nDEPLOY BLOCKED -- Unreplaced placeholders found:" -ForegroundColor Red
     $violations | Select-Object -Unique | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
     Write-Host "`nComplete the Activation Guide in README.md before deploying.`n" -ForegroundColor Cyan
     exit 1
 }
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 # Read deploy config
 $cfg     = Get-Content "$scriptDir\deploy.config.json" -Raw | ConvertFrom-Json
 $solName = $cfg.solutionName
 $envUrl  = $cfg.targetEnv
 
-# ── Environment guard ─────────────────────────────────────────────────────────
+# -- Environment guard --------------------------------------------------------
 # Direct deployment is allowed to SMKB-Apps-Dev only.
-# Stage and Production are promoted via Power Platform Pipeline — never via this script.
+# Stage and Production are promoted via Power Platform Pipeline - never via this script.
 $allowedEnv = "https://org229c958d.crm4.dynamics.com/"
 if ($envUrl -ne $allowedEnv) {
-    Write-Host "`nDEPLOY BLOCKED — This script only deploys to SMKB-Apps-Dev." -ForegroundColor Red
+    Write-Host "`nDEPLOY BLOCKED -- This script only deploys to SMKB-Apps-Dev." -ForegroundColor Red
     Write-Host "  Allowed:   $allowedEnv" -ForegroundColor Cyan
     Write-Host "  Attempted: $envUrl" -ForegroundColor Yellow
     Write-Host "`nStage and Production are promoted via Power Platform Pipeline only." -ForegroundColor Cyan
     exit 1
 }
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 Write-Host "Building..." -ForegroundColor Cyan
 Set-Location $scriptDir

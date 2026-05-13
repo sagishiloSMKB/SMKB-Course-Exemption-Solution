@@ -19,8 +19,9 @@ Each starter is an independent, reusable template. Not every solution uses all s
 
 ## SESSION START — Pre-Flight Check
 
-At the very start of every session, before applying any Critical Rule, run:
+At the very start of every session, before applying any Critical Rule, run both checks:
 
+**Check 1 — Git remote:**
 ```powershell
 git remote get-url origin
 ```
@@ -34,7 +35,21 @@ git remote get-url origin
 → Do NOT proceed with Critical Rule 1 or any other work until Init Project is complete.
 
 **If the output is a solution-specific repo (or no remote is configured):**
-→ The repo is initialized — proceed normally with Critical Rule 1 below.
+→ The repo is initialized — proceed to Check 2.
+
+**Check 2 — PAC CLI auth target:**
+```powershell
+pac auth list
+```
+
+The active profile (`*`) must target `https://org229c958d.crm4.dynamics.com/` (SMKB-Apps-Dev).
+
+> **Warning:** The PAC profile named "SMKB-Apps-Dev" incorrectly targets `org1dce1895` (Seminar Hakibutzim College). If that profile is active, select the correct one before any deploy:
+> ```powershell
+> pac auth select --index <N>   # N from pac auth list
+> ```
+
+Never run a deploy without confirming the auth target. If the wrong profile is active and a deploy runs, changes go to the wrong environment silently.
 
 ---
 
@@ -115,6 +130,16 @@ Before running `deploy.ps1` in ANY starter folder, you MUST scan that folder for
 
 Do NOT bypass the placeholder guard in `deploy.ps1`. Do NOT mark a Tables Starter deploy as complete unless the solution name and all table names have been replaced.
 
+### Env Vars — RootComponents must be populated
+
+After activating the Env Vars Starter, the `Other/Solution.xml` `<RootComponents>` block must contain a `type="380"` entry for every env var definition folder:
+
+```xml
+<RootComponent type="380" schemaName="EVT_PORTAL_BASE_URL" behavior="0" />
+```
+
+If `<RootComponents />` is self-closing or empty, env var definitions will be upserted to Dataverse but will **not be linked to the solution** — they will not travel through the pipeline to Stage and Prod. A template comment in `Other/Solution.xml` shows the format.
+
 ### Placeholder Detection Command
 
 Run this before any deploy to check a specific starter folder:
@@ -123,12 +148,12 @@ Run this before any deploy to check a specific starter folder:
 # Replace $starterPath with the starter folder path
 $starterPath = ".\SMKB - Dataverse Tables Starter"
 $patterns = 'YourSolutionName','sol_example_table','sol_EXAMPLE_VAR','your-default-value-here','sol_example_flow','00000000-0000-0000-0000-000000000001','\[yourid\]','\[REPLACE'
-Get-ChildItem $starterPath -Recurse -File -Include "*.xml","*.json","*.ps1" |
+Get-ChildItem $starterPath -Recurse -File -Include "*.xml","*.json","*.ps1" -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -notmatch '_dist' } |
     ForEach-Object {
         $file = $_
         foreach ($p in $patterns) {
-            if ((Get-Content $file.FullName -Raw) -match $p) {
+            if ((Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue) -match $p) {
                 Write-Host "PLACEHOLDER FOUND: '$p' in $($file.Name)"
             }
         }
@@ -224,7 +249,7 @@ When a solution containing flows is imported, flows are often left in a disabled
 
 **For Flows:** Do NOT use `pac solution pack` directly — it cannot include Cloud Flow JSONs. Always use the `deploy.ps1` script which builds the zip manually.
 
-**For Power Apps:** Do NOT use `pac solution pack/import`. Code Apps are deployed with `pac code push`. Requires Node 20+ and pnpm 9+. The app record must exist in the target environment before the first push (`pac code push` updates an existing record — it does NOT create one).
+**For Power Apps:** Do NOT use `pac solution pack/import`. Code Apps are deployed with `pac code push`. Requires Node 20+ and pnpm 9+. The app record must exist before the first push — `pac code push` updates an existing record, it does NOT create one. **There is no "New Code App" option in the portal.** Use `pac code init --environment "https://org229c958d.crm4.dynamics.com/"` to create the app record and populate `power.config.json` in a single step. Never try to create a Code App via the Power Apps portal UI.
 
 ---
 

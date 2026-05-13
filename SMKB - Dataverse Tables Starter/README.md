@@ -73,10 +73,11 @@ Work through the checklist below for **each active table**. The example below us
    - `optionset Name="sol_example_table_a_statecode"` → `optionset Name="evt_sessions_statecode"`
    - `optionset Name="sol_example_table_a_statuscode"` → `optionset Name="evt_sessions_statuscode"`
 3. **Update display names** in `Entity.xml`:
-   - `"Example Table A"` → `"Session"` (singular)
-   - `"Example Table A Records"` → `"Sessions"` (plural)
-4. **In form files** (`FormXml/main/`, `FormXml/card/`, `FormXml/quick/`): update `datafieldname` if it references the primary key field name.
-5. **In `SavedQueries/`**: update the entity name and primary key attribute in the fetchxml.
+   - `"Example Table A"` → `"CIF Application"` (singular — include a solution-short prefix in the display name to avoid ambiguity in shared environments, e.g. `CIF Application` not just `Application`)
+   - `"Example Table A Records"` → `"CIF Applications"` (plural)
+4. **In form files** (`FormXml/main/`, `FormXml/card/`, `FormXml/quick/`): update `datafieldname` attributes that reference the old primary key field name (e.g. `sol_example_table_aid` -> `evt_sessionsid`). The bulk `-replace` command in Step 3 handles this automatically.
+5. **In `SavedQueries/`**: update the entity name and primary key attribute in the fetchxml. The bulk `-replace` covers this too.
+6. **GUID files**: When copying an entity folder to create a new table, generate fresh random GUIDs for all `FormXml/*.xml` and `SavedQueries/*.xml` filenames and their internal ID elements. Re-using the same GUIDs causes "Cannot insert duplicate key" on re-import. Use PowerShell to generate: `[System.Guid]::NewGuid().ToString()`
 
 > **Tip:** Use PowerShell's `-replace` to do the bulk rename in a single command:
 > ```powershell
@@ -264,13 +265,13 @@ This script deploys to **SMKB-Apps-Dev only**. Stage and Production are promoted
 | XML `<Type>` | Dataverse type | Notes |
 |-------------|----------------|-------|
 | `nvarchar` | Text | Set `<MaxLength>` and `<Length>` |
+| `ntext` | Multiline text (Memo) | Use `ntext`, **not** `memo` or `Memo` — wrong value causes "Unable to find attribute type by name" on import |
 | `int` | Whole number | |
 | `decimal` | Decimal | |
 | `datetime` | Date/Time | Set `<Format>` and `<Behavior>` |
 | `boolean` | Two options (Yes/No) | |
 | `lookup` | Lookup | Set `<LookupTypes>` |
 | `picklist` | Choice | Include `<optionset>` |
-| `memo` | Multiline text | |
 | `money` | Currency | |
 
 ---

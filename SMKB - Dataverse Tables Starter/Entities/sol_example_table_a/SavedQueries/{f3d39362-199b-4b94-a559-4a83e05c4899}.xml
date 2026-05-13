@@ -6,7 +6,7 @@
     <isquickfindquery>0</isquickfindquery>
     <isprivate>0</isprivate>
     <isdefault>1</isdefault>
-    <savedqueryid>{aa000004-0000-0000-0000-000000000000}</savedqueryid>
+    <savedqueryid>{f3d39362-199b-4b94-a559-4a83e05c4899}</savedqueryid>
     <layoutxml>
       <grid name="resultset" jump="smkb_name" select="1" icon="1" preview="1">
         <row name="result" id="sol_example_table_aid">
