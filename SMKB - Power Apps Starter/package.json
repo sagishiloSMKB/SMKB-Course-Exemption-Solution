@@ -1,0 +1,25 @@
+{
+  "name": "smkb-power-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@microsoft/power-apps": "^1.0.3",
+    "@smkb/design-ui": "^0.16.0",
+    "vue": "^3.5.13",
+    "vue-router": "^5.0.4"
+  },
+  "devDependencies": {
+    "@microsoft/power-apps-vite": "^1.0.2",
+    "@types/node": "^25.6.0",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.6.3",
+    "vite": "^6.0.0",
+    "vue-tsc": "^2.2.0"
+  }
+}

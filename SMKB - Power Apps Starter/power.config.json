@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "appId": "00000000-0000-0000-0000-000000000000",
+  "appDisplayName": "Your App Display Name",
+  "region": "prod",
+  "environmentId": "00000000-0000-0000-0000-000000000001",
+  "description": "",
+  "buildPath": "./dist",
+  "buildEntryPoint": "index.html",
+  "localAppUrl": "http://localhost:3000",
+  "connectionReferences": {
+    "00000000-0000-0000-0000-000000000002": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+      "displayName": "Microsoft Dataverse",
+      "dataSources": ["commondataserviceforapps"],
+      "authenticationType": "Oauth",
+      "sharedConnectionId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps/connections/[REPLACE: connection-id]",
+      "dataSets": {}
+    }
+  },
+  "databaseReferences": {}
+}

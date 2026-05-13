@@ -1,0 +1,37 @@
+# ── Build artifacts ───────────────────────────────────────────────────────────
+# _dist/ — PAC CLI solution zip staging (Tables, Flows, Env Vars starters)
+_dist/
+# dist/  — Vite/SPA build output (Power Apps, Power Pages starters)
+dist/
+*.zip
+
+# ── Node.js ───────────────────────────────────────────────────────────────────
+node_modules/
+*.tsbuildinfo
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env.local
+.env.*.local
+
+# ── Log files ─────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── PAC CLI / Power Platform exports ──────────────────────────────────────────
+_temp_*/
+
+# ── Editor / IDE ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

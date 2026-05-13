@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<forms xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <systemform>
+    <formid>{aa000002-0000-0000-0000-000000000000}</formid>
+    <IntroducedVersion>1.0</IntroducedVersion>
+    <FormPresentation>1</FormPresentation>
+    <FormActivationState>1</FormActivationState>
+    <form>
+      <tabs>
+        <tab verticallayout="true" id="{aa000002-0000-0000-0000-000000000010}" IsUserDefined="0">
+          <labels>
+            <label description="CardTab" languagecode="1033" />
+          </labels>
+          <columns>
+            <column width="100%">
+              <sections>
+                <section showlabel="false" showbar="false" IsUserDefined="0" id="{aa000002-0000-0000-0000-000000000020}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardHeader">
+                  <labels>
+                    <label description="CardHeader" languagecode="1033" />
+                  </labels>
+                  <rows>
+                    <row>
+                      <cell id="{aa000002-0000-0000-0000-000000000030}">
+                        <labels>
+                          <label description="Status Reason" languagecode="1033" />
+                        </labels>
+                        <control id="statuscode" classid="{5D68B988-0661-4db2-BC3E-17598AD3BE6C}" datafieldname="statuscode" />
+                      </cell>
+                    </row>
+                  </rows>
+                </section>
+                <section showlabel="false" showbar="false" IsUserDefined="0" id="{aa000002-0000-0000-0000-000000000021}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardDetails">
+                  <labels>
+                    <label description="CardDetails" languagecode="1033" />
+                  </labels>
+                  <rows>
+                    <row>
+                      <cell id="{aa000002-0000-0000-0000-000000000031}">
+                        <labels>
+                          <label description="Name" languagecode="1033" />
+                        </labels>
+                        <control id="smkb_name" classid="{4273EDBD-AC1D-40d3-9FB2-095C621B552D}" datafieldname="smkb_name" />
+                      </cell>
+                    </row>
+                  </rows>
+                </section>
+                <section showlabel="false" showbar="false" IsUserDefined="0" id="{aa000002-0000-0000-0000-000000000022}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardLineItem1">
+                  <labels>
+                    <label description="CardLineItem1" languagecode="1033" />
+                  </labels>
+                  <rows>
+                    <row>
+                      <cell id="{aa000002-0000-0000-0000-000000000032}" colspan="1">
+                        <labels>
+                          <label description="" languagecode="1033" />
+                        </labels>
+                      </cell>
+                    </row>
+                  </rows>
+                </section>
+                <section showlabel="false" showbar="false" IsUserDefined="0" id="{aa000002-0000-0000-0000-000000000023}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left" name="CardLineItem2">
+                  <labels>
+                    <label description="CardLineItem2" languagecode="1033" />
+                  </labels>
+                  <rows>
+                    <row>
+                      <cell id="{aa000002-0000-0000-0000-000000000033}" colspan="1">
+                        <labels>
+                          <label description="" languagecode="1033" />
+                        </labels>
+                      </cell>
+                    </row>
+                  </rows>
+                </section>
+              </sections>
+            </column>
+          </columns>
+        </tab>
+      </tabs>
+    </form>
+    <IsCustomizable>1</IsCustomizable>
+    <CanBeDeleted>1</CanBeDeleted>
+    <LocalizedNames>
+      <LocalizedName description="Card" languagecode="1033" />
+    </LocalizedNames>
+  </systemform>
+</forms>

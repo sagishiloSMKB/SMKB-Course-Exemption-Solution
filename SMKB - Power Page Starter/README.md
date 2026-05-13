@@ -6,6 +6,26 @@ Use this as a starting point for any new Power Pages project.
 
 ---
 
+## Step 0 — Rename This Folder
+
+When activating this starter for a specific solution, rename the folder from `SMKB - Power Page Starter` to match your solution:
+
+```
+SMKB - [Component Name] - Power Page
+```
+
+| What to fill in | Example |
+|----------------|---------|
+| Component Name — describes the portal this site provides | `Events RSVP`, `Scholarship Portal` |
+
+Full example rename: `SMKB - Events RSVP - Power Page`
+
+Renaming this folder does not affect deployment — `deploy.mjs` uses a relative path constant (`PAGES_SUBDIR`) inside the script, not the parent folder name.
+
+> Note: there is also a **separate** rename inside this folder — the `powerpages/your-portal---your-portal-dev/` subfolder must be renamed to match your actual portal subdomain (see First Deploy below). These are two independent renames.
+
+---
+
 ## Architecture
 
 | Layer | Technology | Location | Purpose |

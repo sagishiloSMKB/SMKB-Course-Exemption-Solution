@@ -1,0 +1,101 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_office365_[yourid]": {
+        "runtimeSource": "invoker",
+        "connection": {},
+        "api": {
+          "name": "shared_office365"
+        }
+      },
+      "shared_commondataserviceforapps_[yourid]": {
+        "runtimeSource": "invoker",
+        "connection": {},
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "PowerPages",
+          "description": "Power Pages trigger — only callable from your Power Pages site. Replace input schema properties with the fields your site will POST.",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "recipient": {
+                  "type": "string",
+                  "description": "REPLACE: email address of the recipient"
+                },
+                "exampleParam": {
+                  "type": "string",
+                  "description": "REPLACE: add or remove parameters as needed"
+                }
+              },
+              "required": [
+                "recipient"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Send_an_email": {
+          "type": "OpenApiConnection",
+          "description": "REPLACE: update connectionName, From address, To, Subject, and Body for your solution. Convention: send from [sol]NoReply@yourdomain.com using the 'Power Pages User 1' connection.",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_office365_[yourid]",
+              "operationId": "SendEmailV2",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+            },
+            "parameters": {
+              "emailMessage/From": "[sol]NoReply@yourdomain.com",
+              "emailMessage/To": "@triggerBody()?['recipient']",
+              "emailMessage/Subject": "[REPLACE: email subject]",
+              "emailMessage/Body": "<p>[REPLACE: email body HTML]</p>",
+              "emailMessage/Importance": "Normal"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {}
+        },
+        "Respond_to_PowerPages": {
+          "type": "Response",
+          "description": "Return a JSON response to the Power Pages caller.",
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "status": "ok"
+            }
+          },
+          "runAfter": {
+            "Send_an_email": [
+              "Succeeded"
+            ]
+          }
+        }
+      }
+    },
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "description": "STARTER TEMPLATE — replace 'sol' with your solution short name and update all [REPLACE] placeholders before deploying.",
+    "displayName": "sol_example_flow",
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}
