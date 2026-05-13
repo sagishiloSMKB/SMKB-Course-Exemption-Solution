@@ -102,7 +102,7 @@ Replace the solution name placeholder:
 |------|-------------|
 | `"solutionName": "YourSolutionName"` | Your solution's unique name (e.g. `SMKBEvents`) |
 
-The `targetEnv` default is already set to `https://org229c958d.crm4.dynamics.com/` (SMKB-Apps-Dev). Change it only if deploying to a different environment.
+The `targetEnv` is locked to `https://org229c958d.crm4.dynamics.com/` (SMKB-Apps-Dev) — the deploy script will block any other value.
 
 ### Step 6 — Replace source-level placeholders
 
@@ -332,24 +332,20 @@ Use token variables in scoped `<style>` blocks instead of raw values:
 ## Running `deploy.ps1`
 
 ```powershell
-# Default: deploys to SMKB-Apps-Dev (reads targetEnv from deploy.config.json)
+# Deploys to SMKB-Apps-Dev (reads targetEnv from deploy.config.json)
 powershell -ExecutionPolicy Bypass -File deploy.ps1
 ```
 
-To deploy to a different environment, edit `deploy.config.json` before running, or temporarily override:
-```powershell
-# Edit deploy.config.json targetEnv, then:
-powershell -ExecutionPolicy Bypass -File deploy.ps1
-```
+This script deploys to **SMKB-Apps-Dev only**. Stage and Production are promoted via Power Platform Pipeline — the script will block any other `targetEnv` value.
 
-| Environment | Dataverse URL |
-|-------------|---------------|
-| Dev | `https://org229c958d.crm4.dynamics.com/` |
-| Stage | `https://smkb-apps-stage.crm4.dynamics.com/` |
-| Prod | `https://skmb-apps-prod.crm4.dynamics.com/` |
+| Environment | Dataverse URL | Deploy method |
+|-------------|---------------|---------------|
+| Dev | `https://org229c958d.crm4.dynamics.com/` | This script |
+| Stage | — | Power Platform Pipeline only |
+| Prod | — | Power Platform Pipeline only |
 
 > **Note:** The PAC CLI profile named "SMKB-Apps-Dev" incorrectly targets `org1dce1895`.  
-> Always rely on the `targetEnv` in `deploy.config.json` or pass `--environment` explicitly.
+> Always rely on the `targetEnv` in `deploy.config.json`.
 
 ---
 

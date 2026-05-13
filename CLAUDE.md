@@ -231,8 +231,10 @@ Or rely on the default URL already configured in each `deploy.ps1` (which hardco
 
 ## Environment Reference
 
-| Environment | URL | Use for |
-|-------------|-----|---------|
-| SMKB-Apps-Dev | `https://org229c958d.crm4.dynamics.com/` | Development and testing |
-| SMKB-Apps-Stage | `https://smkb-apps-stage.crm4.dynamics.com/` | Staging / UAT |
-| SMKB-Apps-Prod | `https://skmb-apps-prod.crm4.dynamics.com/` | Production |
+> **Deploy scripts in this starter kit only target SMKB-Apps-Dev.** Never pass a Stage or Production URL to any deploy script — the scripts will block it. Stage and Production are managed through Power Platform Pipeline only.
+
+| Environment | URL | Deploy method |
+|-------------|-----|---------------|
+| SMKB-Apps-Dev | `https://org229c958d.crm4.dynamics.com/` | Direct (`deploy.ps1` / `pnpm deploy`) |
+| SMKB-Apps-Stage | — | Power Platform Pipeline only |
+| SMKB-Apps-Prod | — | Power Platform Pipeline only |

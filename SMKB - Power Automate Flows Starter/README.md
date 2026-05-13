@@ -225,21 +225,20 @@ Minimal process:
 ## Running `deploy.ps1`
 
 ```powershell
-# Default: deploys to SMKB-Apps-Dev
+# Deploys to SMKB-Apps-Dev (the only allowed target)
 powershell -ExecutionPolicy Bypass -File deploy.ps1
-
-# Target a different environment
-powershell -ExecutionPolicy Bypass -File deploy.ps1 -TargetEnv "https://smkb-apps-stage.crm4.dynamics.com/"
 ```
 
-> **Note:** The PAC auth profile named "SMKB-Apps-Dev" incorrectly targets `org1dce1895`.  
-> Always use the `-TargetEnv` URL explicitly or rely on the default in `deploy.ps1`.
+This script deploys to **SMKB-Apps-Dev only**. Stage and Production are promoted via Power Platform Pipeline — the script will block any other target.
 
-| Environment   | Dataverse URL                                    |
-|---------------|--------------------------------------------------|
-| Dev           | `https://org229c958d.crm4.dynamics.com/`         |
-| Stage         | `https://smkb-apps-stage.crm4.dynamics.com/`     |
-| Prod          | `https://skmb-apps-prod.crm4.dynamics.com/`      |
+| Environment | Dataverse URL | Deploy method |
+|-------------|---------------|---------------|
+| Dev | `https://org229c958d.crm4.dynamics.com/` | This script |
+| Stage | — | Power Platform Pipeline only |
+| Prod | — | Power Platform Pipeline only |
+
+> **Note:** The PAC auth profile named "SMKB-Apps-Dev" incorrectly targets `org1dce1895`.  
+> Always rely on the default URL in `deploy.ps1`.
 
 ---
 

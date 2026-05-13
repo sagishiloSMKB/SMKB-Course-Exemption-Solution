@@ -121,7 +121,7 @@ Each active starter contains placeholder strings that must be replaced before an
 
 ### Step 4 — Deploy only the active starters
 
-Run `deploy.ps1` inside each active starter folder. Do this for Dev first, then Stage, then Prod.
+Run `deploy.ps1` inside each active starter folder. All deploy scripts target **SMKB-Apps-Dev only** — Stage and Production are promoted via Power Platform Pipeline, never via script.
 
 ```powershell
 # Tables Starter
@@ -165,11 +165,11 @@ Unused starters keep their placeholder names forever (until another solution act
 | Customization Prefix | `smkb` |
 | Option Value Prefix | `39041` |
 
-| Environment | Purpose | Dataverse URL |
-|-------------|---------|---------------|
-| SMKB-Apps-Dev | Development & testing | `https://org229c958d.crm4.dynamics.com/` |
-| SMKB-Apps-Stage | Staging / UAT | `https://smkb-apps-stage.crm4.dynamics.com/` |
-| SMKB-Apps-Prod | Production | `https://skmb-apps-prod.crm4.dynamics.com/` |
+| Environment | Purpose | Dataverse URL | Deploy method |
+|-------------|---------|---------------|---------------|
+| SMKB-Apps-Dev | Development & testing | `https://org229c958d.crm4.dynamics.com/` | Direct (`deploy.ps1`) |
+| SMKB-Apps-Stage | Staging / UAT | — | Power Platform Pipeline only |
+| SMKB-Apps-Prod | Production | — | Power Platform Pipeline only |
 
 > **PAC CLI auth note:** The profile named "SMKB-Apps-Dev" incorrectly targets `org1dce1895`. Always pass `--environment <url>` explicitly, or rely on the default URL in each `deploy.ps1`.
 

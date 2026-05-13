@@ -34,6 +34,20 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# ── Environment guard ─────────────────────────────────────────────────────────
+# Direct deployment is allowed to SMKB-Apps-Dev only.
+# Stage and Production are promoted via Power Platform Pipeline — never via this script.
+$allowedEnv = "https://org229c958d.crm4.dynamics.com/"
+if ($TargetEnv -ne $allowedEnv) {
+    Write-Host "`nDEPLOY BLOCKED — This script only deploys to SMKB-Apps-Dev." -ForegroundColor Red
+    Write-Host "  Allowed:   $allowedEnv" -ForegroundColor Cyan
+    Write-Host "  Attempted: $TargetEnv" -ForegroundColor Yellow
+    Write-Host "`nStage and Production are promoted via Power Platform Pipeline only." -ForegroundColor Cyan
+    exit 1
+}
+# ─────────────────────────────────────────────────────────────────────────────
+
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
