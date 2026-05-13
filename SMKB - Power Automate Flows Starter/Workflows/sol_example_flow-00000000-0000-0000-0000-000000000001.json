@@ -55,45 +55,141 @@
         }
       },
       "actions": {
-        "Send_an_email": {
+        "Get_environment_name": {
           "type": "OpenApiConnection",
-          "description": "REPLACE: update connectionName, From address, To, Subject, and Body for your solution. Convention: send from [sol]NoReply@yourdomain.com using the 'Power Pages User 1' connection.",
+          "description": "Read sol_ENVIRONMENT_NAME env var. Returns 'dev' by default; pipeline sets 'stage' or 'prod' per environment. Used to prefix email subjects in non-production environments.",
           "inputs": {
             "host": {
-              "connectionName": "shared_office365_[yourid]",
-              "operationId": "SendEmailV2",
-              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+              "connectionName": "shared_commondataserviceforapps_[yourid]",
+              "operationId": "GetEnvironmentVariableValue",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
             },
             "parameters": {
-              "emailMessage/From": "[sol]NoReply@yourdomain.com",
-              "emailMessage/To": "@triggerBody()?['recipient']",
-              "emailMessage/Subject": "[REPLACE: email subject]",
-              "emailMessage/Body": "<p>[REPLACE: email body HTML]</p>",
-              "emailMessage/Importance": "Normal"
+              "schemaName": "sol_ENVIRONMENT_NAME"
             },
             "authentication": "@parameters('$authentication')"
           },
           "runAfter": {}
         },
-        "Respond_to_PowerPages": {
-          "type": "Response",
-          "description": "Return a JSON response to the Power Pages caller.",
+        "Get_error_report_emails": {
+          "type": "OpenApiConnection",
+          "description": "Read sol_FLOW_ERROR_EMAILS env var. JSON array of email addresses for error notifications. Set per-environment via pipeline: dev team in Dev, ops team in Stage/Prod.",
           "inputs": {
-            "statusCode": 200,
-            "body": {
-              "status": "ok"
+            "host": {
+              "connectionName": "shared_commondataserviceforapps_[yourid]",
+              "operationId": "GetEnvironmentVariableValue",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "schemaName": "sol_FLOW_ERROR_EMAILS"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {}
+        },
+        "Main_Flow": {
+          "type": "Scope",
+          "description": "Wrap all main flow logic in a Scope so the error handler can target it with runAfter on Failed/TimedOut.",
+          "actions": {
+            "Send_an_email": {
+              "type": "OpenApiConnection",
+              "description": "REPLACE: update connectionName, From address, Subject, and Body for your solution. Subject is auto-prefixed with '(DEV)' or '(STAGE)' in non-production environments via the sol_ENVIRONMENT_NAME env var.",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_office365_[yourid]",
+                  "operationId": "SendEmailV2",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                },
+                "parameters": {
+                  "emailMessage/From": "[sol]NoReply@yourdomain.com",
+                  "emailMessage/To": "@triggerBody()?['recipient']",
+                  "emailMessage/Subject": "@if(equals(outputs('Get_environment_name')?['body/value'], 'prod'), '[REPLACE: email subject]', concat('(', toUpper(outputs('Get_environment_name')?['body/value']), ') [REPLACE: email subject]'))",
+                  "emailMessage/Body": "<p>[REPLACE: email body HTML]</p>",
+                  "emailMessage/Importance": "Normal"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Respond_to_PowerPages": {
+              "type": "Response",
+              "description": "Return success response to the Power Pages caller.",
+              "inputs": {
+                "statusCode": 200,
+                "body": {
+                  "status": "ok"
+                }
+              },
+              "runAfter": {
+                "Send_an_email": [
+                  "Succeeded"
+                ]
+              }
             }
           },
           "runAfter": {
-            "Send_an_email": [
+            "Get_environment_name": [
               "Succeeded"
+            ],
+            "Get_error_report_emails": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Handle_Flow_Error": {
+          "type": "Scope",
+          "description": "Error handler — runs when Main_Flow fails or times out. Notifies the sol_FLOW_ERROR_EMAILS list and returns an error response to the Power Pages caller so the site does not hang.",
+          "actions": {
+            "Send_error_notification": {
+              "type": "OpenApiConnection",
+              "description": "Send error alert to all addresses in sol_FLOW_ERROR_EMAILS. The JSON array is joined to semicolons for the Office 365 To field.",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_office365_[yourid]",
+                  "operationId": "SendEmailV2",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                },
+                "parameters": {
+                  "emailMessage/From": "[sol]NoReply@yourdomain.com",
+                  "emailMessage/To": "@join(json(outputs('Get_error_report_emails')?['body/value']), ';')",
+                  "emailMessage/Subject": "@concat('(', toUpper(outputs('Get_environment_name')?['body/value']), ') [ERROR] sol_example_flow failed')",
+                  "emailMessage/Body": "@concat('<p>The flow <strong>sol_example_flow</strong> failed in the <strong>', outputs('Get_environment_name')?['body/value'], '</strong> environment.</p><p>Run ID: ', workflow()[''run''][''name''], '</p><p>Check the flow run history in Power Automate for details.</p>')",
+                  "emailMessage/Importance": "High"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Respond_with_error": {
+              "type": "Response",
+              "description": "Always return an error response so the Power Pages caller does not hang waiting for a response that will never come.",
+              "inputs": {
+                "statusCode": 500,
+                "body": {
+                  "status": "error"
+                }
+              },
+              "runAfter": {
+                "Send_error_notification": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Main_Flow": [
+              "Failed",
+              "TimedOut",
+              "Skipped"
             ]
           }
         }
       }
     },
     "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
-    "description": "STARTER TEMPLATE — replace 'sol' with your solution short name and update all [REPLACE] placeholders before deploying.",
+    "description": "STARTER TEMPLATE — replace 'sol' with your solution short name and update all [REPLACE] placeholders before deploying. Demonstrates ALM-aware patterns: environment-prefixed email subjects and flow error notifications via env vars.",
     "displayName": "sol_example_flow",
     "flowFailureAlertSubscribed": false,
     "isManaged": false

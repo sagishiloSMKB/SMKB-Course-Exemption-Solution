@@ -69,6 +69,17 @@ Work through every placeholder below before running `deploy.ps1`. Do not skip an
 | `Name="sol_example_flow"` | Your flow's name |
 | `/Workflows/sol_example_flow-00000000-0000-0000-0000-000000000001.json` | Your flow's JSON filename |
 
+#### ALM env vars used by this flow
+
+The example flow reads two environment variables that must also be activated in the Env Vars Starter:
+
+| Env var schema name | Replace with | Purpose |
+|---------------------|-------------|---------|
+| `sol_ENVIRONMENT_NAME` | `[sol]_ENVIRONMENT_NAME` (e.g. `evt_ENVIRONMENT_NAME`) | Current env name (`dev` / `stage` / `prod`) — used to prefix email subjects |
+| `sol_FLOW_ERROR_EMAILS` | `[sol]_FLOW_ERROR_EMAILS` (e.g. `evt_FLOW_ERROR_EMAILS`) | JSON array of error-report recipients — different per environment |
+
+Replace both `sol_` prefixes in the flow JSON the same way you replace all other `sol_` placeholders.
+
 #### `Other/Solution.xml` — RootComponents
 | Find | Replace with |
 |------|-------------|
@@ -302,6 +313,89 @@ Example trigger definition for a Power Pages–triggered flow:
   }
 }
 ```
+
+---
+
+## ALM-Aware Flow Patterns
+
+The example flow demonstrates two patterns that every production flow should follow. Both depend on the **Env Vars Starter** being activated alongside this starter.
+
+### Reading an environment variable inside a flow
+
+Use the Dataverse connector's `GetEnvironmentVariableValue` operation. It returns the current environment's value (or the definition's default if no override is set).
+
+```json
+"Get_environment_name": {
+  "type": "OpenApiConnection",
+  "inputs": {
+    "host": {
+      "connectionName": "shared_commondataserviceforapps_[yourid]",
+      "operationId": "GetEnvironmentVariableValue",
+      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+    },
+    "parameters": {
+      "schemaName": "evt_ENVIRONMENT_NAME"
+    },
+    "authentication": "@parameters('$authentication')"
+  },
+  "runAfter": {}
+}
+```
+
+Access the value in subsequent actions: `@outputs('Get_environment_name')?['body/value']`
+
+### Environment-prefixed email subjects
+
+Prefix every outgoing email subject with the environment name in Dev and Stage — so non-production emails are immediately recognisable. In production, no prefix is added.
+
+```
+Subject expression:
+@if(
+  equals(outputs('Get_environment_name')?['body/value'], 'prod'),
+  'Your actual subject',
+  concat('(', toUpper(outputs('Get_environment_name')?['body/value']), ') Your actual subject')
+)
+```
+
+Result: `(DEV) Confirmation email` in Dev, `(STAGE) Confirmation email` in Stage, `Confirmation email` in Prod.
+
+### Error handling with Scope + error notification
+
+Wrap all main logic in a `Scope` action called `Main_Flow`. Add a second `Scope` called `Handle_Flow_Error` that runs only when `Main_Flow` fails:
+
+```json
+"Handle_Flow_Error": {
+  "type": "Scope",
+  "runAfter": {
+    "Main_Flow": ["Failed", "TimedOut", "Skipped"]
+  },
+  "actions": {
+    "Send_error_notification": { ... },
+    "Respond_with_error": {
+      "type": "Response",
+      "inputs": { "statusCode": 500, "body": { "status": "error" } },
+      "runAfter": { "Send_error_notification": ["Succeeded", "Failed", "Skipped"] }
+    }
+  }
+}
+```
+
+The error notification email reads the `sol_FLOW_ERROR_EMAILS` env var — a JSON array of addresses. Join them for the Office 365 `To` field:
+
+```
+@join(json(outputs('Get_error_report_emails')?['body/value']), ';')
+```
+
+**Why the error Scope also needs `Respond_with_error`:** For Power Pages–triggered flows, the calling site waits for an HTTP response. If the flow fails without responding, the site hangs until a timeout. Always return a 500 response from the error handler so the caller can handle the failure gracefully.
+
+### Required env vars
+
+Both patterns require these env vars in the Env Vars Starter (rename to your prefix):
+
+| Template schema name | Rename to | Purpose |
+|---------------------|-----------|---------|
+| `sol_ENVIRONMENT_NAME` | `evt_ENVIRONMENT_NAME` | Email subject prefix; default `dev` |
+| `sol_FLOW_ERROR_EMAILS` | `evt_FLOW_ERROR_EMAILS` | Error recipient list; JSON array, no default — set per env via pipeline |
 
 ---
 

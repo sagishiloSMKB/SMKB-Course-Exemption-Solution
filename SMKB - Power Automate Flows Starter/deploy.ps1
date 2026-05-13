@@ -64,7 +64,9 @@ $placeholders = @(
     '00000000-0000-0000-0000-000000000001',
     '\[yourid\]',
     '\[REPLACE',
-    '\[sol\]'
+    '\[sol\]',
+    'sol_ENVIRONMENT_NAME',
+    'sol_FLOW_ERROR_EMAILS'
 )
 $violations = @()
 Get-ChildItem $scriptDir -Recurse -File -Include "*.xml","*.json" |

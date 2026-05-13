@@ -64,6 +64,7 @@ For **each variable** your solution needs:
 | `your-default-value-here` | Your actual default value, or remove the `<defaultvalue>` element if there is no universal default |
 
 4. After creating all your real variable folders, **delete** the `sol_EXAMPLE_VAR` template folder (it should not be deployed).
+5. If your solution uses Cloud Flows, **rename** (do not delete) `sol_ENVIRONMENT_NAME` and `sol_FLOW_ERROR_EMAILS` to your prefix — they are required by the example flow and should be kept. See the "ALM-Required Variables" section below.
 
 ### Step 4 — Verify no placeholders remain
 
@@ -215,6 +216,48 @@ This script deploys to **SMKB-Apps-Dev only**. Stage and Production are promoted
 | Variable **value** (the actual secret or setting per environment) | set via portal or PAC | **Never** |
 
 Values are per-environment overrides. Committing them would expose environment-specific secrets and settings to source control.
+
+---
+
+## ALM-Required Variables — Always Include With Cloud Flows
+
+When your solution uses the **Flows Starter**, always activate these two variables. They are pre-built templates in this starter — just rename them to your prefix.
+
+### `sol_ENVIRONMENT_NAME` — Environment identifier
+
+| Setting | Value |
+|---------|-------|
+| Schema name | `sol_ENVIRONMENT_NAME` (rename to e.g. `evt_ENVIRONMENT_NAME`) |
+| Type | String |
+| Default value | `dev` |
+
+**Purpose:** Tells flows which environment they are running in. Flows use this to prefix email subjects with `(DEV)` or `(STAGE)` so non-production emails are clearly distinguishable. In production, no prefix is added.
+
+**Pipeline setup:** After pipeline promotion, set the value to `stage` or `prod` in the environment connection settings — the same place you override any other env var value. Never commit values to Git.
+
+### `sol_FLOW_ERROR_EMAILS` — Error notification recipients
+
+| Setting | Value |
+|---------|-------|
+| Schema name | `sol_FLOW_ERROR_EMAILS` (rename to e.g. `evt_FLOW_ERROR_EMAILS`) |
+| Type | JSON |
+| Default value | *(none — must be set per environment)* |
+
+**Purpose:** JSON array of email addresses that receive an alert whenever a flow in this solution fails. The array is different per environment — typically the dev team in Dev, and the operations team in Stage and Prod.
+
+**Format:** `["ops@smkb.ac.il", "dev@smkb.ac.il"]`
+
+**Pipeline setup:** Set the value for each environment via pipeline connection settings. Do not commit email addresses to Git.
+
+### Why these belong in env vars (not hardcoded in the flow)
+
+| If hardcoded | If in env vars |
+|-------------|----------------|
+| Changing error recipients requires a code change + redeploy | Change the value in the portal per environment — no redeploy |
+| All environments get the same subject prefix | Each environment controls its own name (`dev`, `stage`, `prod`) |
+| Dev test emails go to production ops team | Each environment targets the correct audience |
+
+This is the ALM pipeline model: flows are promoted unchanged through Dev → Stage → Prod. Env vars are the mechanism for everything that legitimately differs between environments.
 
 ---
 

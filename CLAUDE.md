@@ -92,6 +92,8 @@ Before running `deploy.ps1` in ANY starter folder, you MUST scan that folder for
 | `00000000-0000-0000-0000-000000000000` | Power Apps Starter — `power.config.json` App ID |
 | `00000000-0000-0000-0000-000000000001` | Power Apps Starter — `power.config.json` Environment ID |
 | `Your App Display Name` | Power Apps Starter — `power.config.json` appDisplayName |
+| `sol_ENVIRONMENT_NAME` | Env Vars Starter + Flows Starter — env var definition folder name and flow action `schemaName` |
+| `sol_FLOW_ERROR_EMAILS` | Env Vars Starter + Flows Starter — env var definition folder name and flow action `schemaName` |
 | `TODO-your-portal` | Power Pages Starter — `client/scripts/deploy.mjs` (`PORTAL_URL`) |
 | `TODO-get-from-pac-pages-list` | Power Pages Starter — `powerpages/.../website.yml` (`adx_websiteid`) |
 

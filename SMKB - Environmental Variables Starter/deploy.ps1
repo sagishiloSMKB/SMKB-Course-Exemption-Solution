@@ -22,7 +22,7 @@ $zipPath   = Join-Path $distDir "solution.zip"
 
 # ── Placeholder safety check ──────────────────────────────────────────────────
 # Blocks deployment if any template placeholders remain unreplaced.
-$placeholders = @('YourSolutionName', 'Your Solution Name', 'sol_EXAMPLE_VAR', 'your-default-value-here')
+$placeholders = @('YourSolutionName', 'Your Solution Name', 'sol_EXAMPLE_VAR', 'your-default-value-here', 'sol_ENVIRONMENT_NAME', 'sol_FLOW_ERROR_EMAILS')
 $violations   = @()
 Get-ChildItem $scriptDir -Recurse -File -Include "*.xml" |
     Where-Object { $_.FullName -notmatch '_dist' } | ForEach-Object {
