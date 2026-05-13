@@ -57,8 +57,9 @@ If either placeholder is found, ask the user:
 **If (A) — new project:**
 
 1. Ask for:
-   - **Site display name** — e.g. `SMKB - My Project` (used in `adx_name` and the bot consumer config)
-   - **Portal subdomain** — the URL slug, e.g. `my-project` (folder becomes `smkb---my-project-dev`, portal URL becomes `https://my-project.powerappsportals.com`)
+   - **Functional Component Name** — what is this site *for*? (e.g. `Events RSVP`, `Scholarship Applications`, `Alumni Registration`) — this drives all naming below
+   - **Site display name** — `SMKB - [Functional Component Name] - Dev` (e.g. `SMKB - Events RSVP - Dev`) — used in `adx_name` and the bot consumer config
+   - **Portal subdomain** — `[functional-component-name]-dev` in lowercase with hyphens (e.g. `events-rsvp-dev`) — folder becomes `smkb---events-rsvp-dev`, portal URL becomes `https://events-rsvp-dev.powerappsportals.com`
    - **Solution name** — Power Platform solution for ALM, e.g. `MyProjectSolution`
    - **GitHub repository URL** — e.g. `https://github.com/smkb-org/my-project` (optional, can be skipped; used to connect the repo and set up branching)
 

@@ -60,6 +60,8 @@ Derived values (confirm with the developer):
 - Short name must be 2–5 lowercase letters only — no numbers, no underscores, no hyphens
 - Short name drives ALL component naming for this solution — every table, flow, and env var will be prefixed with it
 
+> **Component-level names (Power Pages and Power Apps)** are collected in Step 8 when you gather specifications. Each Power Pages site and each Power App gets its own **Functional Component Name** — a short phrase describing what that specific site or app does, not just the solution name repeated. A single solution can have multiple sites and multiple apps, each with a different name.
+
 ---
 
 ### Step 3 — Remove the starter kit remote
@@ -147,15 +149,42 @@ For each selected starter, rename its folder from the template name to the solut
 SMKB - X Starter  →  SMKB - [Component Name] - [Type Label]
 ```
 
+### Tables, Env Vars, and Flows — use the Solution Name as the Component Name
+
+These are solution-wide resources. Their Component Name is simply the solution name:
+
 | Starter | Type Label | Example rename |
 |---------|-----------|---------------|
 | Dataverse Tables Starter | `Dataverse Tables` | `SMKB - Events Tickets - Dataverse Tables` |
 | Environmental Variables Starter | `Environmental Variables` | `SMKB - Events Tickets - Environmental Variables` |
 | Power Automate Flows Starter | `Cloud Flows` | `SMKB - Events Tickets - Cloud Flows` |
-| Power Apps Starter | `Power App` | `SMKB - Events Backoffice - Power App` |
-| Power Page Starter | `Power Page` | `SMKB - Events RSVP - Power Page` |
 
-The **Component Name** part is up to the developer — it describes what that specific component manages (not just the solution name). Renaming does not break any deploy script — all scripts use `$PSScriptRoot`.
+### Power App and Power Pages — use a Functional Component Name
+
+These components are NOT named after the solution — they are named after what they **do**. The Component Name must describe the specific purpose of that app or site.
+
+| Starter | Type Label | Component Name | Example rename |
+|---------|-----------|---------------|----------------|
+| Power Apps Starter | `Power App` | What the app is for (e.g. staff backoffice) | `SMKB - Events Backoffice - Power App` |
+| Power Page Starter | `Power Page` | What the site is for (e.g. public RSVP form) | `SMKB - Events RSVP - Power Page` |
+
+The Component Name you choose here must be consistent across three places:
+
+| Object | Convention | Example |
+|--------|-----------|---------|
+| Repo folder | `SMKB - [Name] - Power App` / `Power Page` | `SMKB - Events Backoffice - Power App` |
+| Power Platform display name | `SMKB - [Name] - Dev` | `SMKB - Events Backoffice - Dev` |
+| Portal subdomain (Power Pages only) | `[name-lowercase]-dev` | `events-backoffice-dev` → `events-backoffice-dev.powerappsportals.com` |
+
+**Multiple sites and apps:** A solution can have more than one Power Pages starter and more than one Power Apps starter. Each gets its own descriptive name — never reuse the same folder for two different functions:
+
+```
+SMKB - Events RSVP - Power Page          ← public registration form
+SMKB - Events Admin Portal - Power Page  ← staff event management portal
+SMKB - Events Backoffice - Power App     ← internal management app
+```
+
+Renaming does not break any deploy script — all scripts use `$PSScriptRoot`.
 
 ---
 
@@ -180,13 +209,17 @@ For each activated starter, collect enough detail to drive placeholder replaceme
 - What it does: the logic, recipients, subject/body
 - Input parameters (if triggered from Power Pages)
 
-**For the Power App:**
-- App display name (e.g., `SMKB Events Backoffice`)
+**For each Power App:**
+- **Functional Component Name** — the name chosen in Step 7 (e.g. `Events Backoffice`)
+- **App display name in Power Platform** — `SMKB - [Functional Component Name] - Dev` (e.g. `SMKB - Events Backoffice - Dev`)
 - Which Dataverse tables it reads and writes
 - Key screens and their purpose
 
-**For the Power Pages site:**
-- Portal subdomain (e.g., `events-rsvp`)
+**For each Power Pages site:**
+- **Functional Component Name** — the name chosen in Step 7 (e.g. `Events RSVP`)
+- **Portal display name in Power Platform** — `SMKB - [Functional Component Name] - Dev` (e.g. `SMKB - Events RSVP - Dev`)
+- **Portal subdomain** — `[functional-component-name]-dev` in lowercase with hyphens (e.g. `events-rsvp-dev`)
+- **Site address** — `[subdomain].powerappsportals.com` (e.g. `events-rsvp-dev.powerappsportals.com`)
 - Key pages and forms
 - Auth requirements: public access vs Azure AD
 

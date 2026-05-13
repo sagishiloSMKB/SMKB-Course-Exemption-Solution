@@ -159,6 +159,16 @@ where type labels are: `Dataverse Tables`, `Environmental Variables`, `Cloud Flo
 
 If the folder is still named `SMKB - X Starter`, that means the starter has not been activated yet — rename it first, then proceed with the other activation steps.
 
+**Power App and Power Pages naming:** For these two types, the Component Name must describe the **function** of that specific site or app — not just repeat the solution name. The same Component Name must be consistent across all three places:
+
+| Object | Convention | Example |
+|--------|-----------|---------|
+| Repo folder | `SMKB - [Name] - Power App` / `Power Page` | `SMKB - Events Backoffice - Power App` |
+| Power Platform display name | `SMKB - [Name] - Dev` | `SMKB - Events Backoffice - Dev` |
+| Portal subdomain (Power Pages only) | `[name-lowercase]-dev` | `events-backoffice-dev` |
+
+If in doubt about what to name a component, ask the user what the site or app is *for* — that answer becomes the Component Name.
+
 ---
 
 ## CRITICAL RULE 4 — Deployment Order
