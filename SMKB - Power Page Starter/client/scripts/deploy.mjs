@@ -103,6 +103,33 @@ for (const file of files) {
   console.log('  Copied', file)
 }
 
+// ── 3b. Guard: block if starter-kit sentinel GUIDs haven't been freshened ──────
+console.log('\n▶ Checking for unfreshened starter-kit GUIDs...')
+const SENTINEL_GUID = 'a3f1bd7e-2958-45af-90ce-e9d951422a3d'
+function findYamlFiles(dir) {
+  const entries = readdirSync(dir, { withFileTypes: true })
+  const results = []
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      results.push(...findYamlFiles(fullPath))
+    } else if (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml')) {
+      results.push(fullPath)
+    }
+  }
+  return results
+}
+const yamlFiles = findYamlFiles(pagesDir)
+const staleFiles = yamlFiles.filter(f => readFileSync(f, 'utf8').includes(SENTINEL_GUID))
+if (staleFiles.length > 0) {
+  console.error('\n❌  Starter-kit GUIDs detected in portal YAML files:')
+  staleFiles.forEach(f => console.error(`   ${f}`))
+  console.error('\n   Run guid-freshen.ps1 in the portal folder before deploying.')
+  console.error('   This prevents this portal from colliding with other portals built from the same starter.\n')
+  process.exit(1)
+}
+console.log('   No starter-kit GUIDs found ✓')
+
 // ── 4. Upload to Power Pages ──────────────────────────────────────────────────
 console.log('\n▶ Uploading to Power Pages...')
 execSync(

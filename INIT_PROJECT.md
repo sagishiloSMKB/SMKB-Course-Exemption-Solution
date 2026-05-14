@@ -217,6 +217,28 @@ Renaming does not break any deploy script — all scripts use `$PSScriptRoot`.
 
 ---
 
+### Step 7b — Freshen Power Pages GUIDs (Power Pages only)
+
+> **Skip this step if the Power Pages starter was NOT activated.**
+
+**Why this step exists:** Every portal initialized from this starter kit starts with identical hardcoded GUIDs. When `pac pages upload` runs, it upserts Dataverse records by primary key. If two portals share the same GUIDs, the second upload silently steals records from the first portal, breaking both. This has already happened in production (May 2026). This step replaces every portal-scoped GUID with fresh random GUIDs so your portal is completely isolated.
+
+**Before running these scripts**, make sure:
+1. The portal folder has been renamed (Step 7 is complete)
+2. `adx_websiteid` in `website.yml` has been set to the real GUID from `pac pages list`
+
+```powershell
+# Replace <your-portal-folder> with the renamed folder (e.g. smkb---events-rsvp-dev)
+powershell -ExecutionPolicy Bypass -File "SMKB - Events RSVP - Power Page\powerpages\<your-portal-folder>\guid-freshen.ps1"
+powershell -ExecutionPolicy Bypass -File "SMKB - Events RSVP - Power Page\powerpages\<your-portal-folder>\verify-consistency.ps1"
+```
+
+If `verify-consistency.ps1` reports errors, fix them before continuing.
+
+> **Warning:** Run `guid-freshen.ps1` exactly once per portal — before the first deploy and never again. Running it a second time generates new GUIDs that no longer match what is in Dataverse, breaking the live site.
+
+---
+
 ### Step 8 — Gather solution specifications
 
 For each activated starter, collect enough detail to drive placeholder replacements and implementation. Ask the developer:

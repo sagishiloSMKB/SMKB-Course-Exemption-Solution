@@ -130,14 +130,14 @@ The home page uses the **SMKB App** page template (`adx_usewebsiteheaderandfoote
 
 ## Key GUIDs
 
-> `adx_websiteid` is the only environment-specific GUID — it must be updated for each new environment (see First Deploy). All other GUIDs are portable starter defaults upserted into Dataverse on first deploy.
+> `adx_websiteid` is the only environment-specific GUID — it must be updated for each new environment (see First Deploy). All other GUIDs listed below are starter defaults. **After running `guid-freshen.ps1`, every portal-scoped GUID is replaced with a fresh random GUID — these values will no longer match the live portal.**
 
-| Entity | GUID | Env-specific? |
-|--------|------|---------------|
+| Entity | Starter default GUID | Env-specific? |
+|--------|----------------------|---------------|
 | Website | TODO — get from `pac pages list` | **Yes** |
-| Home page (root) | `a3f1bd7e-2958-45af-90ce-e9d951422a3d` | No |
-| SMKB App page template | `4fc2abf8-23fa-4b2a-8f07-9a5f9e123eab` | No |
-| SMKB App web template | `53cba0bc-bcc7-4b58-ae2b-6fd5b61973d9` | No |
+| Home page (root) | `a3f1bd7e-2958-45af-90ce-e9d951422a3d` | Replaced by `guid-freshen.ps1` |
+| SMKB App page template | `4fc2abf8-23fa-4b2a-8f07-9a5f9e123eab` | Replaced by `guid-freshen.ps1` |
+| SMKB App web template | `53cba0bc-bcc7-4b58-ae2b-6fd5b61973d9` | Replaced by `guid-freshen.ps1` |
 | Language (English/1033) | `77b70744-951d-4f29-9f99-2e2c8a19db20` | No |
 | Published state | `498e04fe-0f5f-4a19-b384-3b0470b012b4` | No |
 | Draft state | `ebb208dc-b9f2-4d43-a177-6e28de9092d6` | No |
@@ -321,3 +321,28 @@ Three GUIDs must be consistent across all YAML files or Power Pages will return 
 2. **Published state ID** — `publishingstate.yml` entry with `adx_isdefault: true` = all content pages `adx_publishingstateid` = all webfile.yml entries `adx_publishingstateid`
 
 If these drift after a `pac pages download --overwrite`, run a bulk replace across all YAML files to restore consistency. See README → "The Phantom GUID Pitfall" for the full recovery procedure.
+
+---
+
+## GUID Isolation — Required Before Every New Portal Deploy
+
+**The problem:** Every portal initialized from this starter kit starts with the same hardcoded GUIDs. `pac pages upload` upserts Dataverse records by primary key — if two portals share the same GUIDs, the second upload sets `adx_websiteid` on records that already belong to the first portal, silently stealing them. Both portals break. This has already happened in production (CIF and Open Day portals, May 2026).
+
+**The fix:** Before the very first `pnpm deploy` for any new portal, run:
+
+```powershell
+# 1. Freshen all portal-scoped GUIDs (run ONCE, before first deploy only)
+powershell -ExecutionPolicy Bypass -File "powerpages/<portal-folder>/guid-freshen.ps1"
+
+# 2. Verify YAML consistency after freshening
+powershell -ExecutionPolicy Bypass -File "powerpages/<portal-folder>/verify-consistency.ps1"
+
+# 3. Then deploy — deploy.mjs blocks upload if the sentinel GUID is still present
+pnpm deploy
+```
+
+**Rules:**
+- Run `guid-freshen.ps1` **exactly once** per portal, before the first deploy. Never again.
+- Running it a second time generates GUIDs that no longer match Dataverse — the live site breaks.
+- `deploy.mjs` enforces this: it will block upload if the starter-kit sentinel GUID is still present in any YAML file.
+- **Never run `pac pages download --overwrite` before freshening.** The download brings back the starter-kit GUIDs from the environment, defeating the freshening.
