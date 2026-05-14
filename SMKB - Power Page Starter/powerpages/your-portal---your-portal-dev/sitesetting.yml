@@ -256,11 +256,11 @@
   adx_value: DENY
 - adx_description: Controls how much referrer information is included with requests. strict-origin-when-cross-origin balances privacy and compatibility.
   adx_name: HTTP/Referrer-Policy
-  adx_sitesettingid: a1b2c3d4-0001-0001-0001-000000000001
+  adx_sitesettingid: e7278a7f-fffa-4648-a7dc-8382b6053114
   adx_value: strict-origin-when-cross-origin
 - adx_description: Restricts which browser features this site can use. Adjust the value per project needs (e.g. add microphone=() if using voice features).
   adx_name: HTTP/Permissions-Policy
-  adx_sitesettingid: a1b2c3d4-0002-0002-0002-000000000002
+  adx_sitesettingid: b1966e96-262f-44ad-9e3e-e7bd41dcfc11
   adx_value: "camera=(), microphone=(), geolocation=(), payment=()"
 - adx_name: Authentication/OpenAuth/LinkedIn/ConsumerSecret
   adx_sitesettingid: bce270b9-be91-4e74-aed3-35bb4198e8f7

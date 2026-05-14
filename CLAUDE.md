@@ -206,6 +206,46 @@ When a solution uses multiple starters, deploy in this order:
 
 ---
 
+## CRITICAL RULE 5 — Multi-Solution Environment: What Must Be Globally Unique
+
+All SMKB solutions are deployed to the same Power Platform environment (SMKB-Apps-Dev). Some identifiers are **environment-scoped**, not solution-scoped. If two solutions share them, one silently overwrites the other.
+
+### Short Name (prefix) — must be unique across ALL solutions in the environment
+
+The short name (e.g., `evt`) determines the schema name prefix of every component in the solution: tables (`evt_registration`), env vars (`EVT_PORTAL_BASE_URL`), flows (`evt_send_confirmation`). If two solutions share the same short name, their components will collide in Dataverse.
+
+**Before committing to a short name, confirm it is not already in use by another solution deployed to SMKB-Apps-Dev.**
+
+Currently registered short names (update this table when initializing a new solution):
+
+| Short name | Solution |
+|-----------|---------|
+| `cif` | SMKB – Community Initiatives Fund |
+
+### Environment Variable schema names — environment-scoped
+
+Environment variable `schemaName` values (e.g., `EVT_PORTAL_BASE_URL`) are globally unique within the entire Power Platform environment. If two solutions define an env var with the same schema name, the second import overwrites the first definition. Unique short names prevent this — but only if short names are actually unique.
+
+### Table schema names — environment-scoped
+
+Dataverse table logical names (e.g., `evt_registration`) are globally unique within the environment. Same protection: unique short names prevent collisions.
+
+### Flow names — solution-scoped (NOT a cross-solution conflict risk)
+
+Power Automate flow display names and logical names are scoped within their solution. Two solutions can both contain a flow named `evt_send_confirmation` without conflicting — they live in separate solution containers. No action needed.
+
+### Publisher prefix — intentionally shared
+
+All SMKB solutions use the **same publisher**: `SKMBCore` (prefix `smkb`). This is correct and by design — it provides a consistent org-wide namespace. Do NOT create a new publisher for each solution. The publisher prefix (`smkb_`) is used for shared column names like `smkb_name`.
+
+### Power Pages portals — require GUID freshening before first deploy
+
+Every portal initialized from this starter shares identical hardcoded GUIDs. If two portals are deployed without freshening, the second upload silently overwrites the first portal's records.
+
+Run `guid-freshen.ps1` exactly **once**, before the first deploy, for every new portal. See the Power Pages starter's CLAUDE.md → "GUID Isolation" section for full details.
+
+---
+
 ## Connection References — The One Exception to Solution Isolation
 
 Power Platform has one intentional exception to the "each solution owns its own components" rule: **connection references**.

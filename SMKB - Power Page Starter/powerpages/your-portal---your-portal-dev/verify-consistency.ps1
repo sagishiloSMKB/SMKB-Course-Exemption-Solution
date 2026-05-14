@@ -105,7 +105,7 @@ if (Test-Path $webPagesDir) {
 
 # ---- Check 4: Weblink adx_pageid references ----
 Write-Host ""
-Write-Host "[4/4] Checking weblink adx_pageid references..."
+Write-Host "[4/5] Checking weblink adx_pageid references..."
 $weblinkFiles = Get-ChildItem $portalDir -Recurse -Filter "*.weblink.yml" -ErrorAction SilentlyContinue
 $weblinkErrors = 0
 foreach ($wl in $weblinkFiles) {
@@ -121,6 +121,26 @@ foreach ($wl in $weblinkFiles) {
 }
 if ($weblinkErrors -eq 0) {
     Pass "All weblink adx_pageid references resolve"
+}
+
+# ---- Check 5: Web-file adx_parentpageid references ----
+Write-Host ""
+Write-Host "[5/5] Checking web-file adx_parentpageid references..."
+$webfileFiles = Get-ChildItem $portalDir -Recurse -Filter "*.webfile.yml" -ErrorAction SilentlyContinue
+$webfileErrors = 0
+foreach ($wf in $webfileFiles) {
+    $wfContent = Get-Content $wf.FullName -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+    if (-not $wfContent) { continue }
+    if ($wfContent -match "adx_parentpageid:\s*($guidRegex)") {
+        $ref = $Matches[1].ToLower()
+        if (-not $rootPageGuids.ContainsKey($ref)) {
+            Fail "Web-file '$($wf.Name)' has adx_parentpageid '$ref' that does not resolve to any root page -- the smkb container page may be missing from web-pages/"
+            $webfileErrors++
+        }
+    }
+}
+if ($webfileErrors -eq 0) {
+    Pass "All web-file adx_parentpageid references resolve"
 }
 
 # ---- Summary ----
