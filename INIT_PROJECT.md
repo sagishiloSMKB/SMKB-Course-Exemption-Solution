@@ -1,5 +1,39 @@
 # Init Project — Starting a New Solution
 
+## Agent Standing Instruction — Log Everything
+
+> **Read this before starting any step.**
+
+As you work through this flow, **record any of the following in [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md)**:
+
+- Any step that required a workaround or clarification not covered by these instructions
+- Any error or unexpected output you encountered and how you resolved it
+- Any instruction that was ambiguous, missing, or wrong
+- Any improvement that would make a step smoother for the next agent or developer
+- Anything that took more back-and-forth with the user than it should have
+
+**Format for each entry:**
+
+```
+## [YYYY-MM-DD] — [Solution name being initialized]
+
+### Issue / Observation
+[What happened]
+
+### Step
+[Which Init Project step this occurred in]
+
+### Resolution
+[What you did to fix or work around it]
+
+### Suggested improvement
+[What should change in the starter kit or INIT_PROJECT.md to prevent this]
+```
+
+Log entries as you encounter them — do not wait until the end. If the init completes with no issues, add a short "No issues" entry so we know the run was clean.
+
+---
+
 This guide walks through the **one-time setup** required when you clone this starter kit to build a new solution. It is different from starting a regular Claude session on an already-initialized project.
 
 > **Working with Claude?** Say "init project" and Claude will follow this guide step by step.  
