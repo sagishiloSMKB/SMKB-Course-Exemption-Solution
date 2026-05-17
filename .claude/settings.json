@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git remote*)",
+      "Bash(git branch*)",
+      "Bash(git rev-parse*)",
+      "Bash(git add*)",
+      "Bash(git stash*)",
+      "Bash(node --version)",
+      "Bash(pnpm --version)",
+      "Bash(pac --version)",
+      "Bash(pac auth list)",
+      "Bash(pac pages list)",
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(pnpm run build)",
+      "Bash(pnpm install)",
+      "Bash(pnpm run check:security)",
+      "Bash(node scripts/security-check.mjs)",
+      "Bash(powershell*verify-consistency.ps1*)",
+      "Bash(powershell*guid-freshen.ps1*-DryRun*)"
+    ]
+  }
+}

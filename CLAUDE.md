@@ -51,6 +51,8 @@ The active profile (`*`) must target `https://org229c958d.crm4.dynamics.com/` (S
 
 Never run a deploy without confirming the auth target. If the wrong profile is active and a deploy runs, changes go to the wrong environment silently.
 
+**Windows-only — WebDAV:** Do not enable WebDAV or allow Claude Code to access `\\*` network paths. WebDAV is deprecated by Microsoft and may allow Claude Code to make unintended network requests that bypass the permission system. If VS Code or any tool offers to mount a WebDAV share, decline.
+
 ---
 
 ## INIT PROJECT COMMAND

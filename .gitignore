@@ -23,6 +23,10 @@ yarn-error.log*
 # ── PAC CLI / Power Platform exports ──────────────────────────────────────────
 _temp_*/
 
+# ── Claude Code ───────────────────────────────────────────────────────────────
+# settings.json is committed (team-wide allowlist) — settings.local.json is not
+.claude/settings.local.json
+
 # ── Editor / IDE ──────────────────────────────────────────────────────────────
 .vscode/
 .idea/

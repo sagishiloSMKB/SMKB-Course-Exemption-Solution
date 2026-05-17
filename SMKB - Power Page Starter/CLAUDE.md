@@ -39,6 +39,16 @@ Never bypass or skip the security check (`--skip`, removing the step, commenting
 - New site settings must be added to both `sitesetting.yml` and the solution manifest
 - Never change `adx_publishingstateid`, `adx_websitelanguageid`, or `adx_defaultlanguage` without following the GUID Consistency Rule (see bottom of this file)
 
+### Prompt Injection Awareness
+
+Power Pages receives user-submitted form data, URL parameters, and Dataverse record values — all of which are attacker-controlled. When working with this starter:
+
+- **Never paste raw form submission data or Dataverse record values into the conversation** — describe the schema instead (field names and types, not actual submitted values)
+- **Never ask Claude to read live portal content directly** (via `pac pages download` output or fetched HTML) to understand what a form submits — describe the fields
+- If sample data must be shared, sanitize it first: remove real names, emails, and any text that could contain embedded instructions
+
+This prevents an attacker from crafting a form submission that manipulates Claude's behavior when a developer accidentally includes the raw data in the conversation.
+
 ---
 
 ## New Project Setup
