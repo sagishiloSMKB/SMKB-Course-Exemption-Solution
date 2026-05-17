@@ -1,3 +1,6 @@
+allowBuilds:
+  '@smkb/design-ui': true
+  esbuild: true
 onlyBuiltDependencies:
   - '@smkb/design-ui'
   - esbuild

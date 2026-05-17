@@ -18,10 +18,22 @@
       "Bash(find *)",
       "Bash(pnpm run build)",
       "Bash(pnpm install)",
+      "Bash(pnpm run lint)",
       "Bash(pnpm run check:security)",
       "Bash(node scripts/security-check.mjs)",
       "Bash(powershell*verify-consistency.ps1*)",
       "Bash(powershell*guid-freshen.ps1*-DryRun*)"
+    ],
+    "deny": [
+      "Bash(pac pages upload*)",
+      "Bash(pac solution import*)",
+      "Bash(pac code push*)",
+      "Bash(pac auth select*)",
+      "Bash(pac pages download*--overwrite*)",
+      "Bash(git push*--force*)",
+      "Bash(git commit*--amend*)",
+      "Bash(git reset*--hard*)",
+      "Bash(git clean*-f*)"
     ]
   }
 }

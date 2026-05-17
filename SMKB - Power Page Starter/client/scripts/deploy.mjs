@@ -3,12 +3,13 @@
  *
  * Steps:
  *  1. Guard: must be on 'main' branch and config must be set
- *  2. Security check (pnpm check:security — must pass before continuing)
- *  3. Verify/select the SMKB-Apps-Dev PAC auth environment
- *  4. Bump cache-bust version in the Liquid web template (?v=N)
- *  5. Build the client (vue-tsc + vite build)
- *  6. Copy dist/smkb/* → ../powerpages/.../web-files/
- *  7. Upload via pac pages upload --modelVersion 2
+ *  2. ESLint (pnpm run lint — blocks on errors: v-html, console.log, Vue rules)
+ *  3. Security check (pnpm check:security — blocks on critical failures)
+ *  4. Verify/select the SMKB-Apps-Dev PAC auth environment
+ *  5. Bump cache-bust version in the Liquid web template (?v=N)
+ *  6. Build the client (vue-tsc + vite build)
+ *  7. Copy dist/smkb/* → ../powerpages/.../web-files/
+ *  8. Upload via pac pages upload --modelVersion 2
  *
  * Usage (from the client/ directory):
  *   pnpm deploy
@@ -58,6 +59,10 @@ const pagesDir    = join(repoRoot, 'powerpages', PAGES_SUBDIR)
 // Resolve pac CLI: prefer PAC_CLI_PATH env var, fall back to the default LOCALAPPDATA install path.
 const PAC = process.env.PAC_CLI_PATH
   ?? join(process.env.LOCALAPPDATA ?? '', 'Microsoft', 'PowerAppsCLI', 'pac.cmd')
+
+// ── Pre-deploy lint ───────────────────────────────────────────────────────────
+console.log('\n▶ Running ESLint...')
+execSync('pnpm run lint', { cwd: root, stdio: 'inherit' })
 
 // ── Pre-deploy security check ─────────────────────────────────────────────────
 console.log('\n▶ Running security checks...')

@@ -152,6 +152,20 @@ git remote -v
 
 ---
 
+### Step 5b — Enable git hooks
+
+Run once to activate the pre-commit security linter for this working copy:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
+This tells Git to use the `.githooks/` folder (version-controlled) instead of `.git/hooks/`. After this, any commit that touches `.vue` or `.ts` files will automatically run ESLint before the commit completes — catching XSS patterns (`v-html`), debug statements (`console.log`), and other Vue/TS security rules.
+
+> **Note:** This is a local git config setting. Every developer who clones this repo must run this command once in their working copy.
+
+---
+
 ### Step 6 — Starters are determined by specifications
 
 Do NOT select starters before gathering specifications — choosing starters from a generic checklist before understanding the solution leads to wrong activations (e.g. activating Flows before confirming any flows are actually needed).

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Run ESLint only when Vue/TS files are staged — skip for commits that only touch YAML, PS1, etc.
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(vue|ts|tsx)$')
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+cd "SMKB - Power Page Starter/client" || exit 1
+pnpm run lint
