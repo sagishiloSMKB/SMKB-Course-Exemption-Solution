@@ -364,7 +364,9 @@ For each activated starter, collect enough detail to drive placeholder replaceme
 
 ---
 
-### Step 9 — Build the implementation plan
+### Step 9 — Build the implementation plan (Plan Mode)
+
+> **Agent instruction:** Enter plan mode now using the `EnterPlanMode` tool before writing anything. Do not make any file changes until the developer approves the plan.
 
 Using the specifications from Step 8, build a structured plan covering:
 
@@ -381,7 +383,7 @@ Using the specifications from Step 8, build a structured plan covering:
 > ```
 > After `pac code init`, `appId` in `power.config.json` will be `null` — this is expected (known PAC CLI behavior). The GUID is populated automatically on the first `pac code push`.
 
-Present the complete plan to the developer for confirmation before beginning any implementation.
+Write the full plan to the plan file, then call `ExitPlanMode` to present it to the developer for approval. Do not begin Steps 10–12 until the developer approves.
 
 ---
 
