@@ -100,7 +100,7 @@ pac auth create --url https://org229c958d.crm4.dynamics.com/
 
 > **Warning:** The PAC profile named "SMKB-Apps-Dev" incorrectly targets `org1dce1895` (Seminar Hakibutzim College), NOT SMKB-Apps-Dev. Always verify the active profile URL before proceeding. If the wrong profile is active: `pac auth select --index <N>` where N is the index from `pac auth list`.
 
-> **Note for the agent:** Run `pac --version` and `pac auth list` now — both commands are permitted in agent settings. If either fails with a PATH error (common on Windows), do not skip this step — tell the developer, ask them to run the command in their terminal, and paste the output back so you can read it and continue.
+> **Note for the agent:** Run `pac --version` and `pac auth list` now using the **PowerShell tool** (not the Bash tool) — PAC CLI is a Windows executable and is only available in the Windows PowerShell PATH, not in the bash shell. Both commands are permitted in agent settings. If they still fail (PAC CLI not installed), do not skip this step — tell the developer, ask them to run the commands in their own PowerShell terminal, and paste the output back so you can read it and continue.
 >
 > `pac auth select` is blocked in agent settings. If the wrong profile is active, you cannot fix it yourself — stop and ask the developer to run `pac auth select --index <N>` before you proceed.
 
