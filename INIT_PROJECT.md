@@ -140,8 +140,9 @@ Collect the following from the developer:
 Derived values (confirm with the developer):
 - Local folder / repo name: `SMKB - [Solution Name] - Solution`  
   Example: `SMKB - Events Tickets - Solution`
-- GitHub repo name: `SMKB-[SolutionName]-Solution`  
-  Example: `SMKB-Events-Tickets-Solution`
+- GitHub repo name: `SMKB-[Solution-Name-Words-Joined-By-Hyphens]-Solution` — derived from the **human display name**, NOT the PascalCase unique name  
+  Example: "Events Tickets" → `SMKB-Events-Tickets-Solution` ✓  
+  NOT: "SMKBEventsTickets" → `SMKB-EventsTickets-Solution` ✗
 
 **Validation rules:**
 - Unique name must be alphanumeric, PascalCase, max 50 characters
