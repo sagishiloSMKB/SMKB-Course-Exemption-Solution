@@ -65,6 +65,7 @@ Init Project is a collaboration between the agent and the developer. The agent h
 | `pac --version` / `pac auth list` (verify setup) | Tries first | Run manually + paste output if agent's shell can't find `pac` |
 | `pac pages list` (get site GUID for Step 11) | Tries first | Run manually + paste output if agent's shell can't find `pac` |
 | `pac auth select` / `pac auth create` (change active profile) | — | Must run locally — blocked in agent settings |
+| `pnpm install` in starter folders (Step 5b) | — | Must run locally — required before first commit touching .vue/.ts |
 | Run `guid-freshen.ps1` (Step 7b) | — | Must run locally (PowerShell) |
 | Run `deploy.ps1` / `pnpm deploy` | — | Must run locally (PowerShell) |
 | Visit portal URL in browser (first provisioning) | — | Must do in browser |
@@ -212,7 +213,7 @@ git remote -v
 
 ---
 
-### Step 5b — Enable git hooks
+### Step 5b — Enable git hooks and install dependencies
 
 Run once to activate the pre-commit security linter for this working copy:
 
@@ -223,6 +224,23 @@ git config core.hooksPath .githooks
 This tells Git to use the `.githooks/` folder (version-controlled) instead of `.git/hooks/`. After this, any commit that touches `.vue` or `.ts` files will automatically run ESLint before the commit completes — catching XSS patterns (`v-html`), debug statements (`console.log`), and other Vue/TS security rules.
 
 > **Note:** This is a local git config setting. Every developer who clones this repo must run this command once in their working copy.
+
+**Install dependencies for activated starters (required for the hook to work):**
+
+The ESLint hook calls `pnpm run lint`, which requires `node_modules` to be present. Run `pnpm install` in every starter folder that has a `package.json` — otherwise the hook will fail on the first commit that touches a `.vue` or `.ts` file.
+
+```powershell
+# Run in each activated starter that has a package.json:
+# Power Pages — run inside the client/ subfolder
+cd "SMKB - [Your Portal Name] - Power Page\client"
+pnpm install
+
+# Power Apps — run inside the starter folder root
+cd "SMKB - [Your App Name] - Power App"
+pnpm install
+```
+
+Skip this for starters that do not have a `package.json` (Tables, Env Vars, Flows).
 
 ---
 
