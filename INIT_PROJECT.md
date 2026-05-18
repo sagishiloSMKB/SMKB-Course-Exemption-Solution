@@ -170,21 +170,16 @@ git remote -v
 
 ### Step 4 — Create the new GitHub repository
 
-Create a **private** repository in the SMKB-AC-IL GitHub organization.
+Create a **private** repository in the SMKB-AC-IL GitHub organization:
 
-**Option A — using the `gh` CLI (recommended if installed):**
-```powershell
-# Replace SMKB-Events-Tickets-Solution with your derived repo name
-gh repo create SMKB-AC-IL/SMKB-Events-Tickets-Solution --private
-```
-
-**Option B — manually on GitHub:**
 1. Go to [github.com/SMKB-AC-IL](https://github.com/SMKB-AC-IL)
 2. Click **New repository**
-3. Name: `SMKB-Events-Tickets-Solution` (use the derived GitHub repo name from Step 2)
+3. Name: use the GitHub repo name derived in Step 2 (e.g. `SMKB-Events-Tickets-Solution`)
 4. Visibility: **Private**
 5. **Do NOT** add a README, .gitignore, or license — the repo must be empty
-6. Copy the HTTPS clone URL
+6. Click **Create repository** and copy the HTTPS clone URL
+
+Tell the developer exactly which name to use, then wait for them to confirm the repo is created before moving to Step 5.
 
 ---
 
