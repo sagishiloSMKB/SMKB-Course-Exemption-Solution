@@ -1,6 +1,9 @@
 {
   "permissions": {
     "allow": [
+      "Read(**)",
+      "Glob(**)",
+      "Grep(**)",
       "Bash(git status)",
       "Bash(git log*)",
       "Bash(git diff*)",
