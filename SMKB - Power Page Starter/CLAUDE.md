@@ -199,7 +199,7 @@ feature/* → short-lived branches off dev (or directly off main for small fixes
 `pnpm deploy` is Dev-only. Promoting to Stage and Production:
 
 1. After `pnpm deploy`, verify the Dev site looks correct
-2. In Power Apps Maker, add any new Power Pages components to the solution (Add Existing → Power Pages website) — new site settings and other records added by PAC upload are **not** automatically included in the solution
+2. Re-run the `pac solution add-solution-component` loop from INIT_PROJECT.md Step 11 to ensure all current portal components are in the solution — new records added by PAC upload are **not** automatically linked
 3. Trigger the pipeline: Dev → Stage → Production via Power Platform Admin Center
 
 **Rule:** Never use `pac pages upload`, `pac auth select`, or any PAC CLI command targeting a Stage or Production org URL. Those environments receive changes through the pipeline only.
@@ -207,7 +207,7 @@ feature/* → short-lived branches off dev (or directly off main for small fixes
 **When adding new site settings or Power Pages components:**
 1. Add the YAML entry (e.g., in `sitesetting.yml`)
 2. Run `pnpm deploy` to upsert to Dev
-3. In Power Apps Maker: Add Existing → Power Pages → re-add the website to capture the new record
+3. Re-run the `pac solution add-solution-component` component loop (INIT_PROJECT.md Step 11) to capture new component records in the solution
 4. Trigger the pipeline
 
 ---

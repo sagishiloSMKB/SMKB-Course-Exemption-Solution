@@ -1,4 +1,5 @@
 {
+  "schemaVersion": "1.0.0.0",
   "properties": {
     "connectionReferences": {
       "shared_office365_[yourid]": {
@@ -16,9 +17,10 @@
         }
       }
     },
+    "templateName": "",
     "definition": {
       "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
-      "contentVersion": "1.0.0.0",
+      "contentVersion": "undefined",
       "parameters": {
         "$authentication": {
           "defaultValue": {},
@@ -153,7 +155,7 @@
                   "emailMessage/From": "[sol]NoReply@yourdomain.com",
                   "emailMessage/To": "@join(json(outputs('Get_error_report_emails')?['body/value']), ';')",
                   "emailMessage/Subject": "@concat('(', toUpper(outputs('Get_environment_name')?['body/value']), ') [ERROR] sol_example_flow failed')",
-                  "emailMessage/Body": "@concat('<p>The flow <strong>sol_example_flow</strong> failed in the <strong>', outputs('Get_environment_name')?['body/value'], '</strong> environment.</p><p>Run ID: ', workflow()[''run''][''name''], '</p><p>Check the flow run history in Power Automate for details.</p>')",
+                  "emailMessage/Body": "@concat('<p>The flow <strong>sol_example_flow</strong> failed in the <strong>', outputs('Get_environment_name')?['body/value'], '</strong> environment.</p><p>Run ID: ', workflow()['run']['name'], '</p><p>Check the flow run history in Power Automate for details.</p>')",
                   "emailMessage/Importance": "High"
                 },
                 "authentication": "@parameters('$authentication')"
@@ -187,11 +189,6 @@
           }
         }
       }
-    },
-    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
-    "description": "STARTER TEMPLATE — replace 'sol' with your solution short name and update all [REPLACE] placeholders before deploying. Demonstrates ALM-aware patterns: environment-prefixed email subjects and flow error notifications via env vars.",
-    "displayName": "sol_example_flow",
-    "flowFailureAlertSubscribed": false,
-    "isManaged": false
+    }
   }
 }

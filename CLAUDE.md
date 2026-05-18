@@ -291,7 +291,27 @@ When a solution containing flows is imported, flows are often left in a disabled
 
 **For Flows:** Do NOT use `pac solution pack` directly — it cannot include Cloud Flow JSONs. Always use the `deploy.ps1` script which builds the zip manually.
 
-**For Power Apps:** Do NOT use `pac solution pack/import`. Code Apps are deployed with `pac code push`. Requires Node 20+ and pnpm 9+. The app record must exist before the first push — `pac code push` updates an existing record, it does NOT create one. **There is no "New Code App" option in the portal.** Use `pac code init --environment "https://org229c958d.crm4.dynamics.com/"` to create the app record and populate `power.config.json` in a single step. Never try to create a Code App via the Power Apps portal UI.
+**For Power Apps:** Do NOT use `pac solution pack/import`. Code Apps are deployed with `pac code push`. Requires Node 20+ and pnpm 9+. The app record must exist before the first push — `pac code push` updates an existing record, it does NOT create one. **There is no "New Code App" option in the portal.** Use `pac code init --environment "https://org229c958d.crm4.dynamics.com/" --displayName "SMKB - [Component Name] - Dev"` to create the app record and populate `power.config.json` in a single step (delete any existing `power.config.json` first). Never try to create a Code App via the Power Apps portal UI.
+
+**For Power Pages — linking site to solution (after first upload):** The Maker portal "Add Existing → Power Pages" button only adds the site record and silently omits ~200 child components. Use `pac solution add-solution-component` instead:
+
+```powershell
+# 1. Add site record
+pac solution add-solution-component --solution-unique-name YourSolutionName --component-type powerpagesite --component-id <site-guid>
+
+# 2. Add all child components (extract GUIDs from portal YAML files)
+$guids = Get-ChildItem ".\<portal-folder>" -Recurse -Include "*.yml" |
+    Select-String -Pattern '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' |
+    ForEach-Object { $_.Matches.Value } | Sort-Object -Unique
+foreach ($guid in $guids) {
+    pac solution add-solution-component --solution-unique-name YourSolutionName --component-type powerpagecomponent --component-id $guid
+}
+
+# 3. Add language component
+pac solution add-solution-component --solution-unique-name YourSolutionName --component-type powerpagesitelanguage --component-id <site-guid>
+```
+
+See INIT_PROJECT.md Step 11 for the full annotated version of this command sequence.
 
 ---
 

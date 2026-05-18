@@ -394,17 +394,32 @@ The `.portalconfig/manifest.yml` controls which entity types PAC CLI syncs. The 
 
 ### Registering Power Pages components in the solution
 
-After the first `pnpm deploy` (or after adding new components), register all Power Pages components so the pipeline can promote them.
+After the first `pnpm deploy` (or after adding new components), link all portal components to the solution using PAC CLI so the pipeline can promote them.
 
-**In Power Apps Maker (make.powerapps.com):**
-1. Open **Solutions** → select your project solution (the one matching `SOLUTION_NAME` from setup)
-2. Click **Add Existing → More → Power Pages** → select your website
-3. This includes the website record and all its child components (pages, templates, settings, roles, files, etc.)
-4. Click **Save**
+> **Do NOT use Power Apps Maker "Add Existing → Power Pages"** — it adds the site record only and silently omits ~200 child components (pages, templates, settings, roles, web files). Use PAC CLI instead.
+
+Run the `pac solution add-solution-component` sequence from **INIT_PROJECT.md Step 11**:
+
+```powershell
+# 1. Add site record
+pac solution add-solution-component --solution-unique-name YourSolutionName --component-type powerpagesite --component-id <site-guid>
+
+# 2. Add all child components (loop over GUIDs extracted from YAML files)
+$portalFolder = "powerpages\<your-portal-folder>"
+$guids = Get-ChildItem $portalFolder -Recurse -Include "*.yml" |
+    Select-String -Pattern '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' |
+    ForEach-Object { $_.Matches.Value } | Sort-Object -Unique
+foreach ($guid in $guids) {
+    pac solution add-solution-component --solution-unique-name YourSolutionName --component-type powerpagecomponent --component-id $guid
+}
+
+# 3. Add language component
+pac solution add-solution-component --solution-unique-name YourSolutionName --component-type powerpagesitelanguage --component-id <site-guid>
+```
 
 **When you add new components** (new site settings, web pages, web files):
-- After `pnpm deploy`, re-add the website via Add Existing (or add the specific new component type) to capture new records
-- New `adx_sitesetting` records are **not** automatically added to the solution — always add them manually before triggering the pipeline
+- After `pnpm deploy`, re-run the loop above to capture any new component records in the solution
+- New `adx_sitesetting` records are **not** automatically added to the solution — always re-run the loop before triggering the pipeline
 
 ### Component types that must be in the solution
 

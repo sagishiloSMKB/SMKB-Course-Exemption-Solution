@@ -1,17 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ImportExportXml version="9.2" SolutionPackageVersion="9.2" languagecode="1033" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Entities />
-  <Roles />
-  <Workflows />
-  <FieldSecurityProfiles />
-  <Templates />
-  <EntityMaps />
+<!--
+  TEMPLATE / REFERENCE — this file is not read by pac solution pack.
+  When you add lookup columns that link two tables, copy the <EntityRelationship>
+  block below into Other/Customizations.xml inside the <EntityRelationships> element.
+
+  Also add the lookup attribute to the referencing table's Entity.xml.
+
+  Naming conventions:
+    Relationship Name:  [referencing_table]_[referenced_table]
+      e.g. sol_registration_sol_session
+    ReferencedAttributeName: [referenced_table]id  (primary key of the parent table)
+    ReferencingAttributeName: [referenced_table]   (the lookup column on the child table)
+
+  Example: many sol_registration rows each belong to one sol_session.
+-->
+<ImportExportXml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <EntityRelationships>
     <!--
-      Add one <EntityRelationship> block per lookup column linking two tables.
-      See Other/Relationships.xml for the full block template and naming conventions.
+      Copy this block into Other/Customizations.xml → <EntityRelationships> for each lookup column.
 
-      Example (uncomment and replace sol_ prefixes with your short name):
       <EntityRelationship Name="sol_registration_sol_session">
         <EntityRelationshipType>ManyToOne</EntityRelationshipType>
         <IsCustomizable>1</IsCustomizable>
@@ -32,8 +39,4 @@
       </EntityRelationship>
     -->
   </EntityRelationships>
-  <OrganizationSettings />
-  <optionsets />
-  <CustomControls />
-  <EntityDataProviders />
 </ImportExportXml>

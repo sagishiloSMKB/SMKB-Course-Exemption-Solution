@@ -61,21 +61,23 @@ Contact the platform team if you don't have this configured.
 > **Critical:** `pac code push` updates an existing app record. It does NOT create one.  
 > There is **no "New Code App" option** in the Power Apps portal. The correct way to create a Code App record is via `pac code init`.
 
-Run `pac code init` in the starter folder. This creates the Dataverse app record in SMKB-Apps-Dev and writes the real values into `power.config.json` automatically:
+Run `pac code init` in the starter folder. This creates the Dataverse app record in SMKB-Apps-Dev and writes values into `power.config.json`:
 
 ```powershell
 pac auth list
 # Confirm the active profile targets https://org229c958d.crm4.dynamics.com/
 # If not: pac auth select --index <N>
 
-pac code init --environment "https://org229c958d.crm4.dynamics.com/"
+# Delete power.config.json first — if it exists (it does in the starter), pac code init
+# will fail or reuse stale values unless it starts from scratch
+Remove-Item power.config.json -ErrorAction SilentlyContinue
+
+pac code init --environment "https://org229c958d.crm4.dynamics.com/" --displayName "SMKB - [Component Name] - Dev"
 ```
 
-When prompted, enter:
-- **App display name**: `SMKB - [Component Name] - Dev` (e.g. `SMKB - Events Backoffice - Dev`)
-- **Solution unique name**: your solution's unique name (e.g. `SMKBEventsTickets`)
+When prompted for solution name, enter your solution's unique name (e.g. `SMKBEventsTickets`).
 
-`pac code init` overwrites `power.config.json` with the real `appId`, `environmentId`, and `connectionReferences` values. Do not edit `power.config.json` manually after this step.
+> **Note:** After `pac code init`, `appId` in `power.config.json` will be `null` — this is expected (known PAC CLI behavior). The GUID is populated automatically on the first `pac code push`. Do not edit `power.config.json` manually.
 
 ### Step 4 — `deploy.config.json` and `pac code sync` warning
 

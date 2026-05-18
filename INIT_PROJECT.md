@@ -54,6 +54,25 @@ This guide walks through the **one-time setup** required when you clone this sta
 
 ---
 
+## Who Does What
+
+Init Project is a collaboration between the agent and the developer. The agent handles file changes; deployments and portal actions require the developer to act locally.
+
+| Task | Agent | Developer |
+|------|-------|-----------|
+| Rename starter folders | ✓ | |
+| Replace all placeholders in files | ✓ | |
+| Run `guid-freshen.ps1` (Step 7b) | — | Must run locally (PowerShell) |
+| Run `deploy.ps1` / `pnpm deploy` | — | Must run locally (PowerShell) |
+| Visit portal URL in browser (first provisioning) | — | Must do in browser |
+| Set env var values in Maker portal | — | Power Apps Maker → Solutions → your solution → Env Vars |
+| Confirm flow connection references + turn on flows | — | Power Automate portal → Solutions → your solution → Cloud Flows |
+| Create app record (`pac code init`) | — | Must run locally before first push |
+| Run Step 11 PAC CLI commands to add portal to solution | — | Must run locally (PowerShell) |
+| Stage and push commits | — | Confirm each time |
+
+---
+
 ## Before You Start — Prerequisites
 
 Verify all tools are installed before beginning:
@@ -334,6 +353,13 @@ Using the specifications from Step 8, build a structured plan covering:
 4. **Schema details** — table column definitions, flow logic pseudocode, env var defaults
 5. **Development sequence** — which starter to implement first (follow Critical Rule 4 in CLAUDE.md: Tables -> Env Vars -> Flows -> Power Pages)
 
+> **Power Apps — app record must exist before first deploy.** `pac code push` does NOT create app records. Before the first `deploy.ps1`, the developer must run:
+> ```powershell
+> # Delete power.config.json first if it already exists in the starter folder
+> pac code init --environment "https://org229c958d.crm4.dynamics.com/" --displayName "SMKB - [Component Name] - Dev"
+> ```
+> After `pac code init`, `appId` in `power.config.json` will be `null` — this is expected (known PAC CLI behavior). The GUID is populated automatically on the first `pac code push`.
+
 Present the complete plan to the developer for confirmation before beginning any implementation.
 
 ---
@@ -367,17 +393,70 @@ If the command outputs nothing, all placeholders are replaced.
 
 ---
 
+### Step 10b — Post-deploy manual steps
+
+After each `deploy.ps1` or `pnpm deploy`, the developer must complete these steps manually before the next starter can be deployed:
+
+| Starter deployed | What the developer must do next |
+|------------------|---------------------------------|
+| **Dataverse Tables** | Verify tables appear in [make.powerapps.com](https://make.powerapps.com) → Dataverse → Tables |
+| **Environmental Variables** | Set actual runtime values for each env var: Power Apps Maker → Solutions → your solution → Environment Variables → each variable → set Current Value |
+| **Cloud Flows** | For each flow: Power Automate portal → Solutions → your solution → Cloud Flows → open flow → Edit → confirm connection reference assignments → Save → Turn on |
+| **Power Pages** | 1. Visit the portal URL in a browser once to trigger first-time provisioning<br>2. Run Step 11 PAC CLI commands to link the site to the solution |
+| **Power Apps** | If first deploy: run `pac code init` to create the app record before pushing (see Step 9 note) |
+
+> **Env vars and flows must be configured before Power Pages or Power Apps can use them.** Deploy Tables → Env Vars → Flows → configure them → then deploy the portal/app.
+
+---
+
 ### Step 11 — Add Power Pages site to solution (if Power Pages was activated)
 
 After `pnpm deploy` for the Power Pages starter, the site record exists in Dataverse but is NOT yet linked to the Power Platform solution. Without this step, the site will not travel through the pipeline to Stage and Prod.
 
-In Power Apps Maker ([make.powerapps.com](https://make.powerapps.com)):
-1. Open your solution
-2. Click **Add Existing**
-3. Select **Power Pages** -> select your newly deployed site
-4. Save
+> **Do NOT use the Power Apps Maker "Add Existing → Power Pages" button** — it adds only the site record and silently misses ~200 child portal components (pages, templates, content snippets, web files). Use PAC CLI instead.
 
-This links the site record to the solution so it is included in the next pipeline promotion.
+**Step 1 — Get the site GUID:**
+```powershell
+pac pages list
+```
+Copy the GUID from the row matching your portal's display name.
+
+**Step 2 — Add the site record:**
+```powershell
+pac solution add-solution-component `
+    --solution-unique-name YourSolutionName `
+    --component-type powerpagesite `
+    --component-id <site-guid>
+```
+
+**Step 3 — Add all child components (loop — takes ~1–2 minutes):**
+```powershell
+# Replace the path with your renamed portal folder
+$portalFolder = "SMKB - [Your Portal Name] - Power Page\powerpages\<your-portal-folder>"
+
+$guids = Get-ChildItem $portalFolder -Recurse -Include "*.yml" |
+    Select-String -Pattern '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' |
+    ForEach-Object { $_.Matches.Value } |
+    Sort-Object -Unique
+
+foreach ($guid in $guids) {
+    pac solution add-solution-component `
+        --solution-unique-name YourSolutionName `
+        --component-type powerpagecomponent `
+        --component-id $guid
+}
+Write-Host "Done. Added $($guids.Count) portal components."
+```
+
+**Step 4 — Add the site language component:**
+```powershell
+pac solution add-solution-component `
+    --solution-unique-name YourSolutionName `
+    --component-type powerpagesitelanguage `
+    --component-id <site-guid>
+```
+
+After all four steps complete, the portal and all its components are linked to the solution and will travel through the pipeline on the next promotion.
 
 ---
 
@@ -386,10 +465,15 @@ This links the site record to the solution so it is included in the next pipelin
 After folder renames are done (Step 7), the scan is clean (Step 10), and the Power Pages linkage is done (Step 11):
 
 ```powershell
-git add -A
+# Review what will be staged before committing
+git status
+# Stage specific folders rather than -A to avoid accidentally including .env or credential files
+git add "SMKB - [Solution Name] - Dataverse Tables" "SMKB - [Solution Name] - Environmental Variables" ...
 git commit -m "chore: activate starters and rename folders for [Solution Name]"
 git push
 ```
+
+> **Prefer staging specific folder names over `git add -A`** — `git add -A` can accidentally include `.env` files, credential JSON, or other sensitive files if they were created during setup. Run `git status` first and stage only the folders you intentionally modified.
 
 This marks the boundary between "initialized from template" and "active development". All future commits are solution-specific work.
 

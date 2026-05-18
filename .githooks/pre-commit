@@ -5,5 +5,13 @@ if [ -z "$STAGED" ]; then
   exit 0
 fi
 
-cd "SMKB - Power Page Starter/client" || exit 1
+# Find the Power Page client/ folder dynamically so this hook works after Init Project
+# renames "SMKB - Power Page Starter" to the solution-specific folder name.
+CLIENT_DIR=$(find . -maxdepth 3 -type d -name "client" | grep -i "Power Page" | head -1)
+if [ -z "$CLIENT_DIR" ]; then
+  echo "pre-commit: no client/ dir found under any Power Page folder — skipping ESLint"
+  exit 0
+fi
+
+cd "$CLIENT_DIR" || exit 1
 pnpm run lint
