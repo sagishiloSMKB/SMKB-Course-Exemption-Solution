@@ -453,18 +453,100 @@ If the command outputs nothing, all placeholders are replaced.
 
 ---
 
-### Step 10b — Post-deploy manual steps
+### Step 10b — Deploy each activated starter
 
-After each `deploy.ps1` or `pnpm deploy`, the developer must complete these steps manually before the next starter can be deployed:
+Deploy **one starter at a time**, in Critical Rule 4 order (Tables → Env Vars → Flows → Power Apps → Power Pages). Do not proceed to the next until the current one is confirmed working. After each deploy, the agent must log the outcome — this is mandatory, not optional.
 
-| Starter deployed | What the developer must do next |
-|------------------|---------------------------------|
-| **Dataverse Tables** | Verify tables appear in [make.powerapps.com](https://make.powerapps.com) → Dataverse → Tables |
-| **Environmental Variables** | Set actual runtime values for each env var: Power Apps Maker → Solutions → your solution → Environment Variables → each variable → set Current Value |
-| **Cloud Flows** | For each flow: Power Automate portal → Solutions → your solution → Cloud Flows → open flow → Edit → confirm connection reference assignments → Save → Turn on |
-| **Power Pages** | 1. Visit the portal URL in a browser once to trigger first-time provisioning<br>2. Run Step 11 PAC CLI commands to link the site to the solution |
+> **Env vars and flows must be configured before Power Pages or Power Apps can use them.**
 
-> **Env vars and flows must be configured before Power Pages or Power Apps can use them.** Deploy Tables → Env Vars → Flows → configure them → then deploy the portal/app.
+---
+
+#### Dataverse Tables (skip if not activated)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Dataverse Tables\deploy.ps1"
+```
+
+Developer action: Verify tables appear in [make.powerapps.com](https://make.powerapps.com) → **Dataverse → Tables**.
+
+> **10b.F — Tables:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md) now:
+> - Did `deploy.ps1` complete without errors? Paste any unexpected output.
+> - Did `guid-freshen.ps1` run cleanly beforehand (sentinel GUID check passed)?
+> - Did the developer confirm the tables are visible in the Maker portal?
+> - Any placeholder guard false positives or missed placeholders?
+> - Any instruction in INIT_PROJECT.md that was unclear or wrong for this step?
+
+---
+
+#### Environmental Variables (skip if not activated)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Environmental Variables\deploy.ps1"
+```
+
+Developer action: Set runtime values for each env var — **Power Apps Maker → Solutions → your solution → Environment Variables → each variable → Edit → Add current value**.
+
+> **10b.F — Env Vars:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md) now:
+> - Did `deploy.ps1` complete without errors?
+> - Were all env var definitions visible in the Maker portal after import?
+> - Any issues with schema names or `RootComponents` in `Solution.xml`?
+> - Any instruction that was unclear or missing?
+
+---
+
+#### Cloud Flows (skip if not activated)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Cloud Flows\deploy.ps1"
+```
+
+Developer action: For each flow — **Power Automate portal → Solutions → your solution → Cloud Flows → open flow → Edit → confirm connection references → Save → Turn on**. Flows are imported in a disabled state; the developer must enable each one manually.
+
+> **10b.F — Flows:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md) now:
+> - Did `deploy.ps1` complete without errors?
+> - Were the flows visible in the Power Automate portal after import?
+> - Did the autonomous connection reference lookup (from Step 9) work, or did it require manual intervention?
+> - Any JSON parsing errors, wrong placeholder values, or missing `<Workflow>` entries in `Customizations.xml`?
+> - Any instruction that was unclear or missing?
+
+---
+
+#### Power Apps (skip if not activated)
+
+```powershell
+# pac code init has no --path flag — run from inside the Power App folder:
+Push-Location "SMKB - [Component Name] - Power App"
+# First time only — developer must run locally:
+# pac code init --environment "https://org229c958d.crm4.dynamics.com/" --displayName "SMKB - [Component Name] - Dev"
+powershell -ExecutionPolicy Bypass -File deploy.ps1
+Pop-Location
+```
+
+> **10b.F — Power Apps:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md) now:
+> - Did `pac code init` complete and populate `power.config.json` correctly?
+> - Did `deploy.ps1` (pnpm build + pac code push) complete without errors?
+> - Was the app visible in the Power Platform environment?
+> - Any TypeScript, build, or `pac code push` errors?
+> - Any instruction that was unclear or missing?
+
+---
+
+#### Power Pages (skip if not activated)
+
+```powershell
+# From inside the client/ subfolder of the Power Pages starter:
+cd "SMKB - [Component Name] - Power Page\client"
+pnpm deploy
+```
+
+Developer action: Visit the portal URL in a browser once to trigger first-time provisioning. Then run the Step 11 PAC CLI commands to link the site to the solution.
+
+> **10b.F — Power Pages:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md) now:
+> - Did `pnpm deploy` complete without errors?
+> - Did `guid-freshen.ps1` run before this (Step 7b)? Did `verify-consistency.ps1` pass?
+> - Was the portal accessible at the expected URL after the developer visited it?
+> - Any GUID consistency errors, CSP errors, or asset loading failures in DevTools?
+> - Any instruction that was unclear or missing?
 
 ---
 
