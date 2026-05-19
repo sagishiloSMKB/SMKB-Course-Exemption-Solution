@@ -1,16 +1,16 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Entity xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Name LocalizedName="Example Table B" OriginalName="Example Table B">sol_example_table_b</Name>
+  <Name LocalizedName="SOL - Example Table B" OriginalName="SOL - Example Table B">sol_example_table_b</Name>
   <EntityInfo>
     <entity Name="sol_example_table_b">
       <LocalizedNames>
-        <LocalizedName description="Example Table B" languagecode="1033" />
+        <LocalizedName description="SOL - Example Table B" languagecode="1033" />
       </LocalizedNames>
       <LocalizedCollectionNames>
-        <LocalizedCollectionName description="Example Table Bs" languagecode="1033" />
+        <LocalizedCollectionName description="SOL - Example Table Bs" languagecode="1033" />
       </LocalizedCollectionNames>
       <Descriptions>
-        <Description description="Example second table (Table B). Replace with your table description." languagecode="1033" />
+        <Description description="SOL - Example Table B. Replace with your table description." languagecode="1033" />
       </Descriptions>
       <attributes>
 

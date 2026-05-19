@@ -192,6 +192,14 @@ Before any deployment, you must know and confirm with the user:
 
 The short name drives ALL component naming: every table, flow, env var, and related component must be named `[shortName]_component_name`. This prefix prevents collisions between different solutions in the same environment.
 
+**Display name convention:** Every component's human-facing display name must follow `[SHORT_NAME_UPPER] - [Component Display Name]` — uppercase abbreviation, space-hyphen-space separator (e.g. `CFB - Booking Request`, `CFB - Portal Base URL`, `CFB - Booking Submitted`). This applies to Dataverse tables, env var definitions, and cloud flows. Power Apps and Power Pages sites have their own naming conventions — do not apply this pattern to them.
+
+| Component type | Schema name example | Display name example |
+|---------------|--------------------|--------------------|
+| Dataverse table | `cfb_booking_request` | `CFB - Booking Request` |
+| Env var | `CFB_PORTAL_BASE_URL` | `CFB - Portal Base URL` |
+| Cloud flow | `cfb_booking_submitted` | `CFB - Booking Submitted` |
+
 **Folder naming check:** Before touching any files in a starter, verify the folder has been renamed from its template name to the convention name:
 ```
 SMKB - [Component Name] - [Type Label]

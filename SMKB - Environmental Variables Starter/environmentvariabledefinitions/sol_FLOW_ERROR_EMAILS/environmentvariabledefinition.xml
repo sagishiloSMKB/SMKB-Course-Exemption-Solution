@@ -1,6 +1,6 @@
 <environmentvariabledefinition schemaname="sol_FLOW_ERROR_EMAILS">
-  <displayname default="Flow Error Report Emails">
-    <label description="Flow Error Report Emails" languagecode="1033" />
+  <displayname default="SOL - Flow Error Emails">
+    <label description="SOL - Flow Error Emails" languagecode="1033" />
   </displayname>
   <introducedversion>1.0.0.1</introducedversion>
   <iscustomizable>1</iscustomizable>

@@ -1,7 +1,7 @@
 <environmentvariabledefinition schemaname="sol_EXAMPLE_VAR">
   <defaultvalue>your-default-value-here</defaultvalue>
-  <displayname default="EXAMPLE_VAR">
-    <label description="EXAMPLE_VAR" languagecode="1033" />
+  <displayname default="SOL - Example Var">
+    <label description="SOL - Example Var" languagecode="1033" />
   </displayname>
   <introducedversion>1.0.0.1</introducedversion>
   <iscustomizable>1</iscustomizable>

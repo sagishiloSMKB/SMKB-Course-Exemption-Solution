@@ -1,7 +1,7 @@
 <environmentvariabledefinition schemaname="sol_ENVIRONMENT_NAME">
   <defaultvalue>dev</defaultvalue>
-  <displayname default="Environment Name">
-    <label description="Environment Name" languagecode="1033" />
+  <displayname default="SOL - Environment Name">
+    <label description="SOL - Environment Name" languagecode="1033" />
   </displayname>
   <introducedversion>1.0.0.1</introducedversion>
   <iscustomizable>1</iscustomizable>

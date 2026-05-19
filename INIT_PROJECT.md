@@ -413,6 +413,13 @@ Using the specifications from Step 8, build a structured plan covering:
 > ```
 > Use those folder names (e.g. `shared_office365_abc123`) to replace the `[yourid]`, `[sol]`, and `[REPLACE: ...]` placeholders in the flow JSON files under `Workflows\`. See CLAUDE.md → "Connection References" for context on why connection references are shared across solutions.
 
+> **Display names — all three component types** follow `[SHORT_NAME_UPPER] - [Component Display Name]` (e.g. `CFB - Booking Request`). Replace the `SOL - ` prefix in display names at the same time as schema name placeholders:
+> - Tables: `LocalizedName`, `OriginalName`, `LocalizedCollectionName` attributes and the `Description` in `Entity.xml`
+> - Env vars: `<displayname default="...">` and `<label description="...">` in `environmentvariabledefinition.xml`
+> - Flows: `<LocalizedName description="...">` in `Other/Customizations.xml`
+>
+> Power Apps and Power Pages sites use their own conventions — do not apply this pattern to them.
+
 Write the full plan to the plan file, then call `ExitPlanMode` to present it to the developer for approval. Do not begin Steps 10–12 until the developer approves.
 
 ---

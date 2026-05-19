@@ -35,7 +35,7 @@
       <IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>
       <PrimaryEntity>none</PrimaryEntity>
       <LocalizedNames>
-        <LocalizedName languagecode="1033" description="sol_example_flow" />
+        <LocalizedName languagecode="1033" description="SOL - Example Flow" />
       </LocalizedNames>
     </Workflow>
   </Workflows>
