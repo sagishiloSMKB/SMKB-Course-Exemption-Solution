@@ -21,7 +21,7 @@ The same check runs automatically as a blocking step in `pnpm deploy`.
 | X-Frame-Options | `sitesetting.yml` | `DENY` |
 | X-Content-Type-Options | `sitesetting.yml` | `nosniff` |
 | Referrer-Policy | `sitesetting.yml` | `strict-origin-when-cross-origin` |
-| Permissions-Policy | `sitesetting.yml` | Camera, microphone, geolocation disabled |
+| Permissions-Policy | `sitesetting.yml` | `camera=(), microphone=(), geolocation=(), payment=()` |
 | Login throttling | `sitesetting.yml` | 5 attempts / 5 min window; 15 min IP lockout |
 | Login tracking | `sitesetting.yml` | `LoginTrackingEnabled = true` |
 | Cookie SameSite | `sitesetting.yml` | `Lax` |
@@ -148,7 +148,7 @@ Use this checklist before every production release and as the acceptance criteri
 - [ ] `X-Frame-Options: DENY` present in all responses
 - [ ] `X-Content-Type-Options: nosniff` present
 - [ ] `Referrer-Policy: strict-origin-when-cross-origin` present
-- [ ] `Permissions-Policy` present (camera, microphone, geolocation restricted)
+- [ ] `Permissions-Policy` present (`camera=(), microphone=(), geolocation=(), payment=()`)
 - [ ] `Content-Security-Policy` present and does not include `unsafe-inline` for scripts
 - [ ] No sensitive data in response headers (`Server` version suppressed, no `X-Powered-By`, no stack traces)
 

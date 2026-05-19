@@ -9,7 +9,8 @@
  *  5. Bump cache-bust version in the Liquid web template (?v=N)
  *  6. Build the client (vue-tsc + vite build)
  *  7. Copy dist/smkb/* → ../powerpages/.../web-files/
- *  8. Upload via pac pages upload --modelVersion 2
+ *  8. GUID sentinel check (blocks if starter sentinel GUID still present in any YAML file)
+ *  9. Upload via pac pages upload --modelVersion 2
  *
  * Usage (from the client/ directory):
  *   pnpm deploy

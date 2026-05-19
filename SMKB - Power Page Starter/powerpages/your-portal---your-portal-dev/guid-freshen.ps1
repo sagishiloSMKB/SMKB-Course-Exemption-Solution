@@ -32,6 +32,24 @@ if ($websiteYml -match 'TODO') {
     exit 1
 }
 
+# Guard: refuse to run if this portal has already been freshened
+$markerPath = Join-Path $portalDir ".guid-freshened"
+if (Test-Path $markerPath) {
+    Write-Error @"
+guid-freshen.ps1 has already been run for this portal (.guid-freshened exists).
+
+Running it again after the first deploy would break the live portal by generating
+new GUIDs that no longer match the records in Dataverse. Every page would return
+'Page Not Found' -- this is not recoverable without a full re-upload and data migration.
+
+If you are intentionally rebuilding from scratch (blank portal, no live records):
+  1. Delete .guid-freshened manually
+  2. Delete the portal records from Dataverse (pac pages delete or via the portal UI)
+  3. Then run guid-freshen.ps1 again
+"@
+    exit 1
+}
+
 # Collect all YAML files
 $files = Get-ChildItem $portalDir -Recurse -Include "*.yml" -File -ErrorAction SilentlyContinue
 
@@ -87,6 +105,11 @@ foreach ($file in $files) {
 
 Write-Host ""
 Write-Host "Done. $changedFiles file(s) updated. Every portal-scoped GUID is now unique to this portal."
+
+# Write marker so this script cannot run again against a live portal
+[System.IO.File]::WriteAllText($markerPath, "Freshened: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`nPortal directory: $portalDir`n")
+Write-Host "  Marker written: .guid-freshened (prevents accidental second run)"
+
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Run verify-consistency.ps1 to confirm YAML integrity"

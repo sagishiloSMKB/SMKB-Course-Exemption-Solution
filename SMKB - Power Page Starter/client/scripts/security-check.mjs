@@ -13,9 +13,10 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const root     = join(dirname(fileURLToPath(import.meta.url)), '..')
-const repoRoot = join(root, '..')
-const srcDir   = join(root, 'src')
+const root         = join(dirname(fileURLToPath(import.meta.url)), '..')
+const repoRoot     = join(root, '..')        // Power Pages folder (pagesDir reads from here)
+const solutionRoot = join(repoRoot, '..')    // solution folder = git repo root
+const srcDir       = join(root, 'src')
 
 // Locate the powerpages subfolder (adapts after project rename)
 const pagesSubfolders = existsSync(join(repoRoot, 'powerpages'))
@@ -25,7 +26,7 @@ const pagesDir        = pagesSubfolders[0] ? join(repoRoot, 'powerpages', pagesS
 const siteSettingFile = pagesDir ? join(pagesDir, 'sitesetting.yml') : null
 const websiteFile     = pagesDir ? join(pagesDir, 'website.yml') : null
 const deployFile      = join(root, 'scripts', 'deploy.mjs')
-const gitignoreFile   = join(repoRoot, '.gitignore')
+const gitignoreFile   = join(solutionRoot, '.gitignore')
 
 let criticalFailures = 0
 let warnings = 0

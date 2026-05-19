@@ -32,6 +32,24 @@ Never bypass or skip the security check (`--skip`, removing the step, commenting
 - Remove all `console.log` statements from `src/` before committing
 - Validate all data at system boundaries (API responses, URL params, `window.__SMKB_*` globals)
 - `window.__SMKB_*` globals are for non-sensitive config only — never pass tokens or PII through them
+- **Named slots (`#header`, `#footer`, `#slotName`) must be direct children of the component — never wrapped in `<template v-if>` or `<template v-else>`:**
+  ```vue
+  <!-- WRONG — Vue throws: 'v-slot' directive must be owned by a custom element -->
+  <SmkbCard>
+    <template v-if="submitted">
+      <template #header>...</template>
+    </template>
+  </SmkbCard>
+
+  <!-- CORRECT — conditional content goes inside the slot, not around it -->
+  <SmkbCard>
+    <template #header>
+      <h1>{{ submitted ? 'Done' : 'Title' }}</h1>
+    </template>
+    <template v-if="submitted">...</template>
+    <template v-else>...</template>
+  </SmkbCard>
+  ```
 
 **Power Pages / YAML:**
 - Never set `LocalLoginEnabled: true` — Azure AD is the only supported auth path
@@ -168,12 +186,14 @@ pnpm deploy    # build + pac pages upload (from main branch only)
 
 `deploy.mjs` runs these steps:
 1. Checks you are on the `main` branch and that `PORTAL_URL`/`PAGES_SUBDIR` are configured
-2. Runs the security gate (`pnpm check:security` — blocks on critical failures)
-3. Verifies/selects the SMKB-Apps-Dev PAC auth environment (`org229c958d.crm4.dynamics.com`)
-4. Auto-bumps `?v=N` cache version in the Liquid web template
-5. Builds the client (`vue-tsc` + Vite → `dist/smkb/`)
-6. Copies `dist/smkb/app.js` + `dist/smkb/app.css` to `powerpages/.../web-files/`
-7. `pac pages upload --path "powerpages/..." --modelVersion 2`
+2. ESLint (`pnpm run lint` — blocks on `v-html`, `console.log`, Vue rule violations)
+3. Security gate (`pnpm check:security` — blocks on critical failures)
+4. Verifies/selects the SMKB-Apps-Dev PAC auth environment (`org229c958d.crm4.dynamics.com`)
+5. Auto-bumps `?v=N` cache version in the Liquid web template
+6. Builds the client (`vue-tsc` + Vite → `dist/smkb/`)
+7. Copies `dist/smkb/app.js` + `dist/smkb/app.css` to `powerpages/.../web-files/`
+8. GUID sentinel check — blocks if the starter sentinel GUID is still present in any YAML file (run `guid-freshen.ps1` first)
+9. `pac pages upload --path "powerpages/..." --modelVersion 2`
 
 ---
 
@@ -354,5 +374,6 @@ pnpm deploy
 **Rules:**
 - Run `guid-freshen.ps1` **exactly once** per portal, before the first deploy. Never again.
 - Running it a second time generates GUIDs that no longer match Dataverse — the live site breaks.
+- **`guid-freshen.ps1` self-enforces this:** after running, it writes a `.guid-freshened` marker file. On any subsequent invocation, the script reads the marker and exits with an error. To intentionally rebuild from scratch (blank portal, no live records), delete `.guid-freshened` manually first.
 - `deploy.mjs` enforces this: it will block upload if the starter-kit sentinel GUID is still present in any YAML file.
 - **Never run `pac pages download --overwrite` before freshening.** The download brings back the starter-kit GUIDs from the environment, defeating the freshening.

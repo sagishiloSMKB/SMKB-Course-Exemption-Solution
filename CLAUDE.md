@@ -55,6 +55,19 @@ Never run a deploy without confirming the auth target. If the wrong profile is a
 
 ---
 
+## INIT ONBOARDING COMMAND
+
+**Trigger:** User says `init onboarding`, `onboarding`, or `/init-onboarding`
+
+**When triggered:**
+1. Check if `onboarding SMKB Apps Development/node_modules` exists; if not, run `pnpm install` inside that folder first
+2. Run `pnpm run dev` inside `onboarding SMKB Apps Development/`
+3. Tell the user: "Onboarding app is running at **http://localhost:5173** — open it in your browser to begin."
+
+**Note:** `init onboarding` is meant to run before `init project`. It does not require the repo to be initialized. The onboarding folder is removed in Init Project Step 3b and will not be part of any solution repository.
+
+---
+
 ## INIT PROJECT COMMAND
 
 **Trigger conditions:**
@@ -72,7 +85,7 @@ Never run a deploy without confirming the auth target. If the wrong profile is a
 
 ## CRITICAL RULE 1 — Always Ask Which Starters to Activate
 
-At the beginning of any new solution engagement, BEFORE touching any files, you MUST ask the user:
+At the beginning of any new solution engagement, BEFORE touching any files, you MUST ask the user (note: during Init Project, follow the Step 8→9 sequence in INIT_PROJECT.md instead — spec gathering happens before starter selection):
 
 > "Which starters do you want to activate for this solution?
 > - Dataverse Tables (custom data tables)
@@ -104,6 +117,7 @@ Before running `deploy.ps1` in ANY starter folder, you MUST scan that folder for
 | `sol_example_flow` | Flows Starter — `Workflows/*.json`, `Customizations.xml`, `Solution.xml` |
 | `00000000-0000-0000-0000-000000000001` | Flows Starter — flow filename and XML (placeholder GUID) |
 | `[yourid]` | Flows Starter — connection reference names in flow JSON |
+| `[sol]` | Flows Starter — placeholder prefix in connection reference logical names in flow JSON |
 | `[REPLACE` | Flows Starter — placeholder content in flow JSON; Power Apps Starter — `power.config.json` connection ID |
 | `sol_example_item` | Power Apps Starter — `src/services/dataService.ts`, `src/types/ExampleItem.ts` |
 | `00000000-0000-0000-0000-000000000000` | Power Apps Starter — `power.config.json` App ID |
@@ -149,7 +163,7 @@ Run this before any deploy to check a specific starter folder:
 ```powershell
 # Replace $starterPath with the starter folder path
 $starterPath = ".\SMKB - Dataverse Tables Starter"
-$patterns = 'YourSolutionName','sol_example_table','sol_EXAMPLE_VAR','your-default-value-here','sol_example_flow','00000000-0000-0000-0000-000000000001','\[yourid\]','\[REPLACE'
+$patterns = 'YourSolutionName','sol_example_table','sol_EXAMPLE_VAR','your-default-value-here','sol_example_flow','00000000-0000-0000-0000-000000000001','\[yourid\]','\[REPLACE','\[sol\]'
 Get-ChildItem $starterPath -Recurse -File -Include "*.xml","*.json","*.ps1" -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -notmatch '_dist' } |
     ForEach-Object {
@@ -292,6 +306,8 @@ When a solution containing flows is imported, flows are often left in a disabled
 **For Flows:** Do NOT use `pac solution pack` directly — it cannot include Cloud Flow JSONs. Always use the `deploy.ps1` script which builds the zip manually.
 
 **For Power Apps:** Do NOT use `pac solution pack/import`. Code Apps are deployed with `pac code push`. Requires Node 20+ and pnpm 9+. The app record must exist before the first push — `pac code push` updates an existing record, it does NOT create one. **There is no "New Code App" option in the portal.** Use `pac code init --environment "https://org229c958d.crm4.dynamics.com/" --displayName "SMKB - [Component Name] - Dev"` to create the app record and populate `power.config.json` in a single step (delete any existing `power.config.json` first). Never try to create a Code App via the Power Apps portal UI.
+
+`deploy.ps1` also reads **`deploy.config.json`** (in the Power Apps starter folder) for `solutionName` and `targetEnv`. This file ships with `"solutionName": "YourSolutionName"` as a placeholder — replace it with the solution's unique name (e.g. `"SMKBEvents"`) before running `deploy.ps1` for the first time.
 
 **For Power Pages — linking site to solution (after first upload):** The Maker portal "Add Existing → Power Pages" button only adds the site record and silently omits ~200 child components. Use `pac solution add-solution-component` instead:
 

@@ -33,13 +33,14 @@ $placeholders = @(
     'sol_example_item'
 )
 $violations = @()
-Get-ChildItem $scriptDir -Recurse -File -Include "*.json","*.ts","*.vue" -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch 'node_modules|\\dist\\|_dist' } | ForEach-Object {
-        $c = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
-        foreach ($p in $placeholders) {
-            if ($c -match $p) { $violations += "  '$p'  in  $($_.Name)" }
-        }
+$scanFiles = Get-ChildItem $scriptDir -Recurse -File -Include "*.json","*.ts","*.vue" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch 'node_modules|\\dist\\|_dist' }
+foreach ($file in $scanFiles) {
+    $c = [System.IO.File]::ReadAllText($file.FullName)
+    foreach ($p in $placeholders) {
+        if ($c -match $p) { $violations += "  '$p'  in  $($file.Name)" }
     }
+}
 if ($violations) {
     Write-Host "`nDEPLOY BLOCKED -- Unreplaced placeholders found:" -ForegroundColor Red
     $violations | Select-Object -Unique | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }

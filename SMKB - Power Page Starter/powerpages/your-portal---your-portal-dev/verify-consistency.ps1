@@ -6,6 +6,7 @@
 #   2. No starter-kit sentinel GUIDs remain (guid-freshen.ps1 has been run)
 #   3. Every content page's adx_rootwebpageid matches a root page in this portal
 #   4. Every weblink adx_pageid resolves to a root page in this portal
+#   5. Every web-file adx_parentpageid resolves to a root page in this portal
 #
 # USAGE:
 #   powershell -ExecutionPolicy Bypass -File verify-consistency.ps1

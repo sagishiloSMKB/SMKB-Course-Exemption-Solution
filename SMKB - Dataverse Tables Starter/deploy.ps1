@@ -24,17 +24,49 @@ $zipPath   = Join-Path $distDir "solution.zip"
 # Blocks deployment if any template placeholders remain unreplaced.
 $placeholders = @('YourSolutionName', 'Your Solution Name', 'sol_example_table')
 $violations   = @()
-Get-ChildItem $scriptDir -Recurse -File -Include "*.xml" -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch '_dist' } | ForEach-Object {
-        $c = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
-        foreach ($p in $placeholders) {
-            if ($c -match $p) { $violations += "  '$p'  in  $($_.Name)" }
-        }
+$scanFiles = Get-ChildItem $scriptDir -Recurse -File -Include "*.xml" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch '_dist' }
+foreach ($file in $scanFiles) {
+    $c = [System.IO.File]::ReadAllText($file.FullName)
+    foreach ($p in $placeholders) {
+        if ($c -match $p) { $violations += "  '$p'  in  $($file.Name)" }
     }
+}
 if ($violations) {
     Write-Host "`nDEPLOY BLOCKED -- Unreplaced placeholders found:" -ForegroundColor Red
     $violations | Select-Object -Unique | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
     Write-Host "`nComplete the Activation Guide in README.md before deploying.`n" -ForegroundColor Cyan
+    exit 1
+}
+# -----------------------------------------------------------------------------
+
+# -- Sentinel GUID check ------------------------------------------------------
+# Blocks deployment if starter-kit template GUIDs haven't been freshened.
+# These GUIDs were deployed to SMKB-Apps-Dev from a template test -- any new
+# project with the same GUIDs hits a PRIMARY KEY violation or silently overwrites
+# the template records. Run guid-freshen.ps1 once before first deploy.
+$SENTINEL_GUIDS = @(
+    'c481897d-0ff9-4a3c-9872-1f64ea629903',
+    'd43b64b7-302f-4356-afe5-40968a40221a',
+    '8595077e-7d34-4620-9a12-517e1faf9243',
+    'f3d39362-199b-4b94-a559-4a83e05c4899',
+    '4068faef-f780-41e0-b8ab-b249e8289bb5',
+    '08f54373-7133-4436-ad7e-b1bbc3cb245f',
+    '2b0561cb-7ebf-4958-a382-3007e2d8614c',
+    '32813506-bc57-40a3-8bfa-0dc75721a944'
+)
+$staleFiles = @()
+$xmlFiles = Get-ChildItem (Join-Path $scriptDir "Entities") -Recurse -Include "*.xml" -File -ErrorAction SilentlyContinue
+foreach ($f in $xmlFiles) {
+    $c = [System.IO.File]::ReadAllText($f.FullName)
+    foreach ($sg in $SENTINEL_GUIDS) {
+        if ($c -match [regex]::Escape($sg)) { $staleFiles += $f.Name; break }
+    }
+}
+if ($staleFiles) {
+    Write-Host "`nDEPLOY BLOCKED -- Starter-kit sentinel GUIDs found in:" -ForegroundColor Red
+    $staleFiles | Select-Object -Unique | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+    Write-Host "`nRun guid-freshen.ps1 before first deploy to prevent collisions with other projects.`n" -ForegroundColor Cyan
     exit 1
 }
 # -----------------------------------------------------------------------------

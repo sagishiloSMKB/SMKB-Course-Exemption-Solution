@@ -69,13 +69,14 @@ $placeholders = @(
     'sol_FLOW_ERROR_EMAILS'
 )
 $violations = @()
-Get-ChildItem $scriptDir -Recurse -File -Include "*.xml","*.json" -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch '_dist' } | ForEach-Object {
-        $c = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
-        foreach ($p in $placeholders) {
-            if ($c -match $p) { $violations += "  '$p'  in  $($_.Name)" }
-        }
+$scanFiles = Get-ChildItem $scriptDir -Recurse -File -Include "*.xml","*.json" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch '_dist' }
+foreach ($file in $scanFiles) {
+    $c = [System.IO.File]::ReadAllText($file.FullName)
+    foreach ($p in $placeholders) {
+        if ($c -match $p) { $violations += "  '$p'  in  $($file.Name)" }
     }
+}
 if ($violations) {
     Write-Host "`nDEPLOY BLOCKED -- Unreplaced placeholders found:" -ForegroundColor Red
     $violations | Select-Object -Unique | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
@@ -109,16 +110,9 @@ Add-ZipText $archive "[Content_Types].xml" @'
 </Types>
 '@
 
-# customizations.xml -- Workflows section MUST be childless for Cloud Flows
-Add-ZipText $archive "customizations.xml" @'
-<?xml version="1.0" encoding="utf-8"?>
-<ImportExportXml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Entities /><Roles /><Workflows /><FieldSecurityProfiles /><Templates />
-  <EntityMaps /><EntityRelationships /><OrganizationSettings /><optionsets />
-  <WebResources /><CustomControls /><EntityDataProviders />
-  <Languages><Language>1033</Language></Languages>
-</ImportExportXml>
-'@
+# customizations.xml -- read from Other/Customizations.xml which has <Workflow> metadata entries.
+# Without <Workflow> entries the flow JSONs are in the zip but Dataverse never creates Workflow records.
+Add-ZipText $archive "customizations.xml" ([System.IO.File]::ReadAllText("$scriptDir\Other\Customizations.xml"))
 
 # solution.xml (from Other/)
 Add-ZipText $archive "solution.xml" (Get-Content "$scriptDir\Other\Solution.xml" -Raw)

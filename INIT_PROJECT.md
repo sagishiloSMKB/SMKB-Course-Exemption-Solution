@@ -56,7 +56,7 @@ This guide walks through the **one-time setup** required when you clone this sta
 
 ## Who Does What
 
-Init Project is a collaboration between the agent and the developer. The agent handles file changes; deployments and portal actions require the developer to act locally.
+Init Project is a collaboration between the agent and the developer. The agent handles all file changes and can run deploy commands when you explicitly request them. Some actions require the developer to act locally because they involve browser interaction, credentials, or one-time machine setup.
 
 | Task | Agent | Developer |
 |------|-------|-----------|
@@ -67,13 +67,13 @@ Init Project is a collaboration between the agent and the developer. The agent h
 | `pac auth select` / `pac auth create` (change active profile) | — | Must run locally — blocked in agent settings |
 | `pnpm install` in starter folders (Step 5b) | — | Must run locally — required before first commit touching .vue/.ts |
 | Run `guid-freshen.ps1` (Step 7b) | — | Must run locally (PowerShell) |
-| Run `deploy.ps1` / `pnpm deploy` | — | Must run locally (PowerShell) |
+| Run `deploy.ps1` / `pnpm deploy` | When you say "deploy" | Confirm auth is correct first |
 | Visit portal URL in browser (first provisioning) | — | Must do in browser |
 | Set env var values in Maker portal | — | Power Apps Maker → Solutions → your solution → Env Vars |
 | Confirm flow connection references + turn on flows | — | Power Automate portal → Solutions → your solution → Cloud Flows |
 | Create app record (`pac code init`) | — | Must run locally before first push |
 | Run Step 11 PAC CLI commands to add portal to solution | — | Must run locally (PowerShell) |
-| Stage and push commits | — | Confirm each time |
+| Stage and push commits | When you say "commit" / "push" | Confirm each time |
 
 ---
 
@@ -165,6 +165,23 @@ Verify it is gone:
 ```powershell
 git remote -v
 # Expected: (no output)
+```
+
+---
+
+### Step 3b — Remove the onboarding folder
+
+The `onboarding SMKB Apps Development/` folder is a local developer learning tool. It must not be pushed to any solution repository.
+
+Ask the developer to run:
+```powershell
+Remove-Item -Recurse -Force "onboarding SMKB Apps Development"
+```
+
+Verify it is gone:
+```powershell
+Test-Path "onboarding SMKB Apps Development"
+# Expected: False
 ```
 
 ---
@@ -377,11 +394,24 @@ Using the specifications from Step 8, build a structured plan covering:
 5. **Development sequence** — which starter to implement first (follow Critical Rule 4 in CLAUDE.md: Tables -> Env Vars -> Flows -> Power Pages)
 
 > **Power Apps — app record must exist before first deploy.** `pac code push` does NOT create app records. Before the first `deploy.ps1`, the developer must run:
+>
+> **`pac code init` has no `--path` flag — it always writes to the current directory.** Run it from inside the Power App folder using `Push-Location`:
 > ```powershell
-> # Delete power.config.json first if it already exists in the starter folder
+> Push-Location ".\SMKB - [Component Name] - Power App"
+> # Delete power.config.json first if it already exists
 > pac code init --environment "https://org229c958d.crm4.dynamics.com/" --displayName "SMKB - [Component Name] - Dev"
+> Pop-Location
 > ```
 > After `pac code init`, `appId` in `power.config.json` will be `null` — this is expected (known PAC CLI behavior). The GUID is populated automatically on the first `pac code push`.
+
+> **Cloud Flows — connection reference logical names must be looked up autonomously — do NOT ask the developer.** Export any existing solution that already has working flows, then read the folder names:
+> ```powershell
+> pac solution export --name <AnExistingSolutionWithFlows> --path .\inspect.zip --overwrite
+> pac solution unpack --zipFile .\inspect.zip --folder .\inspect_unpacked
+> # Each folder name under inspect_unpacked\connectionreferences\ IS the logical name
+> Remove-Item .\inspect.zip, .\inspect_unpacked -Recurse -Force
+> ```
+> Use those folder names (e.g. `shared_office365_abc123`) to replace the `[yourid]`, `[sol]`, and `[REPLACE: ...]` placeholders in the flow JSON files under `Workflows\`. See CLAUDE.md → "Connection References" for context on why connection references are shared across solutions.
 
 Write the full plan to the plan file, then call `ExitPlanMode` to present it to the developer for approval. Do not begin Steps 10–12 until the developer approves.
 
@@ -426,7 +456,6 @@ After each `deploy.ps1` or `pnpm deploy`, the developer must complete these step
 | **Environmental Variables** | Set actual runtime values for each env var: Power Apps Maker → Solutions → your solution → Environment Variables → each variable → set Current Value |
 | **Cloud Flows** | For each flow: Power Automate portal → Solutions → your solution → Cloud Flows → open flow → Edit → confirm connection reference assignments → Save → Turn on |
 | **Power Pages** | 1. Visit the portal URL in a browser once to trigger first-time provisioning<br>2. Run Step 11 PAC CLI commands to link the site to the solution |
-| **Power Apps** | If first deploy: run `pac code init` to create the app record before pushing (see Step 9 note) |
 
 > **Env vars and flows must be configured before Power Pages or Power Apps can use them.** Deploy Tables → Env Vars → Flows → configure them → then deploy the portal/app.
 

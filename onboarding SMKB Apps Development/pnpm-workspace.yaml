@@ -1,0 +1,3 @@
+allowBuilds:
+  '@smkb/design-ui': true
+  esbuild: true

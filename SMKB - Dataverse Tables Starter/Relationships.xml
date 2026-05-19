@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  TEMPLATE / REFERENCE — this file is not read by pac solution pack.
+  REFERENCE TEMPLATE — DO NOT PLACE IN Other/ — pac solution pack reads all XML files there.
+  This file is for documentation only and is not imported into Dataverse.
+
   When you add lookup columns that link two tables, copy the <EntityRelationship>
   block below into Other/Customizations.xml inside the <EntityRelationships> element.
-
   Also add the lookup attribute to the referencing table's Entity.xml.
 
   Naming conventions:

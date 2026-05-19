@@ -24,13 +24,14 @@ $zipPath   = Join-Path $distDir "solution.zip"
 # Blocks deployment if any template placeholders remain unreplaced.
 $placeholders = @('YourSolutionName', 'Your Solution Name', 'sol_EXAMPLE_VAR', 'your-default-value-here', 'sol_ENVIRONMENT_NAME', 'sol_FLOW_ERROR_EMAILS')
 $violations   = @()
-Get-ChildItem $scriptDir -Recurse -File -Include "*.xml" -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch '_dist' } | ForEach-Object {
-        $c = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
-        foreach ($p in $placeholders) {
-            if ($c -match $p) { $violations += "  '$p'  in  $($_.Name)" }
-        }
+$scanFiles = Get-ChildItem $scriptDir -Recurse -File -Include "*.xml" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch '_dist' }
+foreach ($file in $scanFiles) {
+    $c = [System.IO.File]::ReadAllText($file.FullName)
+    foreach ($p in $placeholders) {
+        if ($c -match $p) { $violations += "  '$p'  in  $($file.Name)" }
     }
+}
 if ($violations) {
     Write-Host "`nDEPLOY BLOCKED -- Unreplaced placeholders found:" -ForegroundColor Red
     $violations | Select-Object -Unique | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
