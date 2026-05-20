@@ -76,6 +76,23 @@ if ($liveWebsiteIdMatch.Success) {
     $guidMap.Remove($liveId) | Out-Null
 }
 
+# Remove adx_portallanguageid values from the map — these reference records in the global
+# adx_portallanguage table (e.g. English = 77b70744) that are provisioned by the Power Pages
+# platform and exist environment-wide. They are NOT portal-scoped. Replacing them breaks the
+# website language lookup, causing every page to return "Page Not Found" after the first deploy.
+$websiteLanguageYmlPath = Join-Path $portalDir "websitelanguage.yml"
+if (Test-Path $websiteLanguageYmlPath) {
+    $wlContent = Get-Content $websiteLanguageYmlPath -Raw -Encoding UTF8
+    $portalLangMatches = [regex]::Matches($wlContent, "adx_portallanguageid:\s*($guidRegex)")
+    foreach ($m in $portalLangMatches) {
+        $langId = $m.Groups[1].Value.ToLower()
+        if ($guidMap.ContainsKey($langId)) {
+            $guidMap.Remove($langId) | Out-Null
+            Write-Host "  Preserved (global portal language): $langId"
+        }
+    }
+}
+
 Write-Host "Found $($guidMap.Count) unique GUIDs to replace."
 
 if ($DryRun) {

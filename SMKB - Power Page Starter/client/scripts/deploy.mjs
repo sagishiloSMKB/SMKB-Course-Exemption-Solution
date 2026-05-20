@@ -144,7 +144,6 @@ execSync(
 )
 
 console.log('\n✅ Deployment complete.')
-console.log(`   Clear server cache: ${PORTAL_URL}/_services/about`)
 
 console.log('\n📋 Next step — promote to Stage/Production:')
 console.log('   1. Verify the Dev site looks correct')
