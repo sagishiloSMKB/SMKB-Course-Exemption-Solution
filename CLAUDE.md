@@ -156,6 +156,16 @@ After activating the Env Vars Starter, the `Other/Solution.xml` `<RootComponents
 
 If `<RootComponents />` is self-closing or empty, env var definitions will be upserted to Dataverse but will **not be linked to the solution** — they will not travel through the pipeline to Stage and Prod. A template comment in `Other/Solution.xml` shows the format.
 
+### Env Vars — Type Codes and the JSON Type Trap
+
+Env var type codes in `environmentvariabledefinition.xml`:
+- `100000000` = String
+- `100000001` = Number
+- `100000002` = Boolean
+- `100000003` = JSON
+
+**Never use JSON type for email lists.** Use String with semicolon-separated addresses (e.g. `admin@smkb.ac.il;ops@smkb.ac.il`). JSON-type env vars require `json()` parsing in every expression that reads them. If a wrong-type var is already deployed, reimport cannot change its type — the only fix is: create a replacement var with a new schema name → migrate all references → redeploy → delete the old var.
+
 ### Placeholder Detection Command
 
 Run this before any deploy to check a specific starter folder:
@@ -164,17 +174,18 @@ Run this before any deploy to check a specific starter folder:
 # Replace $starterPath with the starter folder path
 $starterPath = ".\SMKB - Dataverse Tables Starter"
 $patterns = 'YourSolutionName','sol_example_table','sol_EXAMPLE_VAR','your-default-value-here','sol_example_flow','00000000-0000-0000-0000-000000000001','\[yourid\]','\[REPLACE','\[sol\]'
-Get-ChildItem $starterPath -Recurse -File -Include "*.xml","*.json","*.ps1" -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch '_dist' } |
+Get-ChildItem $starterPath -Recurse -File -Include "*.xml","*.json","*.ts","*.vue","*.yml" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch '_dist|node_modules|\.git' } |
     ForEach-Object {
         $file = $_
+        try { $c = [System.IO.File]::ReadAllText($file.FullName) } catch { return }
         foreach ($p in $patterns) {
-            if ((Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue) -match $p) {
-                Write-Host "PLACEHOLDER FOUND: '$p' in $($file.Name)"
-            }
+            if ($c -match $p) { Write-Host "PLACEHOLDER FOUND: '$p' in $($file.Name)" }
         }
     }
 ```
+
+> **Note:** `.ps1` files are excluded to prevent deploy scripts from flagging themselves.
 
 ---
 
@@ -193,6 +204,8 @@ Before any deployment, you must know and confirm with the user:
 The short name drives ALL component naming: every table, flow, env var, and related component must be named `[shortName]_component_name`. This prefix prevents collisions between different solutions in the same environment.
 
 **Display name convention:** Every component's human-facing display name must follow `[SHORT_NAME_UPPER] - [Component Display Name]` — uppercase abbreviation, space-hyphen-space separator (e.g. `CFB - Booking Request`, `CFB - Portal Base URL`, `CFB - Booking Submitted`). This applies to Dataverse tables, env var definitions, and cloud flows. Power Apps and Power Pages sites have their own naming conventions — do not apply this pattern to them.
+
+**ASCII hyphens only in XML files:** Never use Unicode en dash (–, U+2013) or em dash in XML `LocalizedName` or `Solution.xml` display names. Hebrew-locale Windows (Windows-1255) misinterprets the UTF-8 en dash bytes as garbled characters (`ג€"`). Always use space-hyphen-space ` - ` (ASCII 0x2D).
 
 | Component type | Schema name example | Display name example |
 |---------------|--------------------|--------------------|
@@ -284,13 +297,28 @@ A connection reference is an environment-level pointer to a connection (credenti
 **How to find the logical name of an existing connection reference:**
 
 ```powershell
-# Export any solution that already has a working flow
-pac solution export --name <AnExistingSolutionWithFlows> --path .\inspect.zip --overwrite
+# Step 1: find a solution with working flows
+pac solution list
+
+# Step 2: export and unpack
+pac solution export --name <SolutionUniqueName> --path .\inspect.zip --overwrite
 pac solution unpack --zipFile .\inspect.zip --folder .\inspect_unpacked
-# Look in inspect_unpacked\connectionreferences\ — each folder name IS the logical name
+
+# Step 3: extract logical names from flow JSON files
+Get-ChildItem .\inspect_unpacked\Workflows -Filter "*.json" | ForEach-Object {
+    $j = Get-Content $_.FullName | ConvertFrom-Json
+    $j.properties.connectionReferences.PSObject.Properties | ForEach-Object {
+        [PSCustomObject]@{ Key = $_.Name; ApiName = $_.Value.api.name; LogicalName = $_.Value.connection.connectionReferenceLogicalName }
+    }
+} | Format-Table -AutoSize
+
+# Step 4: clean up
+Remove-Item .\inspect.zip, .\inspect_unpacked -Recurse -Force
 ```
 
-The folder name (e.g. `shared_office365_abc123def`) is the value to use in the flow JSON's `connectionReferences` section.
+The `LogicalName` column value (e.g. `shared_office365_abc123def`) is what to use in the flow JSON's `connectionReferences` section.
+
+> **Note:** The `connectionreferences/` folder does NOT exist in unpacked solutions. Connection reference logical names are embedded in the flow JSON under `connectionReferences[*].connection.connectionReferenceLogicalName`.
 
 **After import — if flows are disabled:**
 When a solution containing flows is imported, flows are often left in a disabled state until connection references are confirmed. To enable:

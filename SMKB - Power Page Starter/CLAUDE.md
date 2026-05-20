@@ -166,9 +166,9 @@ The home page uses the **SMKB App** page template (`adx_usewebsiteheaderandfoote
 | Home page (root) | `a3f1bd7e-2958-45af-90ce-e9d951422a3d` | Replaced by `guid-freshen.ps1` |
 | SMKB App page template | `4fc2abf8-23fa-4b2a-8f07-9a5f9e123eab` | Replaced by `guid-freshen.ps1` |
 | SMKB App web template | `53cba0bc-bcc7-4b58-ae2b-6fd5b61973d9` | Replaced by `guid-freshen.ps1` |
-| Language (English/1033) | `77b70744-951d-4f29-9f99-2e2c8a19db20` | No |
-| Published state | `498e04fe-0f5f-4a19-b384-3b0470b012b4` | No |
-| Draft state | `ebb208dc-b9f2-4d43-a177-6e28de9092d6` | No |
+| Language (English/1033) — both `adx_portallanguageid` AND `adx_websitelanguageid` in `websitelanguage.yml` | `77b70744-951d-4f29-9f99-2e2c8a19db20` | Replaced by `guid-freshen.ps1` — **both fields replaced to the same new GUID** |
+| Published state | `498e04fe-0f5f-4a19-b384-3b0470b012b4` | Replaced by `guid-freshen.ps1` |
+| Draft state | `ebb208dc-b9f2-4d43-a177-6e28de9092d6` | Replaced by `guid-freshen.ps1` |
 
 ---
 
@@ -377,3 +377,78 @@ pnpm deploy
 - **`guid-freshen.ps1` self-enforces this:** after running, it writes a `.guid-freshened` marker file. On any subsequent invocation, the script reads the marker and exits with an error. To intentionally rebuild from scratch (blank portal, no live records), delete `.guid-freshened` manually first.
 - `deploy.mjs` enforces this: it will block upload if the starter-kit sentinel GUID is still present in any YAML file.
 - **Never run `pac pages download --overwrite` before freshening.** The download brings back the starter-kit GUIDs from the environment, defeating the freshening.
+
+---
+
+## Blank Portal Orphan Records — Post-First-Deploy Deconflict Required
+
+> **This step is mandatory after every first deploy of a new portal. Skipping it causes "Page Not Found" on the home page.**
+
+### Why the problem exists
+
+When you create a blank portal at make.powerpages.microsoft.com, Power Pages provisions a default set of page records directly in Dataverse:
+
+| Page | `adx_partialurl` |
+|------|-----------------|
+| Home | `/` |
+| Access Denied | `/access-denied` |
+| Page Not Found | `/Page-Not-Found` |
+| Profile | `/profile` |
+| Search | `/search` |
+
+These records are created with platform-assigned GUIDs and your portal's website ID — before you ever run a deploy.
+
+`guid-freshen.ps1` generates fresh GUIDs for all records defined in **your** YAML files. When `pac pages upload` then runs, it upserts records by primary key (`adx_webpageid`). Since your freshened GUIDs are different from the blank portal's GUIDs, your records are inserted as **additional records** alongside the blank portal's originals. Both sets now coexist in Dataverse.
+
+### How this causes "Page Not Found"
+
+Power Pages resolves a URL request for `/` by:
+1. Querying for all root pages (`adx_isroot: true`) with `adx_partialurl = /`
+2. Finding two records: the blank portal's Home and your Home
+3. Picking whichever has the **lexicographically lower `adx_webpageid`**
+4. Looking for that page's content page in your portal's language (`adx_webpagelanguageid`)
+5. If the blank portal's Home page was picked: its content page has the blank portal's language ID (not yours) → "Page Not Found"
+
+### How to fix it — the deconflict script
+
+Run once, immediately after the first `pnpm deploy`:
+
+```powershell
+# From the solution root (adjust portal folder name):
+powershell -ExecutionPolicy Bypass -File "powerpages\<portal-folder>\deconflict-portal.ps1"
+```
+
+`deconflict-portal.ps1` (in the same folder as `guid-freshen.ps1`) will:
+1. Download the current Dataverse portal state via `pac pages download`
+2. Compare downloaded page GUIDs with your local YAML page GUIDs
+3. For each record in Dataverse that is NOT in your YAML (blank portal's orphan), create override YAML files in `web-pages/blank-portal-default-*/` that change `adx_partialurl` to `z-portal-default-XXXXXXXX` and set `adx_hiddenfromsitemap: true`
+4. Print the list of created files
+
+Then deploy again to upload the overrides:
+
+```powershell
+cd client && pnpm deploy
+```
+
+After this second deploy, your portal's home page (and all other pages) will serve correctly.
+
+### Commit the deconflict output
+
+The `web-pages/blank-portal-default-*/` folders that the script creates are permanent fixtures. Commit them. They ensure the blank portal's pages stay relocated even after future deploys.
+
+### Diagnostic — if still broken after deconflict
+
+If the portal still returns "Page Not Found" after running the deconflict script and deploying:
+
+```powershell
+pac pages download --websiteId <your-website-id> --path ./temp-check
+```
+
+Inspect `temp-check/<portal>/web-pages/`. If you see two folders for the same page type (e.g. `home_AAAAA/` and `home_BBBBB/`), the overrides didn't upload correctly. Check that the deconflict script ran without errors and that the second `pnpm deploy` completed. Clean up: `Remove-Item ./temp-check -Recurse -Force`
+
+### The GUID Consistency Rule still applies
+
+After deconflict, the GUID chain must remain intact:
+- `website.yml adx_defaultlanguage` = `websitelanguage.yml adx_websitelanguageid` = `websitelanguage.yml adx_portallanguageid` = all content pages `adx_webpagelanguageid`
+
+The deconflict script preserves each orphan content page's own `adx_webpagelanguageid` — it does not change it. Your own pages remain unaffected.

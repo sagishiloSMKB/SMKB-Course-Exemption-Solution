@@ -52,7 +52,8 @@ pac solution import --path $zipPath --environment $TargetEnv --async --max-async
 Write-Host ""
 Write-Host "Done." -ForegroundColor Green
 Write-Host ""
-Write-Host "REMINDER: The solution import upserts env var DEFINITIONS (schema)." -ForegroundColor Cyan
-Write-Host "After deploying, set the VALUE for each variable in the Power Platform portal:" -ForegroundColor Cyan
-Write-Host "  Solutions -> your solution -> Environment Variables -> [variable] -> Edit -> Add value" -ForegroundColor Cyan
+Write-Host "REMINDER: This import upserts env var DEFINITIONS only — existing Current Values are preserved." -ForegroundColor Cyan
+Write-Host "To set a per-environment value that survives future reimports, use 'Current value':" -ForegroundColor Cyan
+Write-Host "  Maker portal -> Solutions -> [solution] -> Environment Variables -> [var] -> Edit -> '+ New value'" -ForegroundColor Cyan
+Write-Host "  Do NOT edit 'Default value' in the portal — it is owned by the solution XML and resets on every import." -ForegroundColor Yellow
 Write-Host "Values are per-environment and must NEVER be committed to Git." -ForegroundColor Yellow

@@ -157,6 +157,8 @@ Derived values (confirm with the developer):
 
 This is the most important step. Removing the origin prevents any solution-specific work from ever being pushed back to the shared template repo.
 
+> **If you copied files into this folder rather than cloning directly:** Run `git init && git branch -M main` first — there is no remote to remove, but you still need a git repository before adding the new one in Step 5.
+
 ```powershell
 git remote remove origin
 ```
@@ -344,6 +346,20 @@ If `verify-consistency.ps1` reports errors, fix them before continuing.
 
 ---
 
+### Step 7c — (Power Pages only) Note on blank portal default pages
+
+> **Skip this step if the Power Pages starter was NOT activated.**
+
+No action needed here — this is an awareness note for Step 10b.5.
+
+When you created the blank portal at make.powerpages.microsoft.com (before Step 7), Power Pages silently provisioned a full set of default page records in Dataverse (Home, Access Denied, Page Not Found, Profile, Search) with platform-assigned GUIDs. Those records exist in Dataverse RIGHT NOW under your website ID.
+
+After the first `pnpm deploy` (Step 10b), your pages are uploaded as ADDITIONAL records alongside the blank portal's. Both sets coexist. Power Pages URL routing picks whichever root page has the lower GUID — which may be the blank portal's page, not yours. If the blank portal's page "wins", it looks for its content page in your language → finds none → "Page Not Found".
+
+This is not visible until after the first deploy. **Step 10b.5 fixes it automatically** using `deconflict-portal.ps1`, which runs after the first deploy and creates override files to relocate the blank portal's pages to non-conflicting URLs.
+
+---
+
 ### Step 8 — Gather solution specifications
 
 For each activated starter, collect enough detail to drive placeholder replacements and implementation. Ask the developer:
@@ -437,19 +453,20 @@ $patterns = @(
     'sol_example_item', 'Your App Display Name',
     'TODO-your-portal', 'TODO-get-from-pac-pages-list'
 )
-Get-ChildItem "." -Recurse -File -Include "*.xml","*.json","*.ts","*.vue","*.ps1","*.html","*.yml" -ErrorAction SilentlyContinue |
+Get-ChildItem "." -Recurse -File -Include "*.xml","*.json","*.ts","*.vue","*.html","*.yml" -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -notmatch '_dist|node_modules|\.git' } |
     ForEach-Object {
         $file = $_
+        try { $c = [System.IO.File]::ReadAllText($file.FullName) } catch { return }
         foreach ($p in $patterns) {
-            if ((Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue) -match $p) {
-                Write-Host "PLACEHOLDER FOUND: '$p' in $($file.Name)"
-            }
+            if ($c -match $p) { Write-Host "PLACEHOLDER FOUND: '$p' in $($file.Name)" }
         }
     }
 ```
 
 If the command outputs nothing, all placeholders are replaced.
+
+> **Note:** `.ps1` files are excluded from this scan to prevent deploy scripts from flagging themselves (they contain the same placeholder strings as guard patterns).
 
 ---
 
@@ -533,24 +550,77 @@ Pop-Location
 
 #### Power Pages (skip if not activated)
 
+**10b.1 — First deploy:**
+
 ```powershell
 # From inside the client/ subfolder of the Power Pages starter:
 cd "SMKB - [Component Name] - Power Page\client"
 pnpm deploy
 ```
 
-Developer action: Visit the portal URL in a browser once to trigger first-time provisioning. Then run the Step 11 PAC CLI commands to link the site to the solution.
+**10b.2 — Visit the portal URL** to verify it responds (may show "Page Not Found" at this point — that is expected before Step 10b.5).
+
+Developer action: Open the portal URL in a browser. Any response — including "Page Not Found" — means the portal is provisioned and reachable.
+
+---
+
+### Step 10b.5 — Deconflict blank portal default pages (Power Pages only)
+
+> **Skip if Power Pages was NOT activated.**
+
+> **CRITICAL — must run after every first deploy.** Skipping this step leaves the blank portal's default page records competing with your pages for URL routing. The symptom is "Page Not Found" on the home page even though the deploy succeeded.
+
+**Why this is required — the full explanation:**
+
+When you created the blank portal at make.powerpages.microsoft.com, Power Pages provisioned a set of default pages (Home, Access Denied, Page Not Found, etc.) with platform-assigned GUIDs directly in Dataverse. These records exist under your website ID before you ever run a deploy.
+
+`guid-freshen.ps1` generates different GUIDs for your pages. When `pac pages upload` runs, it upserts by primary key — so your freshened-GUID pages are inserted as **new records** alongside the blank portal's original records. Both sets exist in Dataverse simultaneously.
+
+Power Pages URL routing works like this: when a request arrives for `/`, it queries for root pages with `adx_partialurl = /`, finds potentially TWO records (blank portal's home + your home), and picks whichever has the **lexicographically lower `adx_webpageid`**. If the blank portal's page wins, Power Pages looks for its content page in your portal's language — finds none (wrong language ID) — and returns "Page Not Found".
+
+The fix: download the current Dataverse state, find the orphan records, and upload override YAML files that change their `adx_partialurl` to non-conflicting values so they no longer compete with your pages.
+
+**Run the deconflict script:**
+
+```powershell
+# Run from the solution root (adjust the portal folder name):
+powershell -ExecutionPolicy Bypass -File "SMKB - [Component Name] - Power Page\powerpages\<portal-folder>\deconflict-portal.ps1"
+```
+
+The script will:
+1. Download the current Dataverse state for your portal (~30-60 seconds)
+2. Compare downloaded page GUIDs against your local YAML files
+3. For each orphan page (blank portal's record, not in your YAML), create override YAML files in `web-pages/blank-portal-default-*/` with a non-conflicting URL (`z-portal-default-XXXXXXXX`) and `adx_hiddenfromsitemap: true`
+4. Report which files were created and print the next step
+
+**Then deploy again to upload the overrides:**
+
+```powershell
+cd "SMKB - [Component Name] - Power Page\client"
+pnpm deploy
+```
+
+**Then verify:**
+
+Open the portal URL in a browser. It should now load your Vue app (not "Page Not Found").
+
+> **After deconflict runs cleanly once, it is safe to commit the generated `web-pages/blank-portal-default-*/` folders.** These YAML files are permanent — they ensure the blank portal's pages remain at non-conflicting URLs even after future deploys. Do not delete them.
+
+> **Diagnostic — if the portal is still broken:** Run `pac pages download --websiteId <id> --path ./temp-check` and inspect the `web-pages/` folder. If you see multiple folders with similar names (e.g. two `home_*/` folders), duplicate records still exist. Check that the deconflict script ran without errors and that the second `pnpm deploy` completed.
 
 > **10b.F — Power Pages:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md) now:
 > - Did `pnpm deploy` complete without errors?
 > - Did `guid-freshen.ps1` run before this (Step 7b)? Did `verify-consistency.ps1` pass?
-> - Was the portal accessible at the expected URL after the developer visited it?
+> - Did `deconflict-portal.ps1` find any orphan pages? How many?
+> - Was the portal accessible at the expected URL after the deconflict deploy?
 > - Any GUID consistency errors, CSP errors, or asset loading failures in DevTools?
 > - Any instruction that was unclear or missing?
 
 ---
 
 ### Step 11 — Add Power Pages site to solution (if Power Pages was activated)
+
+> **Agent task — run these commands autonomously using the PowerShell tool. Do NOT ask the developer to run them manually. All `pac solution add-solution-component` commands are permitted in agent settings.**
 
 After `pnpm deploy` for the Power Pages starter, the site record exists in Dataverse but is NOT yet linked to the Power Platform solution. Without this step, the site will not travel through the pipeline to Stage and Prod.
 
@@ -589,15 +659,21 @@ foreach ($guid in $guids) {
 Write-Host "Done. Added $($guids.Count) portal components."
 ```
 
+> **Expected output for Step 3:** The portal YAML files contain ~141 unique GUIDs. Expect ~130 successful additions — some GUIDs (like `adx_websiteid` and publishing state GUIDs) will return errors because they are global platform components, not portal components. A ~130/141 success rate is normal and does not indicate a problem.
+
 **Step 4 — Add the site language component:**
+
+> **Note:** The `powerpagesitelanguage` component type reliably fails when the portal was initialized from a freshened starter (the language GUID in your YAML no longer matches the platform's language record). **Skip Step 4** — the language component is already linked through the portal's content structure. Missing this step does not prevent the portal from traveling through the pipeline.
+
 ```powershell
-pac solution add-solution-component `
-    --solution-unique-name YourSolutionName `
-    --component-type powerpagesitelanguage `
-    --component-id <site-guid>
+# Skip this — see note above. Kept for reference only.
+# pac solution add-solution-component `
+#     --solution-unique-name YourSolutionName `
+#     --component-type powerpagesitelanguage `
+#     --component-id <site-guid>
 ```
 
-After all four steps complete, the portal and all its components are linked to the solution and will travel through the pipeline on the next promotion.
+After Steps 1–3 complete, the portal and all its components are linked to the solution and will travel through the pipeline on the next promotion.
 
 ---
 

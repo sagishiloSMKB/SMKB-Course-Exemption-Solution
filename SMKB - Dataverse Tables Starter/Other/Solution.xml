@@ -11,7 +11,7 @@
     <Publisher>
       <UniqueName>SKMBCore</UniqueName>
       <LocalizedNames>
-        <LocalizedName description="SMKB – Core" languagecode="1033" />
+        <LocalizedName description="SMKB - Core" languagecode="1033" />
       </LocalizedNames>
       <Descriptions>
         <Description description="Core publisher for SKMB Power Platform solutions" languagecode="1033" />

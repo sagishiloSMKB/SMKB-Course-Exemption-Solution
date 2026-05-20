@@ -20,6 +20,12 @@ export default defineConfig(({ mode }) => ({
               new URL("src/services/mock/mockDataService.ts", import.meta.url)
             ).replace(/\\/g, "/"),
           },
+          {
+            find: /^.*\/services\/configService$/,
+            replacement: fileURLToPath(
+              new URL("src/services/mock/mockConfigService.ts", import.meta.url)
+            ).replace(/\\/g, "/"),
+          },
         ],
       }
     : undefined,
