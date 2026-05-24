@@ -1,0 +1,339 @@
+{
+  "schemaVersion": "1.0.0.0",
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps_[yourid]": {
+        "runtimeSource": "invoker",
+        "connection": {},
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      },
+      "shared_office365_[yourid]": {
+        "runtimeSource": "invoker",
+        "connection": {},
+        "api": {
+          "name": "shared_office365"
+        }
+      }
+    },
+    "templateName": "",
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "undefined",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "ENVIRONMENT_NAME (sol_ENVIRONMENT_NAME)": {
+          "defaultValue": "dev",
+          "type": "String",
+          "metadata": {
+            "schemaName": "sol_ENVIRONMENT_NAME",
+            "description": "Logical environment name (dev/stage/prod)."
+          }
+        },
+        "ERROR_EMAILS (sol_FLOW_ERROR_EMAILS)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "sol_FLOW_ERROR_EMAILS",
+            "description": "Semicolon-separated email addresses for flow error notifications."
+          }
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "PowerPages",
+          "description": "Power Pages trigger — only callable from your Power Pages site. Registered in Power Pages site settings as SMKB/Flow/CheckOTP.",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "Email address of the user submitting the OTP."
+                },
+                "otp": {
+                  "type": "string",
+                  "description": "6-digit OTP code entered by the user."
+                },
+                "contextId": {
+                  "type": "string",
+                  "description": "[ADAPT]: rename or remove to match sol_create_otp."
+                }
+              },
+              "required": [
+                "email",
+                "otp"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Main_Flow": {
+          "type": "Scope",
+          "description": "All main flow logic. Business errors (NOT_FOUND, WRONG_OTP, LOCKED — expected conditions) use Response + Terminate(Succeeded) inside this scope and do NOT reach Handle_Flow_Error. Only unexpected technical failures bubble up.",
+          "actions": {
+            "Validate_Input": {
+              "type": "If",
+              "description": "Guard: reject missing/malformed input before touching any data. Returns 400 + Terminate(Succeeded) so Handle_Flow_Error does NOT run — invalid input is not a bug.",
+              "expression": "@or(empty(coalesce(triggerBody()?['email'], '')), not(contains(coalesce(triggerBody()?['email'], ''), '@')), not(equals(length(coalesce(triggerBody()?['otp'], '')), 6)))",
+              "actions": {
+                "Respond_invalid_input": {
+                  "type": "Response",
+                  "description": "Return 400 for missing/malformed email or OTP that is not exactly 6 characters.",
+                  "inputs": {
+                    "statusCode": 400,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "code": "INVALID_INPUT"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Terminate_after_invalid_input": {
+                  "type": "Terminate",
+                  "description": "Stop the flow cleanly — no error email, no 500.",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_invalid_input": ["Succeeded"]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "IMPLEMENT_Get_OTP_Record": {
+              "type": "OpenApiConnection",
+              "description": "Retrieve the stored OTP record for this email. [IMPLEMENT]: (1) replace entityName with your OTP table plural logical name (e.g. sol_otprequests). (2) replace sol_email in $filter with your email field name. Returns at most 1 record.",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps_[yourid]",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "[IMPLEMENT]: sol_otprequests",
+                  "$filter": "[IMPLEMENT]: sol_email eq '@{triggerBody()?[''email'']}'",
+                  "$top": 1
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {
+                "Validate_Input": ["Succeeded"]
+              }
+            },
+            "If_OTP_Not_Found": {
+              "type": "If",
+              "description": "No OTP record found for this email — user never sent a code, or it was already consumed. Return NOT_FOUND + Terminate(Succeeded).",
+              "expression": "@equals(length(body('IMPLEMENT_Get_OTP_Record')?['value']), 0)",
+              "actions": {
+                "Respond_not_found": {
+                  "type": "Response",
+                  "description": "Return 400 Not Found.",
+                  "inputs": {
+                    "statusCode": 400,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "code": "NOT_FOUND"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Terminate_not_found": {
+                  "type": "Terminate",
+                  "description": "Stop cleanly — no error email.",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_not_found": ["Succeeded"]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "IMPLEMENT_Get_OTP_Record": ["Succeeded"]
+              }
+            },
+            "If_Account_Locked": {
+              "type": "If",
+              "description": "Account is locked after 5 failed attempts — refuse before even comparing the OTP. [IMPLEMENT]: replace 'sol_attempts' with your actual attempts field name in the OTP table.",
+              "expression": "@greaterOrEquals(coalesce(first(body('IMPLEMENT_Get_OTP_Record')?['value'])?['sol_attempts'], 0), 5)",
+              "actions": {
+                "Respond_locked": {
+                  "type": "Response",
+                  "description": "Return 400 Locked.",
+                  "inputs": {
+                    "statusCode": 400,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "code": "LOCKED"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Terminate_locked": {
+                  "type": "Terminate",
+                  "description": "Stop cleanly — no error email.",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_locked": ["Succeeded"]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "If_OTP_Not_Found": ["Succeeded"]
+              }
+            },
+            "IMPLEMENT_PLACEHOLDER": {
+              "type": "Compose",
+              "description": "[IMPLEMENT — BUSINESS LOGIC]: Replace this Compose action with your actual OTP validation actions.\n\nWhat to build (run in this order inside Main_Flow after If_Account_Locked):\n  1. Check expiry: compare stored expires_at to utcNow(). If expired → Respond_expired({ code: 'LOCKED' }) + Terminate(Succeeded).\n  2. Compare OTPs: if stored otp_code != triggerBody()?['otp']:\n       a. Increment attempts counter on the OTP record (UpdateRecord).\n       b. Compute attemptsRemaining = 5 - new_attempts_value.\n       c. Respond_wrong_otp({ code: 'WRONG_OTP', attemptsRemaining: N }) + Terminate(Succeeded).\n  3. On match:\n       a. Delete the OTP record (DeleteRecord) — one-time use; leaving it enables replay attacks.\n       b. Retrieve the user record from your main user table.\n       c. Expose the user record ID for IMPLEMENT_Create_Auth_Session below (e.g. via a Compose or variable).\n\nSecurity notes:\n  - Always delete the OTP row on success — replay attacks are trivially prevented this way.\n  - Expiry check MUST run before the comparison; expired codes should NOT increment the attempts counter.\n  - Comparing plaintext 6-digit codes is safe here because the 5-attempt lockout prevents enumeration.\n\nSession cleanup (optional but recommended):\n  - Before creating the new auth session, delete any previous session rows for this email:\n    ListRecords(sol_sessions, $filter: sol_email eq '...') → Apply_to_each → DeleteRecord.\n    This prevents accumulation of valid tokens for the same user.\n  - A scheduled cleanup flow running daily to delete expired rows is also recommended.\n\nCRITICAL — two error categories:\n\n(A) BUSINESS ERRORS (WRONG_OTP, LOCKED, NOT_FOUND, EXPIRED — expected, do NOT send error email):\n    Pattern: Response(4xx) → Terminate(runStatus: Succeeded)\n    Terminate(Succeeded) ends the run cleanly. Handle_Flow_Error does NOT run.\n\n(B) TECHNICAL ERRORS (Dataverse failure, null reference — unexpected bugs):\n    Let them throw unhandled. The scope fails → Handle_Flow_Error runs → error email sent → 500 returned.",
+              "inputs": "[IMPLEMENT]",
+              "runAfter": {
+                "If_Account_Locked": ["Succeeded"]
+              }
+            },
+            "Compose_Generate_Auth_Token": {
+              "type": "Compose",
+              "description": "Generate a random auth token. guid() produces a UUID-4 format string — cryptographically suitable as an opaque session token.",
+              "inputs": "@guid()",
+              "runAfter": {
+                "IMPLEMENT_PLACEHOLDER": ["Succeeded"]
+              }
+            },
+            "IMPLEMENT_Create_Auth_Session": {
+              "type": "OpenApiConnection",
+              "description": "Create a session record in the Dataverse sessions table. [IMPLEMENT]: (1) replace entityName with your session table plural name (e.g. sol_sessions). (2) replace sol_token/sol_email/sol_expires_at/sol_userid with your actual field schema names. (3) set item/sol_userid to the user record ID from IMPLEMENT_PLACEHOLDER.",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps_[yourid]",
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "[IMPLEMENT]: sol_sessions",
+                  "item/sol_token":      "@outputs('Compose_Generate_Auth_Token')",
+                  "item/sol_email":      "@triggerBody()?['email']",
+                  "item/sol_expires_at": "@addHours(utcNow(), 1)",
+                  "item/[IMPLEMENT]:sol_userid": "[IMPLEMENT]: user record ID from IMPLEMENT_PLACEHOLDER — e.g. @outputs('Get_user_record')?['body/sol_userid']"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {
+                "Compose_Generate_Auth_Token": ["Succeeded"]
+              }
+            },
+            "Respond_to_PowerPages": {
+              "type": "Response",
+              "description": "Return the authenticated user record and auth token to the Power Pages caller. [IMPLEMENT]: replace inviteeId/firstName/lastName body fields with your actual user record expressions.",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "inviteeId":          "[IMPLEMENT]: e.g. @outputs('IMPLEMENT_Get_user_record')?['body/sol_userid']",
+                  "firstName":          "[IMPLEMENT]: e.g. @outputs('IMPLEMENT_Get_user_record')?['body/sol_firstname']",
+                  "lastName":           "[IMPLEMENT]: e.g. @outputs('IMPLEMENT_Get_user_record')?['body/sol_lastname']",
+                  "email":              "[IMPLEMENT]: e.g. @triggerBody()?['email']",
+                  "authToken":          "@outputs('Compose_Generate_Auth_Token')",
+                  "authTokenExpiresAt": "@addHours(utcNow(), 1)"
+                }
+              },
+              "runAfter": {
+                "IMPLEMENT_Create_Auth_Session": ["Succeeded"]
+              }
+            }
+          },
+          "runAfter": {}
+        },
+        "Handle_Flow_Error": {
+          "type": "Scope",
+          "description": "Error handler — runs ONLY on unexpected technical failures (unhandled exception in Main_Flow). Business errors (WRONG_OTP, LOCKED, NOT_FOUND) use Terminate(Succeeded) inside Main_Flow and never reach here.",
+          "actions": {
+            "Check_Error_Emails_Configured": {
+              "type": "If",
+              "description": "Only send the error email if sol_FLOW_ERROR_EMAILS is configured. Skipping silently when the env var is empty avoids spurious SendEmailV2 failures that would add noise to every error handler run.",
+              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (sol_FLOW_ERROR_EMAILS)'))))",
+              "actions": {
+                "Send_error_notification": {
+                  "type": "OpenApiConnection",
+                  "description": "Send error alert to all addresses in sol_FLOW_ERROR_EMAILS (semicolon-separated String env var).",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365_[yourid]",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/From": "[sol]NoReply@yourdomain.com",
+                      "emailMessage/To": "@parameters('ERROR_EMAILS (sol_FLOW_ERROR_EMAILS)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (sol_ENVIRONMENT_NAME)')), ') [ERROR] sol_check_otp failed')",
+                      "emailMessage/Body": "@concat('<p>The flow <strong>sol_check_otp</strong> failed unexpectedly in the <strong>', parameters('ENVIRONMENT_NAME (sol_ENVIRONMENT_NAME)'), '</strong> environment.</p><p><strong>Triggered by:</strong> ', coalesce(triggerBody()?['email'], '(unknown)'), '</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p><p>Open Power Automate &#8594; Cloud flows &#8594; sol_check_otp &#8594; Run history to investigate.</p>')",
+                      "emailMessage/Importance": "High"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Respond_with_error": {
+              "type": "Response",
+              "description": "Always return a response so the Power Pages caller does not hang.",
+              "inputs": {
+                "statusCode": 500,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "code": "ERROR"
+                }
+              },
+              "runAfter": {
+                "Check_Error_Emails_Configured": ["Succeeded", "Failed", "Skipped"]
+              }
+            }
+          },
+          "runAfter": {
+            "Main_Flow": [
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

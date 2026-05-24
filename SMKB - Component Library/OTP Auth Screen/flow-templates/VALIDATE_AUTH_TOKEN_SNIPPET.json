@@ -1,0 +1,112 @@
+{
+  "_instructions": "Copy the 'Validate_Auth_Token' scope below into your flow's Main_Flow.actions. Place it after Validate_Input and before your business logic. Update runAfter to match your preceding action name if different. Also add 'authToken' to your flow's trigger schema (see _trigger_schema_addition).",
+
+  "_trigger_schema_addition": {
+    "authToken": {
+      "type": "string",
+      "description": "Auth token from OTP verification. Required for all authenticated flows."
+    }
+  },
+
+  "Validate_Auth_Token": {
+    "type": "Scope",
+    "description": "Validates the caller's auth token against the Dataverse sessions table. Returns 401 UNAUTHORIZED + Terminate(Succeeded) if the token is missing, unknown, or expired.\n\nROW-LEVEL SECURITY — CRITICAL:\nAfter both If conditions pass, the token is valid. The trusted user identity is:\n  @first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['[IMPLEMENT]:sol_userid']\n\nAlways use this expression — NOT triggerBody()?['userId'] — for all Dataverse queries and writes.\nThis prevents a caller with a valid token from reading or updating another user's data.\n\nExample: to restrict a ListRecords call to the authenticated user's own row:\n  $filter: \"sol_userid eq '@{first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['sol_userid']}'\"\n\nNote: the 401 responses here terminate with runStatus: Succeeded so Handle_Flow_Error does NOT run — an invalid token is an expected condition, not a bug.",
+    "actions": {
+      "IMPLEMENT_Get_Auth_Session": {
+        "type": "OpenApiConnection",
+        "description": "Look up the session record by token. [IMPLEMENT]: (1) replace entityName with your session table plural name (e.g. sol_sessions). (2) replace sol_token in $filter with your token field schema name.",
+        "inputs": {
+          "host": {
+            "connectionName": "shared_commondataserviceforapps_[yourid]",
+            "operationId": "ListRecords",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+          },
+          "parameters": {
+            "entityName": "[IMPLEMENT]: sol_sessions",
+            "$filter": "[IMPLEMENT]: sol_token eq '@{triggerBody()?[''authToken'']}'",
+            "$top": 1
+          },
+          "authentication": "@parameters('$authentication')"
+        },
+        "runAfter": {}
+      },
+      "If_Token_Not_Found": {
+        "type": "If",
+        "description": "No session record for this token — caller is unauthenticated or presented a forged/expired token. Return 401 + Terminate(Succeeded).",
+        "expression": "@equals(length(body('IMPLEMENT_Get_Auth_Session')?['value']), 0)",
+        "actions": {
+          "Respond_unauthorized": {
+            "type": "Response",
+            "description": "Return 401 Unauthorized.",
+            "inputs": {
+              "statusCode": 401,
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "code": "UNAUTHORIZED"
+              }
+            },
+            "runAfter": {}
+          },
+          "Terminate_unauthorized": {
+            "type": "Terminate",
+            "description": "Stop cleanly — no error email.",
+            "inputs": {
+              "runStatus": "Succeeded"
+            },
+            "runAfter": {
+              "Respond_unauthorized": ["Succeeded"]
+            }
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "IMPLEMENT_Get_Auth_Session": ["Succeeded"]
+        }
+      },
+      "If_Token_Expired": {
+        "type": "If",
+        "description": "Token exists but its expiry timestamp is in the past. Return 401 + Terminate(Succeeded). [IMPLEMENT]: replace sol_expires_at with your expiry field schema name.\n\nNote: this action only runs when If_Token_Not_Found succeeded — meaning the token WAS found. If it was not found, If_Token_Not_Found terminates the run before reaching here.",
+        "expression": "@lessOrEquals(ticks(first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['[IMPLEMENT]:sol_expires_at']), ticks(utcNow()))",
+        "actions": {
+          "Respond_token_expired": {
+            "type": "Response",
+            "description": "Return 401 Unauthorized for an expired token.",
+            "inputs": {
+              "statusCode": 401,
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "code": "UNAUTHORIZED"
+              }
+            },
+            "runAfter": {}
+          },
+          "Terminate_token_expired": {
+            "type": "Terminate",
+            "description": "Stop cleanly — no error email.",
+            "inputs": {
+              "runStatus": "Succeeded"
+            },
+            "runAfter": {
+              "Respond_token_expired": ["Succeeded"]
+            }
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "If_Token_Not_Found": ["Succeeded"]
+        }
+      }
+    },
+    "runAfter": {
+      "Validate_Input": ["Succeeded"]
+    }
+  }
+}

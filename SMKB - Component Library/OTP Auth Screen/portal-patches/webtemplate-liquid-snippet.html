@@ -1,0 +1,8 @@
+{{- /* OTP flow URLs — injected by Power Pages Liquid at runtime.
+     Add this block inside the <script> tag of your web template,
+     alongside any other window.__SMKB_* globals already present. */ -}}
+
+<script>
+  window.__SMKB_FLOW_CREATE_OTP__ = '{{ settings["SMKB/Flow/CreateOTP"] | default: "" }}';
+  window.__SMKB_FLOW_CHECK_OTP__  = '{{ settings["SMKB/Flow/CheckOTP"]  | default: "" }}';
+</script>

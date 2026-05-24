@@ -1,0 +1,20 @@
+# Append these two entries to powerpages/[portal-folder]/sitesetting.yml
+# (or whichever file contains your portal's adx_sitesetting records)
+#
+# After deploying both OTP flows, paste each flow's HTTP trigger URL into adx_value.
+# The trigger URL appears in the Power Automate portal under the flow's trigger details.
+#
+# [REPLACE] both adx_sitesettingid values with freshly generated GUIDs before committing.
+# Use: [System.Guid]::NewGuid().ToString() in PowerShell
+#
+# IMPORTANT: adx_value (the trigger URL) must NEVER be committed to git.
+# Set it directly in the portal after deploy:
+#   Power Pages design studio -> Site Settings -> SMKB/Flow/CreateOTP -> Edit
+
+- adx_name: SMKB/Flow/CreateOTP
+  adx_sitesettingid: 00000000-0000-0000-0000-000000000001   # [REPLACE]: generate a new GUID
+  adx_value: ''   # Set after deploying sol_create_otp flow — paste the HTTP trigger URL here
+
+- adx_name: SMKB/Flow/CheckOTP
+  adx_sitesettingid: 00000000-0000-0000-0000-000000000002   # [REPLACE]: generate a new GUID
+  adx_value: ''   # Set after deploying sol_check_otp flow — paste the HTTP trigger URL here
