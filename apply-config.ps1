@@ -43,6 +43,25 @@ function Esc([string]$s) { if ($null -eq $s) { '' } else { $s.Replace('$', '$$')
 
 $script:drift  = @()
 $script:writes = 0
+$script:warned = $false
+
+# -- Pre-flight: MAX_PATH headroom ---------------------------------------------
+# The deepest file this kit writes is roughly
+#   <root>\SMKB - <Name> - Environmental Variables\environmentvariabledefinitions\smkb_<prefix>_<PascalName>\environmentvariabledefinition.xml
+# which needs ~150 characters below <root>. Windows PowerShell 5.1 silently fails Test-Path past
+# 260 chars, so a deep clone makes writes disappear instead of erroring. Warn early and loudly.
+function Test-PathHeadroom {
+  $needed = 150
+  if (($root.Length + $needed) -gt 260) {
+    Write-Host ""
+    Write-Host "WARNING: this repo is $($root.Length) characters deep:" -ForegroundColor Yellow
+    Write-Host "  $root" -ForegroundColor Yellow
+    Write-Host "  Some paths will exceed the Windows 260-character limit, and Windows PowerShell then" -ForegroundColor Yellow
+    Write-Host "  skips files SILENTLY. Clone closer to the drive root (e.g. C:\src\<solution>) or enable" -ForegroundColor Yellow
+    Write-Host "  long paths, then re-run. Verify afterwards with: apply-config.ps1 -Check" -ForegroundColor Yellow
+    Write-Host ""
+  }
+}
 
 # -- Load config --------------------------------------------------------------
 if (-not (Test-Path -LiteralPath $configPath)) { throw "solution.config.json not found at $configPath" }
@@ -125,7 +144,21 @@ function Rename-AlmFolder {
   $new = Join-Path $Base $NewName
   if ($OldName -eq $NewName) { return }
   if ($Check)  { if (Test-Path -LiteralPath $old) { $script:drift += "$Label (folder still '$OldName')  ($Base)" }; return }
-  if (-not (Test-Path -LiteralPath $old)) { if (-not $DryRun) { Write-Host "  ok:      $Label (already '$NewName')" }; return }
+  if (-not (Test-Path -LiteralPath $old)) {
+    # Distinguish "already renamed" from "neither name is there". The latter means the path was
+    # unreadable - on Windows PowerShell 5.1 that is almost always MAX_PATH (>260 chars), where
+    # Test-Path returns $false instead of throwing. Reporting it as 'ok' would hide a real desync
+    # (Solution.xml gets rewritten while the folders do not).
+    if (Test-Path -LiteralPath $new) { if (-not $DryRun) { Write-Host "  ok:      $Label (already '$NewName')" } }
+    else {
+      Write-Host "  WARNING: $Label - neither '$OldName' nor '$NewName' found under" -ForegroundColor Yellow
+      Write-Host "           $Base" -ForegroundColor Yellow
+      Write-Host "           Nothing renamed. If that path is longer than 260 characters, clone the repo" -ForegroundColor Yellow
+      Write-Host "           closer to the drive root (or enable Windows long paths) and re-run." -ForegroundColor Yellow
+      $script:warned = $true
+    }
+    return
+  }
   if ($DryRun) { Write-Host "  WOULD RENAME $Label -> $NewName"; return }
   if (Test-Path -LiteralPath $new) { Remove-Item -LiteralPath $old -Recurse -Force }
   else { Rename-Item -LiteralPath $old -NewName $NewName }
@@ -153,6 +186,7 @@ if ($Check -and -not $initialized) {
   exit 0
 }
 if (-not $Check) { Assert-Valid }
+Test-PathHeadroom
 if ($initialized) { Test-PrefixGuard }
 
 $mode = if ($Check) { 'CHECK (drift)' } elseif ($DryRun) { 'DRY RUN' } else { 'APPLY' }
