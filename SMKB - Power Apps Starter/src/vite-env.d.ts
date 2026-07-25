@@ -1,2 +1,2 @@
 /// <reference types="vite/client" />
-declare module "@smkb/design-ui/styles" {}
+declare module "@smkbacil/design-ui/styles" {}

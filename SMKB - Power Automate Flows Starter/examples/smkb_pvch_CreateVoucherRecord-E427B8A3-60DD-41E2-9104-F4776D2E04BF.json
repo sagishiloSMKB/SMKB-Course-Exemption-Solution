@@ -1,0 +1,403 @@
+﻿{
+  "properties": {
+    "connectionReferences": {
+      "shared_sharepointonline_pvch": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "smkb_SMKBSharePointConnectionUser1"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      },
+      "shared_office365_pvch": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedoffice365_c3167"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)": {
+          "defaultValue": "dev",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_EnvironmentName",
+            "description": "Logical environment name."
+          }
+        },
+        "ERROR_EMAILS (smkb_pvch_FlowErrorEmails)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_FlowErrorEmails",
+            "description": "Semicolon-separated error email addresses."
+          }
+        },
+        "SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_SharePointSiteUrl",
+            "description": "SharePoint site URL."
+          }
+        }
+      },
+      "triggers": {
+        "manual": {
+          "metadata": {
+            "operationMetadataId": "e5f6a1b2-c3d4-1234-efab-345678901234"
+          },
+          "type": "Request",
+          "kind": "PowerPages",
+          "description": "Creates a new voucher record in Vouchers-voucherDetails. Snapshots all lecturer info at time of creation (Contract A). Returns { voucherId }.",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "authToken",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_1": {
+                  "title": "academicDegree",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_2": {
+                  "title": "faculty",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_3": {
+                  "title": "department",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_4": {
+                  "title": "activityType",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_5": {
+                  "title": "courseName",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_6": {
+                  "title": "lockedFields",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                }
+              },
+              "required": [
+                "text",
+                "text_4",
+                "text_5"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Main_Flow": {
+          "type": "Scope",
+          "description": "Creates a voucher row with a full snapshot of lecturer data (Contract A in spec §8).",
+          "actions": {
+            "Validate_Input": {
+              "type": "If",
+              "expression": "@or(empty(coalesce(triggerBody()?['text'], '')), empty(coalesce(triggerBody()?['text_4'], '')), empty(coalesce(triggerBody()?['text_5'], '')))",
+              "actions": {
+                "Respond_invalid_input": {
+                  "type": "Response", "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "INVALID_INPUT"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Terminate_after_invalid_input": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_invalid_input": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Validate_Auth_Token": {
+              "type": "Scope",
+              "actions": {
+                "Get_Auth_Session": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline_pvch",
+                      "operationId": "GetItems",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                      "table": "Vouchers-LecturersDetails",
+                      "$filter": "sessionToken eq '@{replace(triggerBody()?['text'], '''', '''''')}'",
+                      "$top": 1
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                },
+                "If_Token_Not_Found": {
+                  "type": "If",
+                  "expression": "@equals(length(body('Get_Auth_Session')?['value']), 0)",
+                  "actions": {
+                    "Respond_unauthorized": {
+                      "type": "Response", "kind": "PowerPages",
+                      "inputs": {
+                        "statusCode": 200,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "errorCode": "UNAUTHORIZED"
+                        }
+                      },
+                      "runAfter": {}
+                    },
+                    "Terminate_unauthorized": {
+                      "type": "Terminate",
+                      "inputs": {
+                        "runStatus": "Succeeded"
+                      },
+                      "runAfter": {
+                        "Respond_unauthorized": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  },
+                  "runAfter": {
+                    "Get_Auth_Session": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "If_Token_Expired": {
+                  "type": "If",
+                  "expression": "@lessOrEquals(ticks(first(body('Get_Auth_Session')?['value'])?['sessionExpiresAt']), ticks(utcNow()))",
+                  "actions": {
+                    "Respond_token_expired": {
+                      "type": "Response", "kind": "PowerPages",
+                      "inputs": {
+                        "statusCode": 200,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "errorCode": "UNAUTHORIZED"
+                        }
+                      },
+                      "runAfter": {}
+                    },
+                    "Terminate_token_expired": {
+                      "type": "Terminate",
+                      "inputs": {
+                        "runStatus": "Succeeded"
+                      },
+                      "runAfter": {
+                        "Respond_token_expired": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  },
+                  "runAfter": {
+                    "If_Token_Not_Found": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "runAfter": {
+                "Validate_Input": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Create_Voucher_Record": {
+              "type": "OpenApiConnection",
+              "description": "Creates a new voucher row in Vouchers-voucherDetails with a full snapshot of lecturer data (Contract A). Snapshot fields are immutable — captured at creation time and must not change if the lecturer updates their profile.",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline_pvch",
+                  "operationId": "PostItem",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                  "table": "Vouchers-voucherDetails",
+                  "item/Title": "@first(body('Get_Auth_Session')?['value'])?['Title']",
+                  "item/lecturerID": "@first(body('Get_Auth_Session')?['value'])?['lecturerID']",
+                  "item/lectureType": "@triggerBody()?['text_4']",
+                  "item/orderingFaculty": "@coalesce(triggerBody()?['text_2'], '')",
+                  "item/orderingDepartment": "@coalesce(triggerBody()?['text_3'], '')",
+                  "item/courseName": "@triggerBody()?['text_5']",
+                  "item/lockedFields": "@coalesce(triggerBody()?['text_6'], '')",
+                  "item/lecturerTitle": "@first(body('Get_Auth_Session')?['value'])?['lecturerAcademicDegree']",
+                  "item/lecturerLName": "@first(body('Get_Auth_Session')?['value'])?['lecturerLName']",
+                  "item/lecturerEmail": "@first(body('Get_Auth_Session')?['value'])?['lecturerEmail']",
+                  "item/lecturerCellPhone": "@first(body('Get_Auth_Session')?['value'])?['lecturerCellPhone']",
+                  "item/lecturerBirthDate": "@first(body('Get_Auth_Session')?['value'])?['lecturerBirthDate']",
+                  "item/lecturerTaxStatus": "@first(body('Get_Auth_Session')?['value'])?['lecturerTaxStatus']",
+                  "item/lecturerAddress": "@first(body('Get_Auth_Session')?['value'])?['lecturerAddress']",
+                  "item/lecturerTown": "@first(body('Get_Auth_Session')?['value'])?['lecturerTown']",
+                  "item/companyName": "@first(body('Get_Auth_Session')?['value'])?['companyName']",
+                  "item/companyNumber": "@first(body('Get_Auth_Session')?['value'])?['companyNumber']",
+                  "item/paymentType": "@first(body('Get_Auth_Session')?['value'])?['paymentType']",
+                  "item/lecturerBankName": "@first(body('Get_Auth_Session')?['value'])?['lecturerBankName']",
+                  "item/lecturerBankAccountBranchNum": "@first(body('Get_Auth_Session')?['value'])?['lecturerBankAccountBranchNum']",
+                  "item/lecturerBankAccountNum": "@first(body('Get_Auth_Session')?['value'])?['lecturerBankAccountNum']",
+                  "item/lecturerBankAccountName": "@first(body('Get_Auth_Session')?['value'])?['lecturerBankAccountName']",
+                  "item/numberOfActivities": 0
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {
+                "Validate_Auth_Token": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Respond_to_PowerPages": {
+              "type": "Response", "kind": "PowerPages",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "voucherId": "@string(body('Create_Voucher_Record')?['ID'])"
+                }
+              },
+              "runAfter": {
+                "Create_Voucher_Record": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runAfter": {}
+        },
+        "Handle_Flow_Error": {
+          "type": "Scope",
+          "actions": {
+            "Check_Error_Emails_Configured": {
+              "type": "If",
+              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)'))))",
+              "actions": {
+                "Send_error_notification": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365_pvch",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/From": "noreply@smkb.ac.il",
+                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)')), ') [ERROR] smkb_pvch_CreateVoucherRecord failed')",
+                      "emailMessage/Body": "@concat('<p>smkb_pvch_CreateVoucherRecord failed in <strong>', parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)'), '</strong>. Run ID: ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/Importance": "High"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Respond_with_error": {
+              "type": "Response", "kind": "PowerPages",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "errorCode": "ERROR"
+                }
+              },
+              "runAfter": {
+                "Check_Error_Emails_Configured": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Main_Flow": [
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ]
+          }
+        }
+      }
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}

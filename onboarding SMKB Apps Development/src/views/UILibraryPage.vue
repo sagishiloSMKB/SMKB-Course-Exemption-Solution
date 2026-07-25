@@ -1,8 +1,8 @@
 <template>
   <div class="page">
-    <h1>The @smkb/design-ui Library</h1>
+    <h1>The @smkbacil/design-ui Library</h1>
     <p class="lead">
-      <code>@smkb/design-ui</code> is SMKB's shared component library. Every solution —
+      <code>@smkbacil/design-ui</code> is SMKB's shared component library. Every solution —
       Power Apps or Power Pages — uses the same library for layout, navigation, tables,
       buttons, inputs, and design tokens. You're looking at it right now.
     </p>
@@ -19,7 +19,7 @@
         Without a shared library, each solution would independently implement buttons,
         tables, inputs, and typography — resulting in subtle visual inconsistencies,
         duplicated CSS bugs, and different accessibility patterns per project.
-        <code>@smkb/design-ui</code> ensures all SMKB interfaces look, feel, and behave
+        <code>@smkbacil/design-ui</code> ensures all SMKB interfaces look, feel, and behave
         the same way, and improvements benefit every solution at once.
       </p>
     </div>
@@ -114,12 +114,12 @@ const tokenCategories = [
   { category: 'Surface', examples: ['--smkb-color-surface', '--smkb-color-surface-subtle', '--smkb-color-surface-raised'] },
 ]
 
-const mainTsExample = `import '@smkb/design-ui/tokens-nofonts.css'  // tokens WITHOUT font binaries (CSP-safe)
-import '@smkb/design-ui/tokens-dark.css'
-import '@smkb/design-ui/styles'
+const mainTsExample = `import '@smkbacil/design-ui/tokens-nofonts.css'  // tokens WITHOUT font binaries (CSP-safe)
+import '@smkbacil/design-ui/tokens-dark.css'
+import '@smkbacil/design-ui/styles'
 
 import { createApp } from 'vue'
-import { createSmkb } from '@smkb/design-ui'
+import { createSmkb } from '@smkbacil/design-ui'
 import App from './App.vue'
 import { router } from './router'
 
@@ -159,7 +159,7 @@ const columns = [
 ]
 <\/script>`
 
-const toastExample = `import { useSmkbToast } from '@smkb/design-ui'
+const toastExample = `import { useSmkbToast } from '@smkbacil/design-ui'
 
 const toast = useSmkbToast()
 

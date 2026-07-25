@@ -1,17 +1,84 @@
 #!/bin/sh
-# Run ESLint only when Vue/TS files are staged — skip for commits that only touch YAML, PS1, etc.
-STAGED=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(vue|ts|tsx)$')
-if [ -z "$STAGED" ]; then
-  exit 0
+# ─────────────────────────────────────────────────────────────────────────────
+# Root pre-commit — the ONE git hook for the whole solution monorepo.
+#
+# The starters used to each ship their own hook; git only fires hooks from the
+# repo root, so those never ran once the starters became sub-folders. This hook
+# owns all pre-commit gating and dispatches by the path of each staged file:
+#
+#   • <starter>/**/*.{vue,ts,tsx}                 -> that starter's local eslint
+#   • Power Automate Flows/{Workflows,Other}      -> flow-lint (zero-dep node)
+#   • enforcement (Part C of the refactor plan)   -> doc-boundary + config drift
+#
+# Opt-in — git does NOT install this automatically. Enable once per clone:
+#   git config core.hooksPath .githooks
+#
+# Every step SKIPS GRACEFULLY when its toolchain is not installed, so a fresh
+# clone is never blocked before the per-starter installs have run.
+# ─────────────────────────────────────────────────────────────────────────────
+status=0
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+
+# Is this repo still the uninitialized template? (same signal apply-config.ps1 uses.)
+# While uninitialized, the example flows still carry placeholders on purpose, so the
+# placeholder-blocking flow-lint gate must NOT run at commit time — it runs at deploy time.
+INITIALIZED=1
+if [ ! -f solution.config.json ] || grep -q 'YourSolutionName' solution.config.json; then
+  INITIALIZED=0
 fi
 
-# Find the Power Page client/ folder dynamically so this hook works after Init Project
-# renames "SMKB - Power Page Starter" to the solution-specific folder name.
-CLIENT_DIR=$(find . -maxdepth 3 -type d -name "client" | grep -i "Power Page" | head -1)
-if [ -z "$CLIENT_DIR" ]; then
-  echo "pre-commit: no client/ dir found under any Power Page folder — skipping ESLint"
-  exit 0
+# ── ESLint per code-starter (toolchain-agnostic: call the local eslint binary,
+#    so it works whether the starter uses pnpm or npm) ────────────────────────
+lint_starter() {
+  dir="$1"
+  files=$(printf '%s\n' "$STAGED" | grep -E "^${dir}/.*\.(vue|ts|tsx)$" || true)
+  [ -z "$files" ] && return 0
+  if [ ! -x "$dir/node_modules/.bin/eslint" ]; then
+    echo "pre-commit: [$dir] eslint not installed — skipping lint (install deps to enable)"
+    return 0
+  fi
+  rel=$(printf '%s\n' "$files" | sed "s#^${dir}/##")
+  echo "pre-commit: [$dir] linting staged files ..."
+  ( cd "$dir" && printf '%s\n' "$rel" | xargs -r ./node_modules/.bin/eslint ) || return 1
+  return 0
+}
+
+lint_starter "SMKB - Power Apps Starter"            || status=1
+lint_starter "SMKB - Power Pages Code Site Starter" || status=1
+
+# ── flow-lint for the Cloud Flows starter (static JSON/XML checks) ────────────
+# Only once the solution is initialized — the template's example flows carry placeholders
+# on purpose, and flow-lint (correctly) blocks on those. deploy.ps1 is the placeholder gate.
+FLOWS_DIR="SMKB - Power Automate Flows Starter"
+FLOW_STAGED=$(printf '%s\n' "$STAGED" | grep -E "^${FLOWS_DIR}/(Workflows/.*\.json|Other/.*\.xml)$" || true)
+if [ "$INITIALIZED" = 1 ] && [ -n "$FLOW_STAGED" ]; then
+  if command -v node >/dev/null 2>&1 && [ -f "$FLOWS_DIR/tools/flow-lint/lint.mjs" ]; then
+    echo "pre-commit: [$FLOWS_DIR] running flow-lint ..."
+    node "$FLOWS_DIR/tools/flow-lint/lint.mjs" "$FLOWS_DIR/Workflows" || status=1
+  else
+    echo "pre-commit: [$FLOWS_DIR] node/flow-lint unavailable — skipping flow-lint"
+  fi
 fi
 
-cd "$CLIENT_DIR" || exit 1
-pnpm run lint
+# ── Enforcement: root/starter boundary + solution-config drift (Part C) ───────
+if command -v node >/dev/null 2>&1 && [ -f "scripts/check-doc-boundaries.mjs" ]; then
+  node "scripts/check-doc-boundaries.mjs" || status=1
+fi
+
+if [ -f "apply-config.ps1" ]; then
+  PS=""
+  if command -v pwsh >/dev/null 2>&1; then PS=pwsh
+  elif command -v powershell >/dev/null 2>&1; then PS=powershell
+  fi
+  if [ -n "$PS" ]; then
+    "$PS" -NoProfile -ExecutionPolicy Bypass -File "apply-config.ps1" -Check || status=1
+  else
+    echo "pre-commit: PowerShell unavailable — skipping config-drift check"
+  fi
+fi
+
+if [ "$status" -ne 0 ]; then
+  echo "pre-commit: checks failed — fix the issues (or stage the fixes) and re-commit."
+fi
+exit $status

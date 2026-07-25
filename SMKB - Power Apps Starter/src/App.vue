@@ -18,7 +18,7 @@ import AppNav from './components/AppNav.vue'
 // ── Navigation ────────────────────────────────────────────────────────────────
 // Add one entry here for each section you add to router/index.ts.
 const navItems = [
-  { label: 'Home', to: '/' },
+  { label: 'בית', to: '/' },
 ]
 </script>
 

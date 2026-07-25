@@ -10,6 +10,15 @@ Table definitions are stored as XML files, version-controlled in Git, and pushed
 > **Only activate this starter if your solution actually needs custom Dataverse tables.**
 > If your solution uses only existing standard tables (Contact, Account, etc.) or no Dataverse data at all, leave this folder completely untouched — do not rename files, do not change placeholders, do not run deploy.ps1.
 
+> **Orchestrated from the root.** This starter is standalone (it builds and deploys on its own via
+> `deploy.ps1`), but its **solution identity** — unique name, display name, short prefix, and target
+> environment — is authored once in the root [`solution.config.json`](../solution.config.json) and
+> written into `Other/Solution.xml` by [`apply-config.ps1`](../apply-config.ps1) (run from the repo
+> root). Do **not** hand-edit `YourSolutionName` / `Your Solution Name` here. What you author in *this*
+> folder is the table content — the entities, columns, and relationships, named with your solution's
+> short prefix (the `shortPrefix` from the root config). Global naming/environment/deploy-order rules
+> live in the root `CLAUDE.md`; this README covers only how to define tables.
+
 ### Step 0 — Rename this folder
 
 Before anything else, rename this folder from `SMKB - Dataverse Tables Starter` to match your solution:
@@ -37,63 +46,64 @@ If none of these apply, skip this starter entirely.
 
 ### Step 2 — Decide how many tables you need and name them
 
-Each table needs a name following the pattern `[sol]_table_name`.
+Each table's schema name follows `smkb_<prefix>_<PascalName>` (see CLAUDE.md → Critical Rule 3). The template ships two example tables to rename or delete:
 
 | What you have | What to do |
 |--------------|-----------|
-| Need Table A equivalent | Rename `sol_example_table_a` folder + all references |
-| Need Table B equivalent | Rename `sol_example_table_b` folder + all references |
+| Need Table A equivalent | Rename the `smkb_sol_ExampleTableA` folder + all references |
+| Need Table B equivalent | Rename the `smkb_sol_ExampleTableB` folder + all references |
 | Need fewer than 2 tables | Delete the unused example entity folder and its `RootComponent` from `Solution.xml` |
 | Need more than 2 tables | Copy an existing entity folder, rename, and add a new `RootComponent` to `Solution.xml` |
 
-### Step 3 — Replace all placeholders
+### Step 3 — Rename each table you keep
 
-Work through the checklist below for **each active table**. The example below uses `sol_example_table_a` → `evt_sessions` as an illustration.
+Work through this for **each active table**. The example renames `smkb_sol_ExampleTableA` → `smkb_evt_Sessions`.
 
-#### `Other/Solution.xml`
+> **Dataverse case rule (important).** The *schema* name is PascalCase but the *logical* name is its
+> lowercased form, so one rename produces **two** tokens you must keep straight:
+> - **PascalCase** `smkb_evt_Sessions` — `schemaName`, `entity Name=`, the entity `<Name LocalizedName=…>`, `PhysicalName` (`smkb_evt_SessionsId`), and `optionset Name=` (`smkb_evt_Sessions_statecode`).
+> - **lowercase** `smkb_evt_sessions` — `<LogicalName>`, `<EntitySetName>`, the PK `<Name>`/`<LogicalName>` (`smkb_evt_sessionsid`), and SavedQueries fetchxml (`<entity name=…>`, `<attribute name=…>`).
+
+**`Other/Solution.xml`** — `YourSolutionName` / `Your Solution Name` are set by the root `apply-config.ps1`; you only update the table `schemaName` (PascalCase):
+
 | Find | Replace with |
 |------|-------------|
-| `YourSolutionName` | Your solution's unique name (e.g. `SMKBEvents`) |
-| `Your Solution Name` | Your solution's display name (e.g. `SMKB – Events`) |
-| `schemaName="sol_example_table_a"` | `schemaName="evt_sessions"` |
-| `schemaName="sol_example_table_b"` | `schemaName="evt_registrations"` (or delete if not used) |
+| `schemaName="smkb_sol_ExampleTableA"` | `schemaName="smkb_evt_Sessions"` |
+| `schemaName="smkb_sol_ExampleTableB"` | `schemaName="smkb_evt_Registrations"` (or delete if not used) |
 
-#### Entity folders — rename first, then update contents
+**Entity folder** — rename `Entities/smkb_sol_ExampleTableA/` → `Entities/smkb_evt_Sessions/` (folder = the PascalCase schema name), then apply the two-token replacement in `Entity.xml` + `SavedQueries/*.xml`. Set the display names (`<LocalizedName>` / `<LocalizedCollectionName>` / `Description`) to `EVT - Sessions` / `EVT - Sessions` (`PREFIX - Name`). Forms reference the shared columns (`smkb_name`, `smkb_description`), not the table name, so they need no change.
 
-**For each active table:**
-
-1. **Rename the folder:** `sol_example_table_a` → `evt_sessions`
-2. **In `Entity.xml`**, replace ALL occurrences of `sol_example_table_a` with `evt_sessions`:
-   - `<Name ...>sol_example_table_a</Name>`
-   - `<entity Name="sol_example_table_a">`
-   - `PhysicalName="sol_example_table_aId"` → `PhysicalName="evt_sessionsId"`
-   - `<Name>sol_example_table_aid</Name>` → `<Name>evt_sessionsid</Name>`
-   - `<LogicalName>sol_example_table_aid</LogicalName>` → `<LogicalName>evt_sessionsid</LogicalName>`
-   - `<EntitySetName>sol_example_table_as</EntitySetName>` → `<EntitySetName>evt_sessionss</EntitySetName>`
-   - `optionset Name="sol_example_table_a_statecode"` → `optionset Name="evt_sessions_statecode"`
-   - `optionset Name="sol_example_table_a_statuscode"` → `optionset Name="evt_sessions_statuscode"`
-3. **Update display names** in `Entity.xml`:
-   - `"Example Table A"` → `"CIF Application"` (singular — include a solution-short prefix in the display name to avoid ambiguity in shared environments, e.g. `CIF Application` not just `Application`)
-   - `"Example Table A Records"` → `"CIF Applications"` (plural)
-4. **In form files** (`FormXml/main/`, `FormXml/card/`, `FormXml/quick/`): update `datafieldname` attributes that reference the old primary key field name (e.g. `sol_example_table_aid` -> `evt_sessionsid`). The bulk `-replace` command in Step 3 handles this automatically.
-5. **In `SavedQueries/`**: update the entity name and primary key attribute in the fetchxml. The bulk `-replace` covers this too.
-6. **GUID files**: When copying an entity folder to create a new table, generate fresh random GUIDs for all `FormXml/*.xml` and `SavedQueries/*.xml` filenames and their internal ID elements. Re-using the same GUIDs causes "Cannot insert duplicate key" on re-import. Use PowerShell to generate: `[System.Guid]::NewGuid().ToString()`
-
-> **Tip:** Use PowerShell's `-replace` to do the bulk rename in a single command:
+> **Tip — the two-token bulk rename.** PowerShell's `-replace` is **case-insensitive**, which would flatten both tokens to one case — use **`-creplace`** (case-sensitive), PascalCase first:
 > ```powershell
-> Get-ChildItem ".\Entities\sol_example_table_a" -Recurse -File | ForEach-Object {
->     (Get-Content $_.FullName -Raw) -replace 'sol_example_table_a', 'evt_sessions' |
->     Set-Content $_.FullName -Encoding UTF8 -NoNewline
+> $dir = ".\Entities\smkb_sol_ExampleTableA"
+> Get-ChildItem $dir -Recurse -File | ForEach-Object {
+>     ((Get-Content $_.FullName -Raw) `
+>       -creplace 'smkb_sol_ExampleTableA','smkb_evt_Sessions' `   # PascalCase: schema / PhysicalName / optionset / entity Name
+>       -creplace 'smkb_sol_exampletablea','smkb_evt_sessions') |  # lowercase: LogicalName / EntitySetName / fetchxml / PK
+>       Set-Content $_.FullName -NoNewline
 > }
-> Rename-Item ".\Entities\sol_example_table_a" "evt_sessions"
+> Rename-Item $dir "smkb_evt_Sessions"
 > ```
+> **GUID files:** when you *copy* an entity folder to create an extra table, also generate fresh GUIDs for every `FormXml/*.xml` + `SavedQueries/*.xml` filename and internal ID (reusing them causes "Cannot insert duplicate key" on import). `[System.Guid]::NewGuid().ToString().ToLower()`. For the shipped example tables, `guid-freshen.ps1` (Step 3b) already does this.
+
+### Step 3b — Freshen the sentinel GUIDs (run once, before first deploy)
+
+The two example tables ship with fixed form/view GUIDs that were used in a template test. `deploy.ps1`
+**blocks** until they are replaced, so run this once per new solution (never twice — it writes a
+`.guid-freshened` marker and refuses to re-run):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File guid-freshen.ps1
+```
 
 ### Step 4 — Verify no placeholders remain
 
-Run this before deploying:
+Solution *identity* is verified from the root with `apply-config.ps1 -Check` (it fails if `Other/Solution.xml`
+has drifted from `solution.config.json`). This scan covers the table *content* you author — `deploy.ps1`
+also blocks on these, but check early:
 
 ```powershell
-$patterns = 'YourSolutionName','sol_example_table'
+$patterns = 'YourSolutionName','smkb_sol_'
 Get-ChildItem ".\Other",".\Entities" -Recurse -File | ForEach-Object {
     $file = $_
     foreach ($p in $patterns) {
@@ -120,20 +130,17 @@ powershell -ExecutionPolicy Bypass -File deploy.ps1
 
 ## Naming Convention
 
-All component names use a **solution short-name prefix** so no two solutions ever share a table name.
-
-The placeholder prefix throughout this starter is **`sol`** — replace it with your solution's short name before deploying.
+Every table's schema name is `smkb_<prefix>_<PascalName>` (fixed publisher prefix + your solution short prefix + PascalCase name), so no two solutions ever share a table name. The template's placeholder short prefix is **`sol`** — replace it with your solution's short name.
 
 | Placeholder name | Real example |
 |-----------------|--------------|
-| `sol_example_table_a` | `evt_sessions` |
-| `sol_example_table_b` | `evt_registrations` |
+| `smkb_sol_ExampleTableA` | `smkb_evt_Sessions` |
+| `smkb_sol_ExampleTableB` | `smkb_evt_Registrations` |
 | `YourSolutionName` (in Solution.xml) | `SMKBEvents` |
 
-**Rule:** every custom table in a solution must start with `[solutionShortName]_`.  
-Never use a generic name that could collide with tables in other solutions.
+**Rule:** every custom table is named `smkb_<prefix>_<PascalName>` (schema; logical name is the lowercased form) with display `<PREFIX> - <Name>`. See CLAUDE.md → Critical Rule 3.
 
-The `smkb_name` field (primary name column) and `smkb_description` field use the publisher prefix `smkb_` directly — these are shared column names across all SMKB tables and that's intentional.
+The `smkb_name` (primary name column) and `smkb_description` fields use the bare publisher prefix `smkb_` with no solution segment — these are shared column names across all SMKB tables and that's intentional.
 
 ---
 
@@ -158,7 +165,7 @@ SMKB - Dataverse Tables Starter/
 │   └── Customizations.xml    ← minimal; <Entities /> stays empty
 │
 ├── Entities/
-│   ├── sol_example_table_a/  ← example parent table
+│   ├── smkb_sol_ExampleTableA/  ← example parent table
 │   │   ├── Entity.xml
 │   │   ├── FormXml/
 │   │   │   ├── main/{aa000001-...}.xml   ← main form
@@ -166,7 +173,7 @@ SMKB - Dataverse Tables Starter/
 │   │   │   └── quick/{aa000003-...}.xml  ← quick create form
 │   │   └── SavedQueries/{aa000004-...}.xml  ← Active view
 │   │
-│   └── sol_example_table_b/  ← example child table
+│   └── smkb_sol_ExampleTableB/  ← example child table
 │       ├── Entity.xml
 │       ├── FormXml/ ...
 │       └── SavedQueries/ ...
@@ -181,13 +188,13 @@ SMKB - Dataverse Tables Starter/
 
 ### Adding a new table
 
-1. Copy an existing entity folder (e.g. `sol_example_table_a`).
+1. Copy an existing entity folder (e.g. `smkb_sol_ExampleTableA`).
 2. Rename the folder to `[sol]_your_table_name`.
-3. In `Entity.xml`, replace all occurrences of `sol_example_table_a` with `sol_your_table_name`.
+3. In `Entity.xml`, replace all occurrences of `smkb_sol_ExampleTableA` with `smkb_<prefix>_YourTableName`.
 4. Update display names, descriptions, EntitySetName, and the primary key `PhysicalName`/`Name`/`LogicalName`.
 5. Add a RootComponent line in `Other/Solution.xml`:
    ```xml
-   <RootComponent type="1" schemaName="sol_your_table_name" behavior="0" />
+   <RootComponent type="1" schemaName="smkb_<prefix>_YourTableName" behavior="0" />
    ```
 6. Run `deploy.ps1` to push the new table to Dataverse.
 7. Commit the new XML files.
@@ -202,14 +209,14 @@ SMKB - Dataverse Tables Starter/
 
 ## Adding a Lookup Column Between Tables
 
-To create a lookup column on `sol_example_table_b` pointing to `sol_example_table_a`:
+To create a lookup column on `smkb_sol_ExampleTableB` pointing to `smkb_sol_ExampleTableA`:
 
-1. Add a lookup attribute to `sol_example_table_b/Entity.xml`:
+1. Add a lookup attribute to `smkb_sol_ExampleTableB/Entity.xml`:
    ```xml
-   <attribute PhysicalName="sol_example_table_aId">
+   <attribute PhysicalName="smkb_sol_ExampleTableAId">
      <Type>lookup</Type>
-     <Name>sol_example_table_aid</Name>
-     <LogicalName>sol_example_table_aid</LogicalName>
+     <Name>smkb_sol_exampletableaid</Name>
+     <LogicalName>smkb_sol_exampletableaid</LogicalName>
      <RequiredLevel>none</RequiredLevel>
      <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
      <ImeMode>auto</ImeMode>
@@ -224,7 +231,7 @@ To create a lookup column on `sol_example_table_b` pointing to `sol_example_tabl
      <IsRenameable>1</IsRenameable>
      <LookupStyle>single</LookupStyle>
      <LookupTypes>
-       <LookupType>sol_example_table_a</LookupType>
+       <LookupType>smkb_sol_exampletablea</LookupType>
      </LookupTypes>
      <displaynames>
        <displayname description="Example Table A" languagecode="1033" />
@@ -232,7 +239,7 @@ To create a lookup column on `sol_example_table_b` pointing to `sol_example_tabl
    </attribute>
    ```
 2. Both tables must be in the same solution for the relationship to deploy cleanly.
-3. Run `deploy.ps1` — PAC CLI will automatically handle the `EntityRelationship` definition from the lookup attribute.
+3. **Declare the relationship** — the lookup attribute alone is not enough. Add the matching `<EntityRelationship>` to `Other/Customizations.xml` (use the template block in `Relationships.xml` as the pattern), then run `deploy.ps1`.
 
 > **Note**: Cross-entity lookups are complex to define from scratch in XML. The simplest workflow is: create the lookup in the Dataverse portal UI first, then export → unpack the solution to get the correct XML structure for source control.
 
@@ -269,7 +276,7 @@ This script deploys to **SMKB-Apps-Dev only**. Stage and Production are promoted
 | `int` | Whole number | |
 | `decimal` | Decimal | |
 | `datetime` | Date/Time | Set `<Format>` and `<Behavior>` |
-| `boolean` | Two options (Yes/No) | |
+| `bit` | Two options (Yes/No) | Use `bit` (not `boolean`) — matches the in-file reference and Dataverse import |
 | `lookup` | Lookup | Set `<LookupTypes>` |
 | `picklist` | Choice | Include `<optionset>` |
 | `money` | Currency | |

@@ -6,23 +6,35 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pa": "power-apps"
   },
   "dependencies": {
     "@microsoft/power-apps": "^1.0.3",
-    "@smkb/design-ui": "^0.16.0",
+    "@smkbacil/design-ui": "^0.16.1",
     "vue": "^3.5.13",
     "vue-router": "^5.0.4"
   },
   "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@microsoft/power-apps-cli": "^0.11.0",
     "@microsoft/power-apps-vite": "^1.0.2",
     "@types/node": "^25.6.0",
     "@vitejs/plugin-vue": "^5.2.1",
+    "eslint": "^9.17.0",
+    "eslint-plugin-vue": "^9.32.0",
+    "globals": "^15.14.0",
     "typescript": "~5.6.3",
+    "typescript-eslint": "^8.18.0",
     "vite": "^6.0.0",
+    "vitest": "^2.1.8",
+    "vue-eslint-parser": "^9.4.3",
     "vue-tsc": "^2.2.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@smkb/design-ui", "esbuild"]
+    "onlyBuiltDependencies": ["@smkbacil/design-ui", "esbuild"]
   }
 }

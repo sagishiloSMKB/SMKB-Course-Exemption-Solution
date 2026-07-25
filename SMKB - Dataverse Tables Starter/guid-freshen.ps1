@@ -36,14 +36,14 @@ If you are intentionally rebuilding from scratch (no live records in Dataverse):
 # These GUIDs were deployed to SMKB-Apps-Dev from a template test; sharing them
 # causes PRIMARY KEY violations on import.
 $guidMap = [ordered]@{
-    'c481897d-0ff9-4a3c-9872-1f64ea629903' = [System.Guid]::NewGuid().ToString().ToLower()  # sol_example_table_a main form
-    'd43b64b7-302f-4356-afe5-40968a40221a' = [System.Guid]::NewGuid().ToString().ToLower()  # sol_example_table_a quick-create form
-    '8595077e-7d34-4620-9a12-517e1faf9243' = [System.Guid]::NewGuid().ToString().ToLower()  # sol_example_table_a card form
-    'f3d39362-199b-4b94-a559-4a83e05c4899' = [System.Guid]::NewGuid().ToString().ToLower()  # sol_example_table_a savedquery (view)
-    '4068faef-f780-41e0-b8ab-b249e8289bb5' = [System.Guid]::NewGuid().ToString().ToLower()  # sol_example_table_b main form
-    '08f54373-7133-4436-ad7e-b1bbc3cb245f' = [System.Guid]::NewGuid().ToString().ToLower()  # sol_example_table_b quick-create form
-    '2b0561cb-7ebf-4958-a382-3007e2d8614c' = [System.Guid]::NewGuid().ToString().ToLower()  # sol_example_table_b card form
-    '32813506-bc57-40a3-8bfa-0dc75721a944' = [System.Guid]::NewGuid().ToString().ToLower()  # sol_example_table_b savedquery (view)
+    'c481897d-0ff9-4a3c-9872-1f64ea629903' = [System.Guid]::NewGuid().ToString().ToLower()  # smkb_sol_ExampleTableA main form
+    'd43b64b7-302f-4356-afe5-40968a40221a' = [System.Guid]::NewGuid().ToString().ToLower()  # smkb_sol_ExampleTableA quick-create form
+    '8595077e-7d34-4620-9a12-517e1faf9243' = [System.Guid]::NewGuid().ToString().ToLower()  # smkb_sol_ExampleTableA card form
+    'f3d39362-199b-4b94-a559-4a83e05c4899' = [System.Guid]::NewGuid().ToString().ToLower()  # smkb_sol_ExampleTableA savedquery (view)
+    '4068faef-f780-41e0-b8ab-b249e8289bb5' = [System.Guid]::NewGuid().ToString().ToLower()  # smkb_sol_ExampleTableB main form
+    '08f54373-7133-4436-ad7e-b1bbc3cb245f' = [System.Guid]::NewGuid().ToString().ToLower()  # smkb_sol_ExampleTableB quick-create form
+    '2b0561cb-7ebf-4958-a382-3007e2d8614c' = [System.Guid]::NewGuid().ToString().ToLower()  # smkb_sol_ExampleTableB card form
+    '32813506-bc57-40a3-8bfa-0dc75721a944' = [System.Guid]::NewGuid().ToString().ToLower()  # smkb_sol_ExampleTableB savedquery (view)
 }
 
 Write-Host "Replacing $($guidMap.Count) sentinel GUIDs with fresh values..." -ForegroundColor Cyan

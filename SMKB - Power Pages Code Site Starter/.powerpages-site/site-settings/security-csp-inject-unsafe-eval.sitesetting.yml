@@ -1,0 +1,7 @@
+description: >-
+  Prevents Power Pages from automatically injecting unsafe-eval into the CSP.
+  Vue 3 + Vite does not require eval at runtime, so this is safe to disable.
+  Revert to "true" if a library that uses eval is added to the project.
+id: aaaaaaaa-0008-4000-8000-000000000008
+name: HTTP/Content-Security-Policy/Inject-unsafe-eval
+value: "false"

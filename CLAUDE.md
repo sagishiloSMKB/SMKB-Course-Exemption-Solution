@@ -1,19 +1,112 @@
+# CLAUDE.md
+
+This file guides Claude Code (claude.ai/code) when working in this repository.
+
+This repository is an **orchestrator**. It does not itself build or deploy anything — it walks a
+developer through initializing a new Power Platform solution, decides which starters to activate,
+holds the one solution-wide config, and enforces the conventions that span all starters. Every
+starter is a **self-contained module** that owns its own build, deploy, and framework mechanics in
+its own docs. This file never re-documents a starter's internals; it links to them.
+
+---
+
+## Root vs Starters — Ownership Charter
+
+This is the contract that keeps root and the starters from ever contradicting each other. When in
+doubt about where a fact belongs, use this.
+
+**ROOT owns (and a starter must never redefine):**
+- The init / onboarding flow — `INIT_PROJECT.md`, `INIT ONBOARDING`, and the `SESSION START` pre-flight.
+- Which starters are activated, and renaming their folders to solution-specific names.
+- The single solution config, `solution.config.json`, and the `apply-config.ps1` script that pushes it down.
+- Global cross-starter conventions (below): short-name uniqueness & registry, publisher prefix,
+  display-name format, environment reference, deployment order, connection-reference sharing.
+- Git & CI — `.gitignore`, `.githooks/`, `.github/workflows/`, and the remote.
+- Solution-level documentation & review templates — the root `docs/` set (a per-solution artifact, drafted
+  at the end of Init Project), `TESTING-STRATEGY.md`, and the `audit/` templates. (Distinct from a starter's
+  *own* `docs/`, which documents that starter's mechanics.)
+
+**Each STARTER owns (and root must never re-document):**
+- Its build / dev / deploy commands and scripts.
+- Its architecture and framework mechanics (its own `README.md` / `CLAUDE.md` / `docs/`).
+- Its placeholder guard (inside its own `deploy.ps1`) and its local config files — the *targets* of
+  `apply-config.ps1`, never hand-edited to a value that disagrees with `solution.config.json`.
+- Its framework tooling: skills (`.claude/skills/`), Cursor rules, directory-scoped `.claude/settings.json`.
+
+**Tie-breaker:** For a starter's own build/deploy/naming *mechanics*, the starter's docs are
+authoritative. For *cross-starter conventions and solution identity*, root is authoritative and
+starters conform. Root never inlines starter internals; a starter never restates a global rule — it
+relies on this file.
+
+**Enforced by** (opt-in `git config core.hooksPath .githooks`, and usable in CI):
+- `apply-config.ps1 -Check` — fails if any starter's committed config has drifted from `solution.config.json`.
+- `scripts/check-doc-boundaries.mjs` — fails if a root doc references retired starter architecture or a broken link.
+
+---
+
+## Where To Find X
+
+Root documents only orchestration and the global rules below. Everything else lives in the starter
+that owns it:
+
+| Topic | Lives in |
+|-------|----------|
+| Power Apps (UI-only, flow-backed) — build, deploy, architecture | [Power Apps README](SMKB%20-%20Power%20Apps%20Starter/README.md) · [CLAUDE.md](SMKB%20-%20Power%20Apps%20Starter/CLAUDE.md) · [design system](SMKB%20-%20Power%20Apps%20Starter/SMKB-UI.md) |
+| Cloud Flows — authoring, deploy, ALM patterns | [Flows README](SMKB%20-%20Power%20Automate%20Flows%20Starter/README.md) |
+| Flow JSON snippets & pitfalls | [FLOW_SNIPPETS.md](SMKB%20-%20Power%20Automate%20Flows%20Starter/FLOW_SNIPPETS.md) · [reference flows](SMKB%20-%20Power%20Automate%20Flows%20Starter/examples/README.md) · [flow-lint](SMKB%20-%20Power%20Automate%20Flows%20Starter/tools/flow-lint/README.md) |
+| Power Pages Code Site — rules, deploy, security/CSP, skills | [PP CLAUDE.md](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/CLAUDE.md) · [Getting Started](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/GETTING-STARTED.md) · [full guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/POWER-PAGES-CODE-SITE-GUIDE.md) |
+| Code Site ALM / promotion, flow-error contract | [ALM](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/ALM-CODE-SITES.md) · [flow errors](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/FLOW-ERROR-CONTRACT.md) |
+| Dataverse tables — schema authoring, deploy | [Tables README](SMKB%20-%20Dataverse%20Tables%20Starter/README.md) |
+| Environment variables — definitions, ALM vars | [Env Vars README](SMKB%20-%20Environmental%20Variables%20Starter/README.md) |
+| Solution documentation (architecture, security, privacy, ALM …) — templates, filled per solution at init | [docs/](docs/README.md) |
+| Testing strategy — the layered testing method | [TESTING-STRATEGY.md](TESTING-STRATEGY.md) |
+| Pre-go-live security / UX audit templates | [audit/](audit/README.md) |
+
+## Skills
+
+The kit ships **agent skills** (`/slash`-invocable, and auto-triggered by their descriptions) for the
+build/deploy/quality tasks that are otherwise error-prone. They are **auto-discovered** from
+`.claude/skills/*/SKILL.md` — no install step — and **directory-scoped**: a starter's skills surface when you
+work in that starter (they travel with the folder even after Init Project renames it); root skills are always
+available. *(New skill files need a Claude Code restart to appear in the `/` menu.)* Prefer the matching skill
+over doing the task by hand.
+
+| Owner | Skills |
+|-------|--------|
+| Root (`.claude/skills/`) | `/solution-config` (identity → apply-config) · `/pre-deploy-verify` · `/deploy-solution` (ordered deploy) · `/document-solution` (fill `docs/`) · `/security-audit` · `/ux-audit` · `/create-skill` |
+| Dataverse Tables | `/dvt-add-table` · `/dvt-add-lookup` · `/dvt-deploy` |
+| Environment Variables | `/env-add-var` |
+| Cloud Flows | `/flow-add` · `/flow-deploy` |
+| Power Apps | `/pa-add-flow` · `/pa-init` |
+| Power Pages Code Site | `/ppcs-*` (provision, deploy, register-flow, enable-web-api, add-csp-domain, troubleshoot, …) |
+
+Each starter owns its own `.claude/skills/`; root owns the root ones (see the Ownership Charter). Add new
+skills with `/create-skill`.
+
+---
+
 # SMKB Power Platform Solution Starter Kit — AI Assistant Rules
 
-This file contains mandatory rules for Claude (or any AI assistant) working in this repository. These rules exist to prevent accidental deployment of placeholder components to the SMKB Power Platform environments, which has previously caused conflicts with live solutions.
+Mandatory rules for Claude (or any AI assistant) working here. They exist to prevent accidental
+deployment of placeholder or colliding components to the shared SMKB Power Platform environment.
 
 ---
 
 ## Project Overview
 
-This repository contains 5 sub-starter folders:
-- `SMKB - Dataverse Tables Starter` — custom table schemas
-- `SMKB - Environmental Variables Starter` — environment variable definitions
-- `SMKB - Power Automate Flows Starter` — cloud flow JSON files
-- `SMKB - Power Apps Starter` — Power Apps Code App SPA (Vue 3 + TypeScript)
-- `SMKB - Power Page Starter` — Power Pages site source
+Five sub-starter folders, plus the `SMKB - Component Library` (reusable UI recipes — e.g. the OTP Auth
+Screen; the `@smkbacil/design-ui` package itself is consumed from the npm registry via `.npmrc`, not built
+here) and the `onboarding SMKB Apps Development` learning app:
 
-Each starter is an independent, reusable template. Not every solution uses all starters.
+- `SMKB - Dataverse Tables Starter` — custom table schemas (XML solution).
+- `SMKB - Environmental Variables Starter` — environment variable definitions (XML solution).
+- `SMKB - Power Automate Flows Starter` — cloud flow JSON packaged into a solution zip.
+- `SMKB - Power Apps Starter` — Power Apps Code App SPA (Vue 3 + TS), UI-only, backed by cloud flows.
+- `SMKB - Power Pages Code Site Starter` — Power Pages **Code Site** (Vue 3 SPA uploaded via PAC), flows-backed.
+
+Monorepo — one Git root; each starter manages its own `node_modules` / lock file and is not linked at
+build time. Each starter is an independent, reusable template. Not every solution uses all starters;
+starters you don't activate stay untouched with their template names.
 
 ---
 
@@ -83,6 +176,28 @@ Never run a deploy without confirming the auth target. If the wrong profile is a
 
 ---
 
+## Solution Config + Apply Script
+
+Solution identity is authored in **one** place: [`solution.config.json`](solution.config.json) at the
+repo root. It is the single source of truth for the solution's unique name, display name, short prefix,
+target environment, and per-starter identity (app display name, Power Pages site name / titles, etc.).
+
+Never hand-edit a starter's own config to a different value. Instead, fill `solution.config.json` and run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File apply-config.ps1 -DryRun   # preview every change + the skip list
+powershell -ExecutionPolicy Bypass -File apply-config.ps1           # write identity into every activated starter
+powershell -ExecutionPolicy Bypass -File apply-config.ps1 -Check    # fail if any starter has drifted (used in pre-commit)
+```
+
+The script writes **only identity** (solution name, prefix, display names, site name, env URL/ID, and
+the ALM env-var schema names) into each activated starter's own config files. It deliberately does
+**not** touch platform-assigned placeholders — app IDs, workflow GUIDs, site-setting GUIDs, connection
+references — so each starter's own `deploy.ps1` placeholder guard stays armed for the values a human or
+`pac` must still supply. Re-running is safe (idempotent); after a config change, re-running reconciles.
+
+---
+
 ## CRITICAL RULE 1 — Always Ask Which Starters to Activate
 
 At the beginning of any new solution engagement, BEFORE touching any files, you MUST ask the user (note: during Init Project, follow the Step 8→9 sequence in INIT_PROJECT.md instead — spec gathering happens before starter selection):
@@ -92,7 +207,7 @@ At the beginning of any new solution engagement, BEFORE touching any files, you 
 > - Environmental Variables (config values per environment)
 > - Power Automate Flows (automated workflows)
 > - Power Apps (Code App SPA — staff/admin interface)
-> - Power Pages (web portal — public-facing)
+> - Power Pages Code Site (web portal — public-facing)
 >
 > You can activate any combination. Starters you don't need should remain completely untouched."
 
@@ -104,132 +219,76 @@ Do NOT assume all starters are needed. Do NOT modify or deploy any starter the u
 
 ## CRITICAL RULE 2 — Never Deploy With Placeholder Names
 
-Before running `deploy.ps1` in ANY starter folder, you MUST scan that folder for unreplaced placeholders. The following strings are placeholders that MUST NOT exist in any deployed starter:
+A starter must never be deployed while it still holds template placeholders. This is enforced in two
+layers — do not bypass either:
 
-| Placeholder string | Appears in |
-|--------------------|-----------|
-| `YourSolutionName` | All starters — `Other/Solution.xml` |
-| `Your Solution Name` | All starters — `Other/Solution.xml` |
-| `sol_example_table_a` | Tables Starter — `Entity.xml`, `Solution.xml`, form/view XMLs |
-| `sol_example_table_b` | Tables Starter — `Entity.xml`, `Solution.xml`, form/view XMLs |
-| `sol_EXAMPLE_VAR` | Env Vars Starter — folder name, `environmentvariabledefinition.xml` |
-| `your-default-value-here` | Env Vars Starter — `environmentvariabledefinition.xml` |
-| `sol_example_flow` | Flows Starter — `Workflows/*.json`, `Customizations.xml`, `Solution.xml` |
-| `00000000-0000-0000-0000-000000000001` | Flows Starter — flow filename and XML (placeholder GUID) |
-| `[yourid]` | Flows Starter — connection reference names in flow JSON |
-| `[sol]` | Flows Starter — placeholder prefix in connection reference logical names in flow JSON |
-| `[REPLACE` | Flows Starter — placeholder content in flow JSON; Power Apps Starter — `power.config.json` connection ID |
-| `sol_example_item` | Power Apps Starter — `src/services/dataService.ts`, `src/types/ExampleItem.ts` |
-| `00000000-0000-0000-0000-000000000000` | Power Apps Starter — `power.config.json` App ID |
-| `00000000-0000-0000-0000-000000000001` | Power Apps Starter — `power.config.json` Environment ID |
-| `Your App Display Name` | Power Apps Starter — `power.config.json` appDisplayName |
-| `sol_ENVIRONMENT_NAME` | Env Vars Starter + Flows Starter — env var definition folder name and flow action `schemaName` |
-| `sol_FLOW_ERROR_EMAILS` | Env Vars Starter + Flows Starter — env var definition folder name and flow action `schemaName` |
-| `TODO-your-portal` | Power Pages Starter — `client/scripts/deploy.mjs` (`PORTAL_URL`) |
-| `TODO-get-from-pac-pages-list` | Power Pages Starter — `powerpages/.../website.yml` (`adx_websiteid`) |
+1. **Identity** is filled by the root config + apply script. Fill [`solution.config.json`](solution.config.json)
+   and run `apply-config.ps1` (see "Solution Config + Apply Script" above). That clears the solution
+   name, prefix, display names, site name, environment, and ALM env-var schema names across every
+   activated starter at once.
+2. **The remaining placeholders** (app IDs, workflow GUIDs, table/flow scaffold names, site-setting
+   GUIDs) are each guarded by that starter's own `deploy.ps1` (or deploy flow), which refuses to deploy
+   while its placeholders remain. The specific tokens and how to resolve them live in each starter's docs.
 
-> **Power Pages note:** The Power Pages Starter's own `CLAUDE.md` detects these TODOs automatically at session start and prompts the developer to fill them in. The entries above are for reference — the Power Pages deploy script (`deploy.mjs`) also guards against deploying when `PORTAL_URL` still contains `TODO`.
+Never disable or bypass a starter's placeholder guard. Do NOT mark a starter deploy complete unless
+its identity has been applied and its own guard passes.
 
-**If any of these strings are found:**
-1. STOP immediately — do not run deploy.ps1
-2. Report exactly which files contain unreplaced placeholders
-3. Ask the user to confirm they have replaced all placeholders before proceeding
-4. Only proceed after explicit user confirmation
-
-**The one exception:** if the user explicitly asks to do a test deploy of the placeholder skeleton (e.g. to verify the template structure works), you may proceed after confirming this is intentional.
+**The one exception:** if the user explicitly asks for a test deploy of the placeholder skeleton (e.g.
+to verify the template structure works), you may proceed after confirming this is intentional.
 
 ### ⚠️ Warning — Placeholder Tables Already Exist in SMKB-Apps-Dev
 
-`sol_example_table_a` and `sol_example_table_b` were deployed to SMKB-Apps-Dev on 2026-05-13 under the `YourSolutionName` solution as a template test. They currently exist in the environment.
+Under the old naming, `sol_example_table_a` / `sol_example_table_b` were deployed to SMKB-Apps-Dev on 2026-05-13 as a template test and still exist in the environment. The current template ships the example tables as `smkb_sol_ExampleTableA` / `smkb_sol_ExampleTableB` (the `sol` segment is a placeholder you rename).
 
-**If a developer deploys the Tables Starter without renaming the tables first, the import will SUCCEED** — but this is NOT a success. It means they just pushed placeholder components (with no real schema) to the environment. The deploy.ps1 placeholder guard will block this, but if the guard is bypassed or disabled, the deployment will silently succeed while doing nothing useful.
-
-Do NOT bypass the placeholder guard in `deploy.ps1`. Do NOT mark a Tables Starter deploy as complete unless the solution name and all table names have been replaced.
-
-### Env Vars — RootComponents must be populated
-
-After activating the Env Vars Starter, the `Other/Solution.xml` `<RootComponents>` block must contain a `type="380"` entry for every env var definition folder:
-
-```xml
-<RootComponent type="380" schemaName="EVT_PORTAL_BASE_URL" behavior="0" />
-```
-
-If `<RootComponents />` is self-closing or empty, env var definitions will be upserted to Dataverse but will **not be linked to the solution** — they will not travel through the pipeline to Stage and Prod. A template comment in `Other/Solution.xml` shows the format.
-
-### Env Vars — Type Codes and the JSON Type Trap
-
-Env var type codes in `environmentvariabledefinition.xml`:
-- `100000000` = String
-- `100000001` = Number
-- `100000002` = Boolean
-- `100000003` = JSON
-
-**Never use JSON type for email lists.** Use String with semicolon-separated addresses (e.g. `admin@smkb.ac.il;ops@smkb.ac.il`). JSON-type env vars require `json()` parsing in every expression that reads them. If a wrong-type var is already deployed, reimport cannot change its type — the only fix is: create a replacement var with a new schema name → migrate all references → redeploy → delete the old var.
-
-### Placeholder Detection Command
-
-Run this before any deploy to check a specific starter folder:
-
-```powershell
-# Replace $starterPath with the starter folder path
-$starterPath = ".\SMKB - Dataverse Tables Starter"
-$patterns = 'YourSolutionName','sol_example_table','sol_EXAMPLE_VAR','your-default-value-here','sol_example_flow','00000000-0000-0000-0000-000000000001','\[yourid\]','\[REPLACE','\[sol\]'
-Get-ChildItem $starterPath -Recurse -File -Include "*.xml","*.json","*.ts","*.vue","*.yml" -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch '_dist|node_modules|\.git' } |
-    ForEach-Object {
-        $file = $_
-        try { $c = [System.IO.File]::ReadAllText($file.FullName) } catch { return }
-        foreach ($p in $patterns) {
-            if ($c -match $p) { Write-Host "PLACEHOLDER FOUND: '$p' in $($file.Name)" }
-        }
-    }
-```
-
-> **Note:** `.ps1` files are excluded to prevent deploy scripts from flagging themselves.
+If the Tables Starter is deployed without renaming the example tables first, the import will *succeed* while pushing empty placeholder components. The Tables `deploy.ps1` guard blocks this (it fails on the un-renamed `smkb_sol_` segment) — do not bypass it, and do not mark a Tables deploy complete unless the solution name and all table names have been replaced.
 
 ---
 
 ## CRITICAL RULE 3 — Confirm Solution Identity Before Deploying
 
-Before any deployment, you must know and confirm with the user:
+Before any deployment, you must know and confirm with the user (these are the values you enter into
+`solution.config.json`):
 
 | Item | Example |
 |------|---------|
 | Solution Unique Name | `SMKBEvents` |
-| Solution Display Name | `SMKB – Events` |
+| Solution Display Name | `SMKB - Events` |
 | Solution Short Name (prefix) | `evt` |
 | Activated starter folder names | `SMKB - Events Tickets - Dataverse Tables`, etc. |
 | Git repository name | `SMKB - Events Tickets - Solution` (GitHub: `SMKB-Events-Tickets-Solution`) |
 
-The short name drives ALL component naming: every table, flow, env var, and related component must be named `[shortName]_component_name`. This prefix prevents collisions between different solutions in the same environment.
+The short name is the **middle segment** of every component's schema name and the prefix of every display name; it namespaces this solution within the shared `smkb` publisher, preventing collisions between solutions in the same environment.
 
-**Display name convention:** Every component's human-facing display name must follow `[SHORT_NAME_UPPER] - [Component Display Name]` — uppercase abbreviation, space-hyphen-space separator (e.g. `CFB - Booking Request`, `CFB - Portal Base URL`, `CFB - Booking Submitted`). This applies to Dataverse tables, env var definitions, and cloud flows. Power Apps and Power Pages sites have their own naming conventions — do not apply this pattern to them.
+**Schema name convention** — every custom Dataverse component (tables, columns you add, env vars, flows) is named `smkb_<prefix>_<PascalName>`:
+- `smkb` = the publisher customization prefix, fixed (the publisher is `SKMBCore`).
+- `<prefix>` = the solution short name, **lowercase** (e.g. `cfb`).
+- `<PascalName>` = a PascalCase descriptor, no separators (e.g. `BookingRequest`).
+- **Dataverse forces logical names lowercase.** `schemaName` / `PhysicalName` / `optionset Name=` keep PascalCase; the `<LogicalName>`, `<EntitySetName>`, primary-key, and optionset logical names are the lowercased form — e.g. table `smkb_cfb_BookingRequest` → logical `smkb_cfb_bookingrequest`, PK `smkb_cfb_bookingrequestid`, set `smkb_cfb_bookingrequests`, optionsets `smkb_cfb_bookingrequest_statecode` / `_statuscode`.
 
-**ASCII hyphens only in XML files:** Never use Unicode en dash (–, U+2013) or em dash in XML `LocalizedName` or `Solution.xml` display names. Hebrew-locale Windows (Windows-1255) misinterprets the UTF-8 en dash bytes as garbled characters (`ג€"`). Always use space-hyphen-space ` - ` (ASCII 0x2D).
+**Display name convention:** `[SHORT_NAME_UPPER] - [Human Name]` — uppercase prefix, space-hyphen-space separator (e.g. `CFB - Booking Request`). Applies to Dataverse tables, env var definitions, and cloud flows.
+
+**ASCII hyphens only in XML files:** Never use a Unicode en dash (–, U+2013) or em dash in XML `LocalizedName` or `Solution.xml` display names. Hebrew-locale Windows (Windows-1255) misinterprets the UTF-8 en dash bytes as garbled characters (`ג€"`). Always use space-hyphen-space ` - ` (ASCII 0x2D). This applies to any script the kit ships as well — keep `.ps1` files ASCII-only.
 
 | Component type | Schema name example | Display name example |
 |---------------|--------------------|--------------------|
-| Dataverse table | `cfb_booking_request` | `CFB - Booking Request` |
-| Env var | `CFB_PORTAL_BASE_URL` | `CFB - Portal Base URL` |
-| Cloud flow | `cfb_booking_submitted` | `CFB - Booking Submitted` |
+| Dataverse table | `smkb_cfb_BookingRequest` | `CFB - Booking Request` |
+| Env var | `smkb_cfb_PortalBaseUrl` | `CFB - Portal Base URL` |
+| Cloud flow | `smkb_cfb_BookingSubmitted` | `CFB - Booking Submitted` |
 
-**Folder naming check:** Before touching any files in a starter, verify the folder has been renamed from its template name to the convention name:
-```
-SMKB - [Component Name] - [Type Label]
-```
-where type labels are: `Dataverse Tables`, `Environmental Variables`, `Cloud Flows`, `Power App`, `Power Page`.
+> **Shared columns keep the bare publisher prefix** (`smkb_name`, `smkb_description`) with no solution segment — they are intentionally shared across all SMKB tables. **Connection references** keep their fixed environment-level names (never prefix them). See Critical Rule 5.
 
-If the folder is still named `SMKB - X Starter`, that means the starter has not been activated yet — rename it first, then proceed with the other activation steps.
+**Folder naming:** Before touching a starter, verify its folder has been renamed from the template name to `SMKB - [Component Name] - [Type Label]`, where the type labels are `Dataverse Tables`, `Environmental Variables`, `Cloud Flows`, `Power App`, `Power Pages Code Site`. A folder still named `SMKB - X Starter` means the starter has not been activated — rename it first.
 
-**Power App and Power Pages naming:** For these two types, the Component Name must describe the **function** of that specific site or app — not just repeat the solution name. The same Component Name must be consistent across all three places:
+**Power App and Power Pages Code Site naming:** For these two types the Component Name must describe the **function** of that specific app or site, and be consistent across all three places:
 
 | Object | Convention | Example |
 |--------|-----------|---------|
-| Repo folder | `SMKB - [Name] - Power App` / `Power Page` | `SMKB - Events Backoffice - Power App` |
+| Repo folder | `SMKB - [Name] - Power App` / `Power Pages Code Site` | `SMKB - Events Backoffice - Power App` |
 | Power Platform display name | `SMKB - [Name] - Dev` | `SMKB - Events Backoffice - Dev` |
-| Portal subdomain (Power Pages only) | `[name-lowercase]-dev` | `events-backoffice-dev` |
+| Power Pages `solution.ts` `siteName` (the **bare** name) | `[Name]` | `Lecturer Portal` |
+| Resulting Power Pages site name (**derived**, `[PREFIX] - [Name]`) | `[PREFIX] - [Name]` | `EVT - Lecturer Portal` |
 
-If in doubt about what to name a component, ask the user what the site or app is *for* — that answer becomes the Component Name.
+If in doubt about what to name one of these, ask the user what the app or site is *for* — that answer becomes the Component Name. Enter the Power Pages **bare** site name in the Code Site starter's `src/config/solution.ts` `siteName` field (or `powerPages.siteName` in `solution.config.json`); `apply-config.ps1` derives the prefixed `[PREFIX] - [Name]` form — do NOT type the prefix yourself or it doubles (`EVT - EVT - …`). See the [Power Pages starter docs](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/CLAUDE.md).
 
 ---
 
@@ -239,7 +298,10 @@ When a solution uses multiple starters, deploy in this order:
 1. **Tables Starter** — creates the table schemas first
 2. **Environmental Variables Starter** — creates config variables
 3. **Flows Starter** — flows may reference tables and env vars
-4. **Power Pages Starter** — uses PAC CLI powerpages commands, not solution import
+4. **Power Apps Starter** — the app references flows/tables
+5. **Power Pages Code Site Starter** — uploaded via PAC (not solution import); promoted to Stage/Prod via Pipeline
+
+Each starter's own deploy steps live in its README (see "Where To Find X").
 
 ---
 
@@ -249,7 +311,7 @@ All SMKB solutions are deployed to the same Power Platform environment (SMKB-App
 
 ### Short Name (prefix) — must be unique across ALL solutions in the environment
 
-The short name (e.g., `evt`) determines the schema name prefix of every component in the solution: tables (`evt_registration`), env vars (`EVT_PORTAL_BASE_URL`), flows (`evt_send_confirmation`). If two solutions share the same short name, their components will collide in Dataverse.
+The short name (e.g., `evt`) is the **middle segment** of every component's schema name: tables (`smkb_evt_Registration`), env vars (`smkb_evt_PortalBaseUrl`), flows (`smkb_evt_SendConfirmation`). If two solutions share the same short name, their components will collide in Dataverse.
 
 **Before committing to a short name, confirm it is not already in use by another solution deployed to SMKB-Apps-Dev.**
 
@@ -257,113 +319,52 @@ Currently registered short names (update this table when initializing a new solu
 
 | Short name | Solution |
 |-----------|---------|
-| `cif` | SMKB – Community Initiatives Fund |
+| `cif` | SMKB - Community Initiatives Fund |
 
-### Environment Variable schema names — environment-scoped
+### Environment Variable & Table schema names — environment-scoped
 
-Environment variable `schemaName` values (e.g., `EVT_PORTAL_BASE_URL`) are globally unique within the entire Power Platform environment. If two solutions define an env var with the same schema name, the second import overwrites the first definition. Unique short names prevent this — but only if short names are actually unique.
+Env var and Dataverse table schema names (e.g., `smkb_evt_PortalBaseUrl`, `smkb_evt_Registration`) are globally unique within the entire environment. If two solutions define one with the same name, the second import overwrites the first. Unique short names prevent this — but only if short names are actually unique.
 
-### Table schema names — environment-scoped
-
-Dataverse table logical names (e.g., `evt_registration`) are globally unique within the environment. Same protection: unique short names prevent collisions.
+**Env var data types (global rule):** use **String** with semicolon-separated values for lists (e.g. an email list `admin@smkb.ac.il;ops@smkb.ac.il`) — **never JSON type**, which would force `json()` parsing in every expression and cannot be changed by reimport once deployed. The type codes and per-variable guidance live in the [Env Vars README](SMKB%20-%20Environmental%20Variables%20Starter/README.md).
 
 ### Flow names — solution-scoped (NOT a cross-solution conflict risk)
 
-Power Automate flow display names and logical names are scoped within their solution. Two solutions can both contain a flow named `evt_send_confirmation` without conflicting — they live in separate solution containers. No action needed.
+Power Automate flow display names and logical names are scoped within their solution. Two solutions can both contain a flow named `smkb_evt_SendConfirmation` without conflicting. No action needed.
 
 ### Publisher prefix — intentionally shared
 
-All SMKB solutions use the **same publisher**: `SKMBCore` (prefix `smkb`). This is correct and by design — it provides a consistent org-wide namespace. Do NOT create a new publisher for each solution. The publisher prefix (`smkb_`) is used for shared column names like `smkb_name`.
+All SMKB solutions use the **same publisher**: `SKMBCore` (prefix `smkb`). This is correct and by design — a consistent org-wide namespace. Do NOT create a new publisher per solution. Every component therefore carries the `smkb_` publisher prefix; the per-solution short name is the middle segment that namespaces it (`smkb_<prefix>_...`). Shared columns like `smkb_name` use the bare publisher prefix with no solution segment.
 
-### Power Pages portals — require GUID freshening before first deploy
+### Power Pages Code Sites — isolated by prefix + site name
 
-Every portal initialized from this starter shares identical hardcoded GUIDs. If two portals are deployed without freshening, the second upload silently overwrites the first portal's records.
-
-Run `guid-freshen.ps1` exactly **once**, before the first deploy, for every new portal. See the Power Pages starter's CLAUDE.md → "GUID Isolation" section for full details.
+Code Sites are namespaced by the publisher prefix and their site name — the canonical `[PREFIX] - [Name]` form is derived by `apply-config.ps1` from the **bare** `siteName` in `solution.ts` (do not pre-prefix it). There is no shared-GUID overwrite hazard like the old portal model. Per-environment site-setting GUIDs are freshened by the starter's own `scripts/freshen-site-settings.ps1` (run by its provisioning skill). See the [Power Pages starter docs](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/CLAUDE.md).
 
 ---
 
 ## Connection References — The One Exception to Solution Isolation
 
-Power Platform has one intentional exception to the "each solution owns its own components" rule: **connection references**.
-
-A connection reference is an environment-level pointer to a connection (credentials for a connector). They are **designed to be shared** across solutions. Creating one connection reference per connector type (e.g. one for Office 365 Outlook, one for Dataverse) and reusing it in all flows is correct Power Platform architecture.
+Power Platform has one intentional exception to "each solution owns its own components": **connection references**. A connection reference is an environment-level pointer to a connection (connector credentials). They are **designed to be shared** across solutions — create one per connector type (Office 365 Outlook, Dataverse, etc.) and reuse it in all flows.
 
 **Rules:**
-- Do NOT create a new connection reference for every solution or every flow — this creates credential sprawl and maintenance burden
-- When replacing the `[yourid]` placeholder in a flow JSON, use the logical name of an **existing** connection reference already in the environment
-- Connection references with the same connector type point to the same service account; reusing them across solutions is intentional and correct
+- Do NOT create a new connection reference per solution or per flow — that causes credential sprawl.
+- When wiring a flow, use the logical name of an **existing** connection reference already in the environment.
+- Connection references of the same connector type point to the same service account; reusing them across solutions is intentional and correct.
 
-**How to find the logical name of an existing connection reference:**
-
-```powershell
-# Step 1: find a solution with working flows
-pac solution list
-
-# Step 2: export and unpack
-pac solution export --name <SolutionUniqueName> --path .\inspect.zip --overwrite
-pac solution unpack --zipFile .\inspect.zip --folder .\inspect_unpacked
-
-# Step 3: extract logical names from flow JSON files
-Get-ChildItem .\inspect_unpacked\Workflows -Filter "*.json" | ForEach-Object {
-    $j = Get-Content $_.FullName | ConvertFrom-Json
-    $j.properties.connectionReferences.PSObject.Properties | ForEach-Object {
-        [PSCustomObject]@{ Key = $_.Name; ApiName = $_.Value.api.name; LogicalName = $_.Value.connection.connectionReferenceLogicalName }
-    }
-} | Format-Table -AutoSize
-
-# Step 4: clean up
-Remove-Item .\inspect.zip, .\inspect_unpacked -Recurse -Force
-```
-
-The `LogicalName` column value (e.g. `shared_office365_abc123def`) is what to use in the flow JSON's `connectionReferences` section.
-
-> **Note:** The `connectionreferences/` folder does NOT exist in unpacked solutions. Connection reference logical names are embedded in the flow JSON under `connectionReferences[*].connection.connectionReferenceLogicalName`.
-
-**After import — if flows are disabled:**
-When a solution containing flows is imported, flows are often left in a disabled state until connection references are confirmed. To enable:
-1. Go to the Power Automate portal → Solutions → your solution → Cloud Flows
-2. For each disabled flow, open it and click "Edit"
-3. Confirm the connection reference assignments
-4. Save and turn on
+The Flows starter ships a named SMKB connection-reference bank and documents how to discover logical names and re-enable flows after import — see the [Flows README](SMKB%20-%20Power%20Automate%20Flows%20Starter/README.md).
 
 ---
 
 ## Deployment Method Reference
 
-| Starter | Method | Command |
-|---------|--------|---------|
-| Tables | `pac solution pack` + `pac solution import` | `powershell -ExecutionPolicy Bypass -File deploy.ps1` |
-| Env Vars | `pac solution pack` + `pac solution import` | `powershell -ExecutionPolicy Bypass -File deploy.ps1` |
-| Flows | Manual zip build + `pac solution import` | `powershell -ExecutionPolicy Bypass -File deploy.ps1` |
-| Power Apps | `pnpm build` + `pac code push` | `powershell -ExecutionPolicy Bypass -File deploy.ps1` |
-| Power Pages | `pac powerpages upload` | See Power Pages Starter README |
+Each starter deploys itself; run its own steps (see "Where To Find X"). High-level methods:
 
-**For Flows:** Do NOT use `pac solution pack` directly — it cannot include Cloud Flow JSONs. Always use the `deploy.ps1` script which builds the zip manually.
-
-**For Power Apps:** Do NOT use `pac solution pack/import`. Code Apps are deployed with `pac code push`. Requires Node 20+ and pnpm 9+. The app record must exist before the first push — `pac code push` updates an existing record, it does NOT create one. **There is no "New Code App" option in the portal.** Use `pac code init --environment "https://org229c958d.crm4.dynamics.com/" --displayName "SMKB - [Component Name] - Dev"` to create the app record and populate `power.config.json` in a single step (delete any existing `power.config.json` first). Never try to create a Code App via the Power Apps portal UI.
-
-`deploy.ps1` also reads **`deploy.config.json`** (in the Power Apps starter folder) for `solutionName` and `targetEnv`. This file ships with `"solutionName": "YourSolutionName"` as a placeholder — replace it with the solution's unique name (e.g. `"SMKBEvents"`) before running `deploy.ps1` for the first time.
-
-**For Power Pages — linking site to solution (after first upload):** The Maker portal "Add Existing → Power Pages" button only adds the site record and silently omits ~200 child components. Use `pac solution add-solution-component` instead:
-
-```powershell
-# 1. Add site record
-pac solution add-solution-component --solution-unique-name YourSolutionName --component-type powerpagesite --component-id <site-guid>
-
-# 2. Add all child components (extract GUIDs from portal YAML files)
-$guids = Get-ChildItem ".\<portal-folder>" -Recurse -Include "*.yml" |
-    Select-String -Pattern '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' |
-    ForEach-Object { $_.Matches.Value } | Sort-Object -Unique
-foreach ($guid in $guids) {
-    pac solution add-solution-component --solution-unique-name YourSolutionName --component-type powerpagecomponent --component-id $guid
-}
-
-# 3. Add language component
-pac solution add-solution-component --solution-unique-name YourSolutionName --component-type powerpagesitelanguage --component-id <site-guid>
-```
-
-See INIT_PROJECT.md Step 11 for the full annotated version of this command sequence.
+| Starter | Method |
+|---------|--------|
+| Tables | solution pack + import (its `deploy.ps1`) |
+| Env Vars | solution pack + import (its `deploy.ps1`) |
+| Flows | manual zip build + solution import (its `deploy.ps1`) — `pac solution pack` cannot embed cloud-flow JSON |
+| Power Apps | build + PAC Code Apps push (its `deploy.ps1`) |
+| Power Pages Code Site | PAC pages code-site upload (its own deploy flow); Stage/Prod via Pipeline |
 
 ---
 
@@ -386,6 +387,6 @@ Or rely on the default URL already configured in each `deploy.ps1` (which hardco
 
 | Environment | URL | Deploy method |
 |-------------|-----|---------------|
-| SMKB-Apps-Dev | `https://org229c958d.crm4.dynamics.com/` | Direct (`deploy.ps1` / `pnpm deploy`) |
+| SMKB-Apps-Dev | `https://org229c958d.crm4.dynamics.com/` | Direct (each starter's deploy script) |
 | SMKB-Apps-Stage | — | Power Platform Pipeline only |
 | SMKB-Apps-Prod | — | Power Platform Pipeline only |

@@ -1,0 +1,802 @@
+﻿{
+  "properties": {
+    "connectionReferences": {
+      "shared_sharepointonline_pvch": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "smkb_SMKBSharePointConnectionUser1"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      },
+      "shared_office365_pvch": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedoffice365_c3167"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      },
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "msdyn_Dataverse"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "PVCH - SMS API URL (smkb_PvchSmsApiUrl)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_PvchSmsApiUrl"
+          }
+        },
+        "PVCH - SharePoint Site URL (smkb_SharePointSiteUrl)": {
+          "defaultValue": "https://smkb365.sharepoint.com/teams/SMKBAppsFiles",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_SharePointSiteUrl"
+          }
+        },
+        "PVCH - Environment Name (smkb_pvch_EnvironmentName)": {
+          "defaultValue": "dev",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_EnvironmentName"
+          }
+        },
+        "PVCH - Support Email (smkb_SupportEmail)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_SupportEmail"
+          }
+        },
+        "PVCH - SMS Sender (smkb_PvchSmsSender)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_PvchSmsSender"
+          }
+        },
+        "PVCH - Flow Error Emails (smkb_pvch_FlowErrorEmails)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_FlowErrorEmails"
+          }
+        },
+        "PVCH - SMS API User (smkb_PvchSmsApiUser)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_PvchSmsApiUser"
+          }
+        },
+        "PVCH - Turnstile Site Key (smkb_TurnstileSiteKey)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_TurnstileSiteKey"
+          }
+        }
+      },
+      "triggers": {
+        "manual": {
+          "metadata": {
+            "operationMetadataId": "f8e7d6c5-b4a3-4f21-8e9d-0c1b2a3d4e5f"
+          },
+          "type": "Request",
+          "kind": "PowerPages",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "phone",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_1": {
+                  "title": "turnstileToken",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          },
+          "description": "Power Pages trigger — creates an OTP for the given phone number. Looks up the lecturer by lecturerCellPhone, sends OTP to their email, and returns masked channel values for display."
+        }
+      },
+      "actions": {
+        "Main_Flow": {
+          "actions": {
+            "Validate_Input": {
+              "actions": {
+                "Respond_invalid_input": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "ebc039e9-b3fd-48e6-a0d4-864656e7906b"
+                  },
+                  "type": "Response",
+                  "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "INVALID_INPUT"
+                    }
+                  }
+                },
+                "Terminate_after_invalid_input": {
+                  "runAfter": {
+                    "Respond_invalid_input": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "0c3c7613-27bf-4b69-9209-1184904eafb9"
+                  },
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  }
+                }
+              },
+              "runAfter": {},
+              "expression": "@empty(coalesce(triggerBody()?['text'], ''))",
+              "metadata": {
+                "operationMetadataId": "1f0cc519-e1ea-4f5c-a7cc-aaab9fb9e278"
+              },
+              "type": "If",
+              "description": "Guard: reject missing or empty phone number."
+            },
+            "If_Turnstile_Enabled": {
+              "actions": {
+                "GetTurnstileSecret": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "a1b2c3d4-0001-4000-8000-000000000001"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "PerformUnboundAction",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "actionName": "RetrieveEnvironmentVariableSecretValue",
+                      "item/EnvironmentVariableName": "smkb_pvch_TurnstileSecretAPIKey"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "description": "Fetch the Turnstile secret from Key Vault via the Secret env var (Secret env vars can't be read through flow parameters).",
+                  "runtimeConfiguration": {
+                    "secureData": {
+                      "properties": [
+                        "outputs"
+                      ]
+                    }
+                  }
+                },
+                "Verify_Turnstile": {
+                  "runAfter": {
+                    "GetTurnstileSecret": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "30ad8341-a477-42a7-9775-f97a540ea238"
+                  },
+                  "type": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "uri": "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                    "headers": {
+                      "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    "body": "@concat('secret=', encodeUriComponent(body('GetTurnstileSecret')?['EnvironmentVariableSecretValue']), '&response=', encodeUriComponent(coalesce(triggerBody()?['text_1'], '')))"
+                  },
+                  "description": "POST the secret + client token to Cloudflare siteverify (form-encoded). Secure Inputs keeps the secret/token out of run history. An empty/missing token yields success:false.",
+                  "runtimeConfiguration": {
+                    "secureData": {
+                      "properties": [
+                        "inputs"
+                      ]
+                    }
+                  }
+                },
+                "Parse_Turnstile_Result": {
+                  "runAfter": {
+                    "Verify_Turnstile": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "a87b4b1c-ae42-4fb0-bccc-2308c74eeb04"
+                  },
+                  "type": "ParseJson",
+                  "inputs": {
+                    "content": "@body('Verify_Turnstile')",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  },
+                  "description": "Parse the siteverify JSON response."
+                },
+                "If_Turnstile_Invalid": {
+                  "actions": {
+                    "Respond_captcha_failed": {
+                      "runAfter": {},
+                      "metadata": {
+                        "operationMetadataId": "7ecbac02-40bf-4b1e-87cf-ab21e41433f9"
+                      },
+                      "type": "Response",
+                      "kind": "PowerPages",
+                      "inputs": {
+                        "statusCode": 200,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "errorCode": "CAPTCHA_FAILED"
+                        }
+                      }
+                    },
+                    "Terminate_captcha_failed": {
+                      "runAfter": {
+                        "Respond_captcha_failed": [
+                          "Succeeded"
+                        ]
+                      },
+                      "metadata": {
+                        "operationMetadataId": "61d951e5-b746-47db-9d5c-8b56b7a3d7bf"
+                      },
+                      "type": "Terminate",
+                      "inputs": {
+                        "runStatus": "Succeeded"
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "Parse_Turnstile_Result": [
+                      "Succeeded",
+                      "Failed",
+                      "Skipped"
+                    ]
+                  },
+                  "expression": "@not(equals(body('Parse_Turnstile_Result')?['success'], true))",
+                  "metadata": {
+                    "operationMetadataId": "8ffb441c-6608-4fe5-bafd-3a5ec3a7e774"
+                  },
+                  "type": "If",
+                  "description": "Fail CLOSED: reject unless siteverify returned success:true. Also runs on Failed/Skipped (body() null -> reject), so a secret-fetch/HTTP/parse error can't let OTP through unverified. No lookup, no SMS."
+                }
+              },
+              "runAfter": {
+                "Validate_Input": [
+                  "Succeeded"
+                ]
+              },
+              "expression": "@not(empty(trim(parameters('PVCH - Turnstile Site Key (smkb_TurnstileSiteKey)'))))",
+              "metadata": {
+                "operationMetadataId": "eab62ffb-c0e2-4c76-80e7-48a89e58b905"
+              },
+              "type": "If",
+              "description": "If Turnstile is configured (site key present), verify the captcha token with Cloudflare BEFORE any lookup/SMS. No site key = Turnstile disabled (skip)."
+            },
+            "Get_Lecturer_By_Phone": {
+              "runAfter": {
+                "If_Turnstile_Enabled": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "fcac67ce-e6f1-4c69-9c53-978123a6e22d"
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline_pvch",
+                  "operationId": "GetItems",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@parameters('PVCH - SharePoint Site URL (smkb_SharePointSiteUrl)')",
+                  "table": "Vouchers-LecturersDetails",
+                  "$filter": "lecturerCellPhone eq '@{replace(triggerBody()?['text'], '''', '''''')}'",
+                  "$top": 1
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "description": "Look up the lecturer row by cell phone number."
+            },
+            "If_Lecturer_Not_Found": {
+              "actions": {
+                "Respond_not_found": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "182d926b-b3f8-4213-b04f-793e5333b61f"
+                  },
+                  "type": "Response",
+                  "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "NOT_FOUND"
+                    }
+                  }
+                },
+                "Terminate_not_found": {
+                  "runAfter": {
+                    "Respond_not_found": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "cdecbb0c-eba2-46ad-8658-4e59b7d71d83"
+                  },
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  }
+                }
+              },
+              "runAfter": {
+                "Get_Lecturer_By_Phone": [
+                  "Succeeded"
+                ]
+              },
+              "expression": "@equals(length(body('Get_Lecturer_By_Phone')?['value']), 0)",
+              "metadata": {
+                "operationMetadataId": "9b2be6dc-4d4c-407e-9086-78c95b968b95"
+              },
+              "type": "If",
+              "description": "No lecturer with this phone — return NOT_FOUND."
+            },
+            "If_Lecturer_Archived": {
+              "actions": {
+                "Respond_archived": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "ae222f8f-69f9-4c7a-8a5a-40fdc0e1cd0f"
+                  },
+                  "type": "Response",
+                  "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "ACCOUNT_ARCHIVED"
+                    }
+                  }
+                },
+                "Terminate_archived": {
+                  "runAfter": {
+                    "Respond_archived": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "08c85a9a-d9b4-4a7f-9315-40a3f27dbbc6"
+                  },
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  }
+                }
+              },
+              "runAfter": {
+                "If_Lecturer_Not_Found": [
+                  "Succeeded"
+                ]
+              },
+              "expression": "@equals(first(body('Get_Lecturer_By_Phone')?['value'])?['lecturerStatus'], 'Archived')",
+              "metadata": {
+                "operationMetadataId": "2a0d4596-c795-4cda-b33b-3d4a0d39be6a"
+              },
+              "type": "If",
+              "description": "Block archived lecturers from logging in."
+            },
+            "If_Rate_Limited": {
+              "actions": {
+                "Respond_rate_limited": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "590a39df-72ff-4b8b-9bdb-661b72268c53"
+                  },
+                  "type": "Response",
+                  "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "RATE_LIMITED"
+                    }
+                  }
+                },
+                "Terminate_rate_limited": {
+                  "runAfter": {
+                    "Respond_rate_limited": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "801c8e12-2ba0-416a-bdd7-c3c4da978d02"
+                  },
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  }
+                }
+              },
+              "runAfter": {
+                "If_Lecturer_Archived": [
+                  "Succeeded"
+                ]
+              },
+              "expression": "@and(not(empty(coalesce(first(body('Get_Lecturer_By_Phone')?['value'])?['otpRequestedAt'], ''))), lessOrEquals(ticks(utcNow()), ticks(addMinutes(first(body('Get_Lecturer_By_Phone')?['value'])?['otpRequestedAt'], 1))))",
+              "metadata": {
+                "operationMetadataId": "947576a5-7ec8-4816-9b69-29fc8ec9c7a9"
+              },
+              "type": "If",
+              "description": "Block if an OTP was already sent within the last 1 minute."
+            },
+            "Compose_OTP_Code": {
+              "runAfter": {
+                "If_Rate_Limited": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "ee9e3512-5e49-4ff1-acbb-bffaa5c1e2c9"
+              },
+              "type": "Compose",
+              "inputs": "@string(rand(100000, 999999))",
+              "description": "Generate a random 6-digit OTP using rand(100000, 999999)."
+            },
+            "Patch_Lecturer_OTP_Fields": {
+              "runAfter": {
+                "Compose_OTP_Code": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "c333b18b-63da-49a2-b2d3-d249b2c9f448"
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline_pvch",
+                  "operationId": "PatchItem",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@parameters('PVCH - SharePoint Site URL (smkb_SharePointSiteUrl)')",
+                  "table": "Vouchers-LecturersDetails",
+                  "id": "@first(body('Get_Lecturer_By_Phone')?['value'])?['ID']",
+                  "item/otpCode": "@outputs('Compose_OTP_Code')",
+                  "item/otpExpiresAt": "@formatDateTime(addMinutes(utcNow(), 10), 'yyyy-MM-ddTHH:mm:ssZ')",
+                  "item/otpAttempts": 0,
+                  "item/otpRequestedAt": "@formatDateTime(utcNow(), 'yyyy-MM-ddTHH:mm:ssZ')"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "description": "Write OTP fields to the lecturer's SP row."
+            },
+            "Compose_SMS_Message": {
+              "runAfter": {
+                "Patch_Lecturer_OTP_Fields": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "00f7d996-553e-49f9-bd42-480fa096ff47"
+              },
+              "type": "Compose",
+              "inputs": "קוד האימות שלך לפורטל הזנת שוברים של מכללת סמינר הקיבוצים הוא @{outputs('Compose_OTP_Code')}. הקוד תקף ל-10 דקות.",
+              "description": "Hebrew SMS body with the OTP code."
+            },
+            "GetSmsPassword": {
+              "runAfter": {
+                "Compose_SMS_Message": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "9ef22107-0b1a-48c0-ac66-a921fa9a8a63"
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "PerformUnboundAction",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "actionName": "RetrieveEnvironmentVariableSecretValue",
+                  "item/EnvironmentVariableName": "smkb_pvch_SopranoSMSAPIPassword"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "description": "Fetch the Soprano SMS password from Key Vault via the Secret env var.",
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "outputs"
+                  ]
+                }
+              }
+            },
+            "Send_OTP_SMS": {
+              "runAfter": {
+                "GetSmsPassword": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "d8c734b7-0a0f-4817-8215-58ff213cee86"
+              },
+              "type": "Http",
+              "inputs": {
+                "method": "POST",
+                "uri": "@concat(parameters('PVCH - SMS API URL (smkb_PvchSmsApiUrl)'), '?version=1.0&operation=mt&user=', encodeUriComponent(parameters('PVCH - SMS API User (smkb_PvchSmsApiUser)')), '&password=', encodeUriComponent(body('GetSmsPassword')?['EnvironmentVariableSecretValue']), '&destination=', encodeUriComponent(triggerBody()?['text']), '&source=', encodeUriComponent(parameters('PVCH - SMS Sender (smkb_PvchSmsSender)')), '&message=', encodeUriComponent(outputs('Compose_SMS_Message')))"
+              },
+              "description": "Send the OTP via the Soprano SMS gateway. Credentials/sender/url come from env vars. Secure Inputs keeps the password out of run history.",
+              "runtimeConfiguration": {
+                "contentTransfer": {
+                  "transferMode": "Chunked"
+                },
+                "secureData": {
+                  "properties": [
+                    "inputs"
+                  ]
+                }
+              }
+            },
+            "If_Has_Email": {
+              "actions": {
+                "Send_OTP_Email": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "7eb625a7-59f0-470e-a0ec-5688dca94dc8"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365_pvch",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/To": "@first(body('Get_Lecturer_By_Phone')?['value'])?['lecturerEmail']",
+                      "emailMessage/Subject": "קוד אימות - פורטל דיווח והזנת שוברים",
+                      "emailMessage/Body": "@concat('<div dir=\"rtl\" style=\"direction:rtl;font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;padding:32px 0;text-align:right;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);\"><tr><td style=\"background:#4eb764;padding:20px 28px;text-align:right;\"><p style=\"margin:0;color:#ffffff;font-size:20px;font-weight:bold;\">מכללת סמינר הקיבוצים</p></td></tr><tr><td style=\"padding:32px 28px;\"><p style=\"margin:0 0 8px;font-size:16px;color:#333333;\">שלום,</p><p style=\"margin:0 0 24px;font-size:15px;color:#333333;line-height:1.8;\">קוד האימות שלך לפורטל הדיווח והזנת השוברים:</p><div style=\"text-align:center;margin:0 0 24px;\"><div style=\"display:inline-block;background:#f0f7f1;border:2px solid #4eb764;border-radius:12px;padding:20px 40px;\"><p style=\"margin:0;font-size:48px;font-weight:bold;letter-spacing:10px;color:#4eb764;font-family:monospace,Arial;\">', outputs('Compose_OTP_Code'), '</p></div></div><p style=\"margin:0 0 8px;font-size:14px;color:#666666;text-align:center;\">הקוד תקף ל-10 דקות</p><p style=\"margin:0;font-size:13px;color:#999999;text-align:center;\">אם לא ביקשת קוד זה, ניתן להתעלם מאימייל זה</p></td></tr><tr><td style=\"border-top:1px solid #e5e5e5;padding:20px 28px;text-align:right;\"><p style=\"margin:0;font-size:13px;color:#666666;\">לתמיכה, אנא פנה/י לכתובת: <a href=\"mailto:', parameters('PVCH - Support Email (smkb_SupportEmail)'), '\" style=\"color:#4eb764;\">', parameters('PVCH - Support Email (smkb_SupportEmail)'), '</a></p></td></tr></table></div>')",
+                      "emailMessage/From": "noreply@smkb.ac.il",
+                      "emailMessage/Importance": "Normal"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "description": "Send the OTP to the lecturer's email address from the lecturers list."
+                }
+              },
+              "runAfter": {
+                "Send_OTP_SMS": [
+                  "Succeeded",
+                  "Failed"
+                ]
+              },
+              "expression": "@not(empty(coalesce(first(body('Get_Lecturer_By_Phone')?['value'])?['lecturerEmail'], '')))",
+              "metadata": {
+                "operationMetadataId": "4de2c7ce-5e39-4ad6-8ec0-d87cd8a7ca4c"
+              },
+              "type": "If",
+              "description": "Send the OTP by email too — only if the lecturer has an email on file."
+            },
+            "Compose_Channels": {
+              "runAfter": {
+                "If_Has_Email": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "3e4f89fa-5ef0-4f0c-843f-c80984ba4c3c"
+              },
+              "type": "Compose",
+              "inputs": "@union(if(equals(actions('Send_OTP_SMS')?['status'], 'Succeeded'), createArray(json(concat('{\"type\":\"sms\",\"maskedValue\":\"', concat(substring(triggerBody()?['text'], 0, 3), '****', substring(triggerBody()?['text'], sub(length(triggerBody()?['text']), 3))), '\"}'))), json('[]')), if(and(not(empty(coalesce(first(body('Get_Lecturer_By_Phone')?['value'])?['lecturerEmail'], ''))), equals(actions('Send_OTP_Email')?['status'], 'Succeeded')), createArray(json(concat('{\"type\":\"email_personal\",\"maskedValue\":\"', concat(substring(first(body('Get_Lecturer_By_Phone')?['value'])?['lecturerEmail'], 0, 2), '****', substring(first(body('Get_Lecturer_By_Phone')?['value'])?['lecturerEmail'], indexOf(first(body('Get_Lecturer_By_Phone')?['value'])?['lecturerEmail'], '@'))), '\"}'))), json('[]')))",
+              "description": "Build the channels array from the deliveries that actually succeeded (sms if the SMS sent; email_personal if the lecturer has an email and it sent)."
+            },
+            "If_No_Channel": {
+              "actions": {
+                "Respond_otp_send_failed": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "96e0c482-ba20-4a39-819d-44c5aa3f7dde"
+                  },
+                  "type": "Response",
+                  "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "OTP_SEND_FAILED"
+                    }
+                  }
+                },
+                "Terminate_otp_send_failed": {
+                  "runAfter": {
+                    "Respond_otp_send_failed": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "58c43abc-d999-46b9-be37-f671d9c229fe"
+                  },
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  }
+                }
+              },
+              "runAfter": {
+                "Compose_Channels": [
+                  "Succeeded"
+                ]
+              },
+              "else": {
+                "actions": {
+                  "Respond_to_PowerPages": {
+                    "runAfter": {},
+                    "metadata": {
+                      "operationMetadataId": "dcdeacab-0034-4307-a0d4-dc05962180b0"
+                    },
+                    "type": "Response",
+                    "kind": "PowerPages",
+                    "inputs": {
+                      "statusCode": 200,
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "channels": "@outputs('Compose_Channels')"
+                      }
+                    },
+                    "description": "Return the channels that received the OTP for display in the portal OTP step."
+                  }
+                }
+              },
+              "expression": "@empty(outputs('Compose_Channels'))",
+              "metadata": {
+                "operationMetadataId": "9c85648b-4f5a-413d-ab0b-e8f6957f2b23"
+              },
+              "type": "If",
+              "description": "If neither SMS nor email was sent successfully, return OTP_SEND_FAILED; otherwise return the channels that received the code."
+            }
+          },
+          "runAfter": {},
+          "metadata": {
+            "operationMetadataId": "1d1cef57-3ac4-4ce9-af92-cdc02827f66b"
+          },
+          "type": "Scope",
+          "description": "Main OTP creation logic. Business errors (NOT_FOUND, RATE_LIMITED, OTP_SEND_FAILED) use Response + Terminate(Succeeded) — they do NOT bubble up to Handle_Flow_Error."
+        },
+        "Handle_Flow_Error": {
+          "actions": {
+            "Check_Error_Emails_Configured": {
+              "actions": {
+                "Send_error_notification": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "083065ef-baef-4878-9674-4fe7fb87ba20"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365_pvch",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/To": "@parameters('PVCH - Flow Error Emails (smkb_pvch_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('PVCH - Environment Name (smkb_pvch_EnvironmentName)')), ') [ERROR] smkb_pvch_CreateOtp failed')",
+                      "emailMessage/Body": "@concat('<p>The flow <strong>smkb_pvch_CreateOtp</strong> failed unexpectedly in <strong>', parameters('PVCH - Environment Name (smkb_pvch_EnvironmentName)'), '</strong>.</p><p><strong>Triggered by phone:</strong> ', coalesce(triggerBody()?['text'], '(unknown)'), '</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/From": "noreply@smkb.ac.il",
+                      "emailMessage/Importance": "High"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              },
+              "runAfter": {},
+              "expression": "@not(empty(trim(parameters('PVCH - Flow Error Emails (smkb_pvch_FlowErrorEmails)'))))",
+              "metadata": {
+                "operationMetadataId": "6fd70376-46bf-4dd7-a29e-87655681177a"
+              },
+              "type": "If"
+            },
+            "Respond_with_error": {
+              "runAfter": {
+                "Check_Error_Emails_Configured": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "cc8ca4b2-f447-4928-917b-774b3db87a61"
+              },
+              "type": "Response",
+              "kind": "PowerPages",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "errorCode": "OTP_SEND_FAILED"
+                }
+              }
+            }
+          },
+          "runAfter": {
+            "Main_Flow": [
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "b6067dc7-fcaf-48a4-81bd-b133998b3fa3"
+          },
+          "type": "Scope",
+          "description": "Error handler — runs ONLY on unexpected technical failures (unhandled exception in Main_Flow)."
+        }
+      }
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}

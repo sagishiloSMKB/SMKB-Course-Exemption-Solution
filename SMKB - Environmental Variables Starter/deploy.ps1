@@ -22,7 +22,7 @@ $zipPath   = Join-Path $distDir "solution.zip"
 
 # -- Placeholder safety check -------------------------------------------------
 # Blocks deployment if any template placeholders remain unreplaced.
-$placeholders = @('YourSolutionName', 'Your Solution Name', 'sol_EXAMPLE_VAR', 'your-default-value-here', 'sol_ENVIRONMENT_NAME', 'sol_FLOW_ERROR_EMAILS')
+$placeholders = @('YourSolutionName', 'Your Solution Name', 'smkb_sol_', 'your-default-value-here')
 $violations   = @()
 $scanFiles = Get-ChildItem $scriptDir -Recurse -File -Include "*.xml" -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -notmatch '_dist' }
@@ -52,8 +52,8 @@ pac solution import --path $zipPath --environment $TargetEnv --async --max-async
 Write-Host ""
 Write-Host "Done." -ForegroundColor Green
 Write-Host ""
-Write-Host "REMINDER: This import upserts env var DEFINITIONS only — existing Current Values are preserved." -ForegroundColor Cyan
+Write-Host "REMINDER: This import upserts env var DEFINITIONS only - existing Current Values are preserved." -ForegroundColor Cyan
 Write-Host "To set a per-environment value that survives future reimports, use 'Current value':" -ForegroundColor Cyan
 Write-Host "  Maker portal -> Solutions -> [solution] -> Environment Variables -> [var] -> Edit -> '+ New value'" -ForegroundColor Cyan
-Write-Host "  Do NOT edit 'Default value' in the portal — it is owned by the solution XML and resets on every import." -ForegroundColor Yellow
+Write-Host "  Do NOT edit 'Default value' in the portal - it is owned by the solution XML and resets on every import." -ForegroundColor Yellow
 Write-Host "Values are per-environment and must NEVER be committed to Git." -ForegroundColor Yellow

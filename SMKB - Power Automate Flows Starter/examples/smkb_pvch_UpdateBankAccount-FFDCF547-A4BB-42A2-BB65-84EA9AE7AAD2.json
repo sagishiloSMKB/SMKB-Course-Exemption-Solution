@@ -1,0 +1,639 @@
+﻿{
+  "properties": {
+    "connectionReferences": {
+      "shared_sharepointonline_pvch": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "smkb_SMKBSharePointConnectionUser1"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      },
+      "shared_office365_pvch": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedoffice365_c3167"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      },
+      "shared_approvals": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "smkb_SMKBApprovals"
+        },
+        "api": {
+          "name": "shared_approvals"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)": {
+          "defaultValue": "dev",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_EnvironmentName",
+            "description": "Logical environment name."
+          }
+        },
+        "ERROR_EMAILS (smkb_pvch_FlowErrorEmails)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_FlowErrorEmails",
+            "description": "Semicolon-separated error email addresses."
+          }
+        },
+        "SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_SharePointSiteUrl",
+            "description": "SharePoint site URL."
+          }
+        },
+        "BANK_APPROVER_EMPLOYEE (smkb_BankApproverEmployee)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_BankApproverEmployee",
+            "description": "Approver email for salaried lecturers (LecturerTaxStatus starts with 'שכיר')."
+          }
+        },
+        "BANK_APPROVER_SUPPLIERS (smkb_BankApproverSuppliers)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_BankApproverSuppliers",
+            "description": "Approver email for supplier/self-employed lecturers."
+          }
+        }
+      },
+      "triggers": {
+        "manual": {
+          "metadata": {
+            "operationMetadataId": "c3d4e5f6-a1b2-5678-cdef-789012345678"
+          },
+          "type": "Request",
+          "kind": "PowerPages",
+          "description": "Updates lecturer bank account details after manager approval. Sets BankUpdatePending=true immediately, sends approval request, then writes bank fields on approval or sends rejection email on rejection.",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "authToken",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_1": {
+                  "title": "bankName",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_2": {
+                  "title": "branchCode",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_3": {
+                  "title": "accountNumber",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_4": {
+                  "title": "accountName",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_5": {
+                  "title": "fileBase64",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_6": {
+                  "title": "fileName",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_7": {
+                  "title": "fileMimeType",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_8": {
+                  "title": "voucherId",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                }
+              },
+              "required": [
+                "text",
+                "text_1",
+                "text_2",
+                "text_3",
+                "text_4"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Main_Flow": {
+          "type": "Scope",
+          "description": "Bank update approval flow. Immediately sets BankUpdatePending, routes approval by tax status, handles approval and rejection.",
+          "actions": {
+            "Validate_Input": {
+              "type": "If",
+              "expression": "@or(empty(coalesce(triggerBody()?['text'], '')), empty(coalesce(triggerBody()?['text_1'], '')), empty(coalesce(triggerBody()?['text_3'], '')))",
+              "actions": {
+                "Respond_invalid_input": {
+                  "type": "Response", "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "INVALID_INPUT"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Terminate_after_invalid_input": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_invalid_input": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Validate_Auth_Token": {
+              "type": "Scope",
+              "actions": {
+                "Get_Auth_Session": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline_pvch",
+                      "operationId": "GetItems",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                      "table": "Vouchers-LecturersDetails",
+                      "$filter": "sessionToken eq '@{replace(triggerBody()?['text'], '''', '''''')}'",
+                      "$top": 1
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                },
+                "If_Token_Not_Found": {
+                  "type": "If",
+                  "expression": "@equals(length(body('Get_Auth_Session')?['value']), 0)",
+                  "actions": {
+                    "Respond_unauthorized": {
+                      "type": "Response", "kind": "PowerPages",
+                      "inputs": {
+                        "statusCode": 200,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "errorCode": "UNAUTHORIZED"
+                        }
+                      },
+                      "runAfter": {}
+                    },
+                    "Terminate_unauthorized": {
+                      "type": "Terminate",
+                      "inputs": {
+                        "runStatus": "Succeeded"
+                      },
+                      "runAfter": {
+                        "Respond_unauthorized": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  },
+                  "runAfter": {
+                    "Get_Auth_Session": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "If_Token_Expired": {
+                  "type": "If",
+                  "expression": "@lessOrEquals(ticks(first(body('Get_Auth_Session')?['value'])?['sessionExpiresAt']), ticks(utcNow()))",
+                  "actions": {
+                    "Respond_token_expired": {
+                      "type": "Response", "kind": "PowerPages",
+                      "inputs": {
+                        "statusCode": 200,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "errorCode": "UNAUTHORIZED"
+                        }
+                      },
+                      "runAfter": {}
+                    },
+                    "Terminate_token_expired": {
+                      "type": "Terminate",
+                      "inputs": {
+                        "runStatus": "Succeeded"
+                      },
+                      "runAfter": {
+                        "Respond_token_expired": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  },
+                  "runAfter": {
+                    "If_Token_Not_Found": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "runAfter": {
+                "Validate_Input": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Set_Bank_Update_Pending": {
+              "type": "OpenApiConnection",
+              "description": "Immediately set BankUpdatePending=true so the portal shows the pending state without waiting for approval.",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline_pvch",
+                  "operationId": "PatchItem",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                  "table": "Vouchers-LecturersDetails",
+                  "id": "@first(body('Get_Auth_Session')?['value'])?['ID']",
+                  "item/Title": "@first(body('Get_Auth_Session')?['value'])?['Title']",
+                  "item/bankUpdatePending": true
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {
+                "Validate_Auth_Token": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Save_Bank_File": {
+              "type": "If",
+              "description": "Persist the uploaded bank document as a SharePoint attachment on the lecturer row (only when a file was provided).",
+              "expression": "@not(empty(coalesce(triggerBody()?['text_5'], '')))",
+              "actions": {
+                "Add_Bank_Attachment": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline_pvch",
+                      "operationId": "CreateAttachment",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                      "table": "Vouchers-LecturersDetails",
+                      "itemId": "@int(first(body('Get_Auth_Session')?['value'])['ID'])",
+                      "displayName": "@coalesce(triggerBody()?['text_6'], 'BankAccountApproval')",
+                      "body": "@base64ToBinary(triggerBody()?['text_5'])"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "Set_Bank_Update_Pending": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Respond_to_PowerPages": {
+              "type": "Response", "kind": "PowerPages",
+              "description": "Respond immediately — the approval runs asynchronously (flow continues in background). Power Automate HTTP trigger returns synchronously but approval is async.",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "status": "pending"
+                }
+              },
+              "runAfter": {
+                "Save_Bank_File": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Start_and_wait_for_an_approval": {
+              "type": "OpenApiConnectionWebhook",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_approvals",
+                  "operationId": "StartAndWaitForAnApproval",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_approvals"
+                },
+                "parameters": {
+                  "approvalType": "Basic",
+                  "WebhookApprovalCreationInput/title": "@concat('עדכון פרטי בנק - ', first(body('Get_Auth_Session')?['value'])?['Title'], ' ', first(body('Get_Auth_Session')?['value'])?['lecturerLName'])",
+                  "WebhookApprovalCreationInput/assignedTo": "@if(startsWith(coalesce(first(body('Get_Auth_Session')?['value'])?['lecturerTaxStatus'], ''), 'שכיר'), parameters('BANK_APPROVER_EMPLOYEE (smkb_BankApproverEmployee)'), parameters('BANK_APPROVER_SUPPLIERS (smkb_BankApproverSuppliers)'))",
+                  "WebhookApprovalCreationInput/details": "@concat('שם: ', first(body('Get_Auth_Session')?['value'])?['Title'], ' ', first(body('Get_Auth_Session')?['value'])?['lecturerLName'], '\nאימייל: ', first(body('Get_Auth_Session')?['value'])?['lecturerEmail'], '\nמעמד מס: ', coalesce(first(body('Get_Auth_Session')?['value'])?['lecturerTaxStatus'], ''), '\nבנק: ', triggerBody()?['text_1'], '\nסניף: ', triggerBody()?['text_2'], '\nחשבון: ', triggerBody()?['text_3'], '\nשם בעל חשבון: ', triggerBody()?['text_4'], if(empty(coalesce(triggerBody()?['text_5'], '')), '', concat('\nמסמך מצורף: ', coalesce(triggerBody()?['text_6'], ''))))",
+                  "WebhookApprovalCreationInput/attachments": "@if(empty(coalesce(triggerBody()?['text_5'], '')), json('[]'), createArray(addProperty(addProperty(json('{}'), 'name', coalesce(triggerBody()?['text_6'], 'BankAccountApproval')), 'content', triggerBody()?['text_5'])))",
+                  "WebhookApprovalCreationInput/enableNotifications": true,
+                  "WebhookApprovalCreationInput/enableReassignment": true
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {
+                "Respond_to_PowerPages": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "If_Approved": {
+              "type": "If",
+              "description": "Check approval outcome. On approve: write bank fields + BankUpdatePending=false. On reject: BankUpdatePending=false + send rejection email.",
+              "expression": "@equals(body('Start_and_wait_for_an_approval')?['outcome'], 'Approve')",
+              "actions": {
+                "Patch_Bank_Fields_Approved": {
+                  "type": "OpenApiConnection",
+                  "description": "Write the 4 bank fields to the lecturer row and clear BankUpdatePending.",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline_pvch",
+                      "operationId": "PatchItem",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                      "table": "Vouchers-LecturersDetails",
+                      "id": "@first(body('Get_Auth_Session')?['value'])?['ID']",
+                      "item/Title": "@first(body('Get_Auth_Session')?['value'])?['Title']",
+                      "item/lecturerBankName": "@triggerBody()?['text_1']",
+                      "item/lecturerBankAccountBranchNum": "@triggerBody()?['text_2']",
+                      "item/lecturerBankAccountNum": "@triggerBody()?['text_3']",
+                      "item/lecturerBankAccountName": "@triggerBody()?['text_4']",
+                      "item/bankUpdatePending": false
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                },
+                "Get_Window_Vouchers": {
+                  "type": "OpenApiConnection",
+                  "description": "Fetch ALL of this lecturer's vouchers (filtered to pending in Filter_Pending_Vouchers). The voucher's creation date is irrelevant — any voucher still pending gets the approved bank details back-stamped onto its static snapshot.",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline_pvch",
+                      "operationId": "GetItems",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                      "table": "Vouchers-voucherDetails",
+                      "$filter": "lecturerID eq '@{if(empty(coalesce(first(body('Get_Auth_Session')?['value'])?['lecturerID'], '')), 'PVCH_NO_LECTURER', first(body('Get_Auth_Session')?['value'])?['lecturerID'])}'",
+                      "$top": 5000
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {
+                    "Patch_Bank_Fields_Approved": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Filter_Pending_Vouchers": {
+                  "type": "Query",
+                  "description": "Keep only pending vouchers (approvalStatus = 'ממתין לאישור המחלקה'; both pending sub-states). Excludes 'אושר לתשלום' and 'מבוטל'. Matched in-flow — an OData Hebrew filter matched nothing before.",
+                  "inputs": {
+                    "from": "@coalesce(body('Get_Window_Vouchers')?['value'], json('[]'))",
+                    "where": "@equals(coalesce(item()?['approvalStatus'], ''), 'ממתין לאישור המחלקה')"
+                  },
+                  "runAfter": {
+                    "Get_Window_Vouchers": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Apply_to_each_Window_Voucher": {
+                  "type": "Foreach",
+                  "description": "Stamp the approved bank details onto each pending voucher.",
+                  "foreach": "@body('Filter_Pending_Vouchers')",
+                  "actions": {
+                    "Patch_Window_Voucher_Bank": {
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_sharepointonline_pvch",
+                          "operationId": "PatchItem",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                        },
+                        "parameters": {
+                          "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                          "table": "Vouchers-voucherDetails",
+                          "id": "@items('Apply_to_each_Window_Voucher')?['ID']",
+                          "item/Title": "@items('Apply_to_each_Window_Voucher')?['Title']",
+                          "item/lecturerBankName": "@triggerBody()?['text_1']",
+                          "item/lecturerBankAccountBranchNum": "@triggerBody()?['text_2']",
+                          "item/lecturerBankAccountNum": "@triggerBody()?['text_3']",
+                          "item/lecturerBankAccountName": "@triggerBody()?['text_4']"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      },
+                      "runAfter": {}
+                    }
+                  },
+                  "runAfter": {
+                    "Filter_Pending_Vouchers": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Patch_Bank_Pending_False_On_Reject": {
+                    "type": "OpenApiConnection",
+                    "description": "Clear BankUpdatePending on rejection.",
+                    "inputs": {
+                      "host": {
+                        "connectionName": "shared_sharepointonline_pvch",
+                        "operationId": "PatchItem",
+                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                      },
+                      "parameters": {
+                        "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                        "table": "Vouchers-LecturersDetails",
+                        "id": "@first(body('Get_Auth_Session')?['value'])?['ID']",
+                        "item/Title": "@first(body('Get_Auth_Session')?['value'])?['Title']",
+                        "item/bankUpdatePending": false
+                      },
+                      "authentication": "@parameters('$authentication')"
+                    },
+                    "runAfter": {}
+                  },
+                  "Send_Rejection_Email": {
+                    "type": "OpenApiConnection",
+                    "description": "Notify the lecturer that their bank update request was rejected.",
+                    "inputs": {
+                      "host": {
+                        "connectionName": "shared_office365_pvch",
+                        "operationId": "SendEmailV2",
+                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                      },
+                      "parameters": {
+                        "emailMessage/From": "noreply@smkb.ac.il",
+                        "emailMessage/To": "@first(body('Get_Auth_Session')?['value'])?['lecturerEmail']",
+                        "emailMessage/Subject": "בקשת עדכון פרטי בנק - נדחתה",
+                        "emailMessage/Body": "@concat('<p>שלום ', first(body('Get_Auth_Session')?['value'])?['Title'], ',</p><p>בקשתך לעדכון פרטי חשבון בנק נדחתה.</p><p>לפרטים נוספים, פנה/י לצוות התמיכה.</p>')",
+                        "emailMessage/Importance": "Normal"
+                      },
+                      "authentication": "@parameters('$authentication')"
+                    },
+                    "runAfter": {
+                      "Patch_Bank_Pending_False_On_Reject": [
+                        "Succeeded"
+                      ]
+                    }
+                  }
+                }
+              },
+              "runAfter": {
+                "Start_and_wait_for_an_approval": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runAfter": {}
+        },
+        "Handle_Flow_Error": {
+          "type": "Scope",
+          "description": "Catches unexpected technical failures. Sends error notification.",
+          "actions": {
+            "Check_Error_Emails_Configured": {
+              "type": "If",
+              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)'))))",
+              "actions": {
+                "Send_error_notification": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365_pvch",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/From": "noreply@smkb.ac.il",
+                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)')), ') [ERROR] smkb_pvch_UpdateBankAccount failed')",
+                      "emailMessage/Body": "@concat('<p>smkb_pvch_UpdateBankAccount failed in <strong>', parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)'), '</strong>. Run ID: ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/Importance": "High"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Respond_with_error": {
+              "type": "Response", "kind": "PowerPages",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "errorCode": "ERROR"
+                }
+              },
+              "runAfter": {
+                "Check_Error_Emails_Configured": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Main_Flow": [
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ]
+          }
+        }
+      }
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}

@@ -3,31 +3,31 @@
 #
 # Usage:
 #   .\deploy.ps1
+#   powershell -ExecutionPolicy Bypass -File deploy.ps1
 #
 # HOW IT WORKS
 # ============
 # PAC solution pack cannot include Cloud Flow JSONs from scratch, so this script
-# builds the zip manually and calls pac solution import.
+# builds the zip manually (Content_Types + customizations.xml + solution.xml + Workflows/*.json)
+# and calls pac solution import.
 #
-# ADDING A NEW FLOW
-# =================
-# 1. Drop the flow JSON in Workflows\  named  <FlowDisplayName>-<DataverseWorkflowGUID>.json
-# 2. Add a RootComponent line in Other\Solution.xml:
-#      <RootComponent type="29" id="{GUID}" behavior="0" />
+# THE THREE-FILE RULE (add a flow -> update all three, in lockstep)
+# ================================================================
+# 1. Workflows\<FlowName>-<DataverseWorkflowGUID>.json   the flow definition
+# 2. Other\Customizations.xml   a <Workflow WorkflowId="{GUID}"> entry
+# 3. Other\Solution.xml         a <RootComponent type="29" id="{GUID}" behavior="0" /> entry
+# Missing any one fails the import. See README.md.
 #
 # HOW TO GET A FLOW'S DATAVERSE GUID
 # ====================================
-# The Dataverse workflow GUID appears in the filename when you export a solution
-# that contains the flow. It is NOT the same as the Power Automate flow ID in
-# the browser URL (v1/{envId}/{flowId}).
-# To add an existing (non-solution-aware) flow to this solution without re-importing:
-#   pac solution add-solution-component --environment $targetEnv `
-#       --solutionUniqueName YourSolutionName `
-#       --component <Dataverse-GUID> --componentType 29
+# The Dataverse workflow GUID appears in the filename when you export a solution that contains the
+# flow. It is NOT the Power Automate flow ID in the browser URL. See README.md "Two/Three Flow IDs".
 #
 # PREREQUISITES
 # =============
-# pac CLI installed and authenticated to https://org229c958d.crm4.dynamics.com/
+# - pac CLI installed and authenticated to https://org229c958d.crm4.dynamics.com/
+# - Node.js (optional but recommended): enables the full flow-lint gate. Without it, only the
+#   inline placeholder backstop runs.
 
 param(
     [string]$TargetEnv = "https://org229c958d.crm4.dynamics.com/"
@@ -55,26 +55,26 @@ $scriptDir = $PSScriptRoot
 $distDir   = Join-Path $scriptDir "_dist"
 $zipPath   = Join-Path $distDir "solution.zip"
 
-# -- Placeholder safety check -------------------------------------------------
-# Blocks deployment if any template placeholders remain unreplaced.
+# -- Placeholder backstop (always runs, no Node needed) -----------------------
+# flow-lint (below) is the full gate, but it needs Node. This inline scan guarantees that even on a
+# machine without Node we never ship an unreplaced starter placeholder. Scans only what goes in the
+# zip: Other\*.xml and Workflows\*.json.
 $placeholders = @(
     'YourSolutionName',
     'Your Solution Name',
-    'sol_example_flow',
+    'smkb_sol_',
+    '[yourid]',
+    '[REPLACE',
+    '[sol]',
     '00000000-0000-0000-0000-000000000001',
-    '\[yourid\]',
-    '\[REPLACE',
-    '\[sol\]',
-    'sol_ENVIRONMENT_NAME',
-    'sol_FLOW_ERROR_EMAILS'
+    '00000000-0000-0000-0000-000000000002'
 )
 $violations = @()
-$scanFiles = Get-ChildItem $scriptDir -Recurse -File -Include "*.xml","*.json" -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch '_dist' }
+$scanFiles = Get-ChildItem (Join-Path $scriptDir "Other"),(Join-Path $scriptDir "Workflows") -Recurse -File -Include "*.xml","*.json" -ErrorAction SilentlyContinue
 foreach ($file in $scanFiles) {
     $c = [System.IO.File]::ReadAllText($file.FullName)
     foreach ($p in $placeholders) {
-        if ($c -match $p) { $violations += "  '$p'  in  $($file.Name)" }
+        if ($c.Contains($p)) { $violations += "  '$p'  in  $($file.Name)" }
     }
 }
 if ($violations) {
@@ -82,6 +82,28 @@ if ($violations) {
     $violations | Select-Object -Unique | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
     Write-Host "`nComplete the Activation Guide in README.md before deploying.`n" -ForegroundColor Cyan
     exit 1
+}
+# -----------------------------------------------------------------------------
+
+# -- flow-lint: full security + import-error gate (bundled, zero-dependency) ---
+# Runs the bundled tools\flow-lint over Workflows\. Enforces the audit's security invariants plus
+# import/activation-error rules (256-char descriptions, embedded connections, Power Pages field
+# titles, env-var refs, workflow<->customizations consistency). Errors block; warnings print.
+$lintScript = Join-Path $scriptDir "tools\flow-lint\lint.mjs"
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    if (Test-Path $lintScript) {
+        Write-Host "Running flow-lint..." -ForegroundColor Cyan
+        node $lintScript (Join-Path $scriptDir "Workflows")
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "`nDEPLOY BLOCKED -- flow-lint reported errors (fix them before deploying)." -ForegroundColor Red
+            exit 1
+        }
+    } else {
+        Write-Host "flow-lint not found at tools\flow-lint\lint.mjs -- skipping (placeholder backstop already passed)." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "Node.js not found -- skipping full flow-lint gate (placeholder backstop already passed)." -ForegroundColor Yellow
+    Write-Host "  Install Node to enable the security + import-error checks. See tools\flow-lint\README.md." -ForegroundColor DarkGray
 }
 # -----------------------------------------------------------------------------
 
@@ -110,8 +132,8 @@ Add-ZipText $archive "[Content_Types].xml" @'
 </Types>
 '@
 
-# customizations.xml -- read from Other/Customizations.xml which has <Workflow> metadata entries.
-# Without <Workflow> entries the flow JSONs are in the zip but Dataverse never creates Workflow records.
+# customizations.xml -- from Other/Customizations.xml (has <Workflow> entries + <connectionreferences>).
+# Without <Workflow> entries the flow JSONs ship in the zip but Dataverse never creates Workflow records.
 Add-ZipText $archive "customizations.xml" ([System.IO.File]::ReadAllText("$scriptDir\Other\Customizations.xml"))
 
 # solution.xml (from Other/)
@@ -128,11 +150,30 @@ $archive.Dispose(); $zipStream.Dispose()
 Write-Host "Zip built: $zipPath" -ForegroundColor Green
 
 # ---- Import ----
+# --settings-file    : maps connection references / env vars per environment (optional in dev with
+#                      --force-overwrite, since the connection-reference bank already exists there).
+# --activate-plugins : re-activates existing flows after import (brand-new imports still land Inactive
+#                      once - turn them on in the portal). Watch for "deactivated and replaced" in the
+#                      output: it confirms the PUBLISHED (running) definition was updated. See README.
+# --force-overwrite  : overwrite the unmanaged solution in place.
+$importArgs = @(
+    "solution", "import",
+    "--path",        $zipPath,
+    "--environment", $TargetEnv,
+    "--activate-plugins",
+    "--force-overwrite",
+    "--async",
+    "--max-async-wait-time", "10"
+)
+$settingsFile = Join-Path $scriptDir "deployment-settings.json"
+if (Test-Path $settingsFile) {
+    $importArgs += @("--settings-file", $settingsFile)
+    Write-Host "Using settings file: deployment-settings.json" -ForegroundColor DarkGray
+} else {
+    Write-Host "No deployment-settings.json (copy deployment-settings-template.json to create one for stage/prod). Proceeding without it." -ForegroundColor DarkGray
+}
+
 Write-Host "Importing into $TargetEnv..." -ForegroundColor Cyan
-pac solution import `
-    --path      $zipPath `
-    --environment $TargetEnv `
-    --async `
-    --max-async-wait-time 10
+pac @importArgs
 if ($LASTEXITCODE -ne 0) { throw "pac solution import failed (exit $LASTEXITCODE)" }
 Write-Host "Deploy complete." -ForegroundColor Green

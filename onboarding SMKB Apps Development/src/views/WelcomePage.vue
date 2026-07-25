@@ -51,7 +51,7 @@
           <div class="learn-card-icon">🎨</div>
           <div>
             <div class="learn-card-title">The UI Library</div>
-            <div class="learn-card-desc">@smkb/design-ui — the shared component library used in every solution</div>
+            <div class="learn-card-desc">@smkbacil/design-ui — the shared component library used in every solution</div>
           </div>
         </div>
       </div>
@@ -80,7 +80,7 @@
     </div>
 
     <InfoCallout type="tip">
-      This onboarding app is itself built with <strong>@smkb/design-ui</strong> — the same library
+      This onboarding app is itself built with <strong>@smkbacil/design-ui</strong> — the same library
       every SMKB solution uses. The sidebar, header, and layout you see right now are live examples.
     </InfoCallout>
 

@@ -84,7 +84,7 @@
         <li>Strict installs — pnpm refuses to install packages not listed in package.json,
             preventing phantom dependency bugs</li>
         <li>Workspace support — <code>pnpm-workspace.yaml</code> controls which packages
-            are allowed to run build scripts (important for <code>@smkb/design-ui</code>)</li>
+            are allowed to run build scripts (important for <code>@smkbacil/design-ui</code>)</li>
         <li>Faster — pnpm uses a content-addressable store; packages aren't re-downloaded
             if they're already cached globally</li>
       </ul>

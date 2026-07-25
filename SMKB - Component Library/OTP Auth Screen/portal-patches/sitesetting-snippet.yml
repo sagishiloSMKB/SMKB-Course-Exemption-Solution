@@ -13,8 +13,8 @@
 
 - adx_name: SMKB/Flow/CreateOTP
   adx_sitesettingid: 00000000-0000-0000-0000-000000000001   # [REPLACE]: generate a new GUID
-  adx_value: ''   # Set after deploying sol_create_otp flow — paste the HTTP trigger URL here
+  adx_value: ''   # Set after deploying smkb_sol_CreateOtp flow — paste the HTTP trigger URL here
 
 - adx_name: SMKB/Flow/CheckOTP
   adx_sitesettingid: 00000000-0000-0000-0000-000000000002   # [REPLACE]: generate a new GUID
-  adx_value: ''   # Set after deploying sol_check_otp flow — paste the HTTP trigger URL here
+  adx_value: ''   # Set after deploying smkb_sol_CheckOtp flow — paste the HTTP trigger URL here

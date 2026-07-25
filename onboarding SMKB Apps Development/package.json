@@ -8,7 +8,7 @@
     "build": "vue-tsc -b && vite build"
   },
   "dependencies": {
-    "@smkb/design-ui": "^0.16.0",
+    "@smkbacil/design-ui": "^0.16.1",
     "vue": "^3.5.13",
     "vue-router": "^5.0.4"
   },
@@ -19,6 +19,6 @@
     "vue-tsc": "^2.2.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@smkb/design-ui", "esbuild"]
+    "onlyBuiltDependencies": ["@smkbacil/design-ui", "esbuild"]
   }
 }

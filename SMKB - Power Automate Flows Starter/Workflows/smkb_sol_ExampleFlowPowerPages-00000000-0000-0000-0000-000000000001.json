@@ -1,0 +1,184 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_office365_sol": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedoffice365_c3167"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "ENVIRONMENT_NAME (smkb_sol_EnvironmentName)": {
+          "defaultValue": "dev",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_sol_EnvironmentName",
+            "description": "Logical environment name (dev/stage/prod). Prefixes email subjects outside prod."
+          }
+        },
+        "ERROR_EMAILS (smkb_sol_FlowErrorEmails)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_sol_FlowErrorEmails",
+            "description": "Semicolon-separated email addresses for flow error notifications."
+          }
+        }
+      },
+      "triggers": {
+        "manual": {
+          "metadata": {
+            "operationMetadataId": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+          },
+          "type": "Request",
+          "kind": "PowerPages",
+          "description": "Power Pages trigger. Schema property KEYS are PA designer type names (text, text_1, number), NOT the labels. Replace with your fields - see FLOW_SNIPPETS Snippet 7.",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "recipient",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Main_Flow": {
+          "type": "Scope",
+          "description": "Wrap ALL business logic in this Scope so Handle_Flow_Error can catch failures via runAfter. Replace Send_an_email with your logic; keep a final Response.",
+          "actions": {
+            "Send_an_email": {
+              "type": "OpenApiConnection",
+              "description": "REPLACE the To/Subject/Body for your solution. Subject auto-prefixes (DEV)/(STAGE) outside prod. From is fixed to the SMKB no-reply sender.",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_office365_sol",
+                  "operationId": "SendEmailV2",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                },
+                "parameters": {
+                  "emailMessage/To": "@triggerBody()?['text']",
+                  "emailMessage/Subject": "@if(equals(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), 'prod'), '[REPLACE: email subject]', concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [REPLACE: email subject]'))",
+                  "emailMessage/Body": "<p>[REPLACE: email body HTML]</p>",
+                  "emailMessage/From": "noreply@smkb.ac.il",
+                  "emailMessage/Importance": "Normal"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Respond_to_PowerPages": {
+              "type": "Response",
+              "kind": "PowerPages",
+              "description": "Success response. Power Pages flows ALWAYS return 200; a business error is a 200 body of { errorCode } followed by Terminate (see FLOW_SNIPPETS Snippet 8).",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "status": "ok"
+                }
+              },
+              "runAfter": {
+                "Send_an_email": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runAfter": {}
+        },
+        "Handle_Flow_Error": {
+          "type": "Scope",
+          "description": "Error handler - runs ONLY on unexpected failures in Main_Flow. Emails ERROR_EMAILS (if set), then returns 200 + errorCode so the portal can read the failure.",
+          "actions": {
+            "Check_Error_Emails_Configured": {
+              "type": "If",
+              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)'))))",
+              "actions": {
+                "Send_error_notification": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365_sol",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [ERROR] smkb_sol_ExampleFlowPowerPages failed')",
+                      "emailMessage/Body": "@concat('<p><strong>smkb_sol_ExampleFlowPowerPages</strong> failed in <strong>', parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), '</strong>.</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/From": "noreply@smkb.ac.il",
+                      "emailMessage/Importance": "High"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Respond_with_error": {
+              "type": "Response",
+              "kind": "PowerPages",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "errorCode": "ERROR"
+                }
+              },
+              "runAfter": {
+                "Check_Error_Emails_Configured": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Main_Flow": [
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ]
+          }
+        }
+      }
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}

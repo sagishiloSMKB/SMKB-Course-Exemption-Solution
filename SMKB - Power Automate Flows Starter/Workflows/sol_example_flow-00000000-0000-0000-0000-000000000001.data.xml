@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Activity x:Class="sol_example_flow"
-  xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
-  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <x:Members>
-  </x:Members>
-</Activity>

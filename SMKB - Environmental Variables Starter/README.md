@@ -10,6 +10,14 @@ Definitions are stored as XML files, version-controlled in Git, and pushed to Da
 > **Only activate this starter if your solution actually needs environment variables.**
 > If your solution has no configuration values that change between environments (Dev / Stage / Prod), leave this folder completely untouched — do not rename files, do not change placeholders, do not run deploy.ps1.
 
+> **Orchestrated from the root.** This starter is standalone (it deploys on its own via `deploy.ps1`),
+> but its **solution identity** — unique name and display name in `Other/Solution.xml`, and the two
+> ALM variable schema names — is authored once in the root [`solution.config.json`](../solution.config.json)
+> and applied by [`apply-config.ps1`](../apply-config.ps1) (run from the repo root). Do **not** hand-edit
+> `YourSolutionName` / `Your Solution Name`, and you don't rename the ALM vars by hand. What you author
+> in *this* folder is the variable content — defining each variable and its `RootComponent`. Global
+> naming/environment/deploy-order rules live in the root `CLAUDE.md`.
+
 ### Step 0 — Rename this folder
 
 Before anything else, rename this folder from `SMKB - Environmental Variables Starter` to match your solution:
@@ -38,37 +46,38 @@ If none of these apply, skip this starter entirely.
 
 ### Step 2 — Choose your solution short name
 
-Pick a 2–5 letter uppercase prefix for your variable names (e.g. `EVT` for Events, `SCH` for Scholarships).  
-By convention, environment variable names use uppercase: `[SOL]_VAR_NAME`.
+Pick a 2–5 letter **lowercase** short prefix (e.g. `evt` for Events, `sch` for Scholarships). Every
+component's schema name is `smkb_<prefix>_<PascalName>` — the fixed publisher prefix `smkb_`, then your
+short prefix, then a PascalCase descriptor (e.g. `smkb_evt_PortalBaseUrl`). The display name is
+`<PREFIX_UPPER> - <Human Name>` (e.g. `EVT - Portal Base URL`). See CLAUDE.md → Critical Rule 3.
 
 ### Step 3 — Replace all placeholders
 
 #### `Other/Solution.xml`
-| Find | Replace with |
-|------|-------------|
-| `YourSolutionName` | Your solution's unique name (e.g. `SMKBEvents`) |
-| `Your Solution Name` | Your solution's display name (e.g. `SMKB – Events`) |
+
+> `YourSolutionName` and `Your Solution Name` are set automatically by the root `apply-config.ps1` —
+> do not edit them by hand. You still add the per-variable `RootComponent` entries (step 6 below).
 
 #### `environmentvariabledefinitions/` folder
 For **each variable** your solution needs:
 
-1. Copy the `sol_EXAMPLE_VAR` folder.
-2. Rename it to `[SOL]_YOUR_VAR_NAME` (e.g. `EVT_PORTAL_BASE_URL`).
+1. Copy the `smkb_sol_ExampleVar` folder.
+2. Rename it to `smkb_<prefix>_<PascalName>` (e.g. `smkb_evt_PortalBaseUrl`) — the folder name and the `schemaname` must match exactly.
 3. Inside the copied folder, edit `environmentvariabledefinition.xml`:
 
 | Find | Replace with |
 |------|-------------|
-| `schemaname="sol_EXAMPLE_VAR"` | `schemaname="EVT_PORTAL_BASE_URL"` (your variable name) |
-| `default="EXAMPLE_VAR"` | `default="PORTAL_BASE_URL"` (display name, no prefix) |
-| `description="EXAMPLE_VAR"` | `description="Portal Base URL"` (human-readable label) |
+| `schemaname="smkb_sol_ExampleVar"` | `schemaname="smkb_evt_PortalBaseUrl"` (your variable name) |
+| `default="SOL - Example Var"` | `default="EVT - Portal Base URL"` (display name, `PREFIX - Name`) |
+| `description="SOL - Example Var"` | `description="EVT - Portal Base URL"` (same display name) |
 | `your-default-value-here` | Your actual default value, or remove the `<defaultvalue>` element if there is no universal default |
 
-4. After creating all your real variable folders, **delete** the `sol_EXAMPLE_VAR` template folder (it should not be deployed).
-5. If your solution uses Cloud Flows, **rename** (do not delete) `sol_ENVIRONMENT_NAME` and `sol_FLOW_ERROR_EMAILS` to your prefix — they are required by the example flow and should be kept. See the "ALM-Required Variables" section below.
+4. After creating all your real variable folders, **delete** the `smkb_sol_ExampleVar` template folder (it should not be deployed).
+5. If your solution uses Cloud Flows, the two ALM variables `smkb_sol_EnvironmentName` and `smkb_sol_FlowErrorEmails` have their `sol` segment **renamed to your prefix automatically** by the root `apply-config.ps1` (do not delete them). See the "ALM-Required Variables" section below.
 6. **For every variable folder you created**, add a `<RootComponent>` entry to `Other/Solution.xml`:
 
 ```xml
-<RootComponent type="380" schemaName="EVT_PORTAL_BASE_URL" behavior="0" />
+<RootComponent type="380" schemaName="smkb_evt_PortalBaseUrl" behavior="0" />
 ```
 
 The `schemaName` must exactly match the folder name under `environmentvariabledefinitions/`. A template comment in `Other/Solution.xml` shows the format.
@@ -77,10 +86,11 @@ The `schemaName` must exactly match the folder name under `environmentvariablede
 
 ### Step 4 — Verify no placeholders remain
 
-Run this before deploying:
+Solution *identity* is verified from the root with `apply-config.ps1 -Check`. This scan covers the
+variable *content* you author (`deploy.ps1` also blocks on these):
 
 ```powershell
-$patterns = 'YourSolutionName','sol_EXAMPLE_VAR','your-default-value-here'
+$patterns = 'YourSolutionName','smkb_sol_','your-default-value-here'
 Get-ChildItem ".\Other",".\environmentvariabledefinitions" -Recurse -File | ForEach-Object {
     $file = $_
     foreach ($p in $patterns) {
@@ -107,17 +117,15 @@ After deploying, set the **value** for each variable in the Power Platform porta
 
 ## Naming Convention
 
-All component names use a **solution short-name prefix** so no two solutions ever share a variable name.
-
-The placeholder prefix throughout this starter is **`sol`** — replace it with your solution's short name before deploying.
+Every component's schema name is `smkb_<prefix>_<PascalName>` (fixed publisher prefix + your solution short prefix + PascalCase name), so no two solutions ever share a variable name. The template's placeholder short prefix is **`sol`** — `apply-config.ps1` swaps it for your real prefix.
 
 | Placeholder name | Real example |
 |-----------------|--------------|
-| `sol_EXAMPLE_VAR` | `evt_PORTAL_BASE_URL` |
+| `smkb_sol_ExampleVar` | `smkb_evt_PortalBaseUrl` |
 | `YourSolutionName` (in Solution.xml) | `SMKBEvents` |
 
-**Rule:** every environment variable in a solution must start with `[SOLUTIONSHORT]_` (uppercase by convention).  
-Never use a generic name that could collide with variables in other solutions.
+**Rule:** every environment variable is named `smkb_<prefix>_<PascalName>` (schema) with display `<PREFIX> - <Name>`.  
+Never use a generic name that could collide with variables in other solutions. See CLAUDE.md → Critical Rule 3.
 
 ---
 
@@ -141,10 +149,10 @@ Git repo (XML)  →  deploy.ps1  →  Dataverse environmentvariabledefinition re
 SMKB - Environmental Variables Starter/
 │
 ├── Other/
-│   └── Solution.xml          ← solution metadata (no RootComponents needed for env vars)
+│   └── Solution.xml          ← solution metadata + one RootComponent (type 380) per variable
 │
 ├── environmentvariabledefinitions/
-│   └── sol_EXAMPLE_VAR/
+│   └── smkb_sol_ExampleVar/
 │       └── environmentvariabledefinition.xml   ← one folder per variable; this is what you edit
 │
 ├── deploy.ps1                ← runs pac solution pack + pac solution import
@@ -157,10 +165,10 @@ SMKB - Environmental Variables Starter/
 
 ### Adding a new variable
 
-1. Copy the `sol_EXAMPLE_VAR` folder.
-2. Rename it to your variable name: `[SOL]_YOUR_VAR_NAME`.
+1. Copy the `smkb_sol_ExampleVar` folder.
+2. Rename it to your variable name: `smkb_<prefix>_<PascalName>`.
 3. Update `environmentvariabledefinition.xml` inside:
-   - `schemaname` → your variable's schema name (e.g. `evt_PORTAL_BASE_URL`)
+   - `schemaname` → your variable's schema name (e.g. `smkb_evt_PortalBaseUrl`)
    - `displayname` / `label description` → human-readable name
    - `defaultvalue` → optional default (leave blank if no universal default)
    - `type` → see type reference below
@@ -192,7 +200,7 @@ SMKB - Environmental Variables Starter/
 | Aspect | Cloud Flows | Env Var Definitions |
 |--------|-------------|---------------------|
 | File format | JSON (`Workflows/*.json`) | XML (`environmentvariabledefinitions/<name>/*.xml`) |
-| Listed in Solution.xml RootComponents | Yes (`type="29"`) | **No** — picked up automatically from folder |
+| Listed in Solution.xml RootComponents | Yes (`type="29"`) | **Yes** (`type="380"`) — required, or the definition won't travel through the pipeline |
 | `pac solution pack` support | **No** — must build zip manually | **Yes** — works natively |
 
 ---
@@ -232,11 +240,11 @@ Values are per-environment overrides. Committing them would expose environment-s
 
 When your solution uses the **Flows Starter**, always activate these two variables. They are pre-built templates in this starter — just rename them to your prefix.
 
-### `sol_ENVIRONMENT_NAME` — Environment identifier
+### `smkb_sol_EnvironmentName` — Environment identifier
 
 | Setting | Value |
 |---------|-------|
-| Schema name | `sol_ENVIRONMENT_NAME` (rename to e.g. `evt_ENVIRONMENT_NAME`) |
+| Schema name | `smkb_sol_EnvironmentName` (apply-config renames the `sol` segment → e.g. `smkb_evt_EnvironmentName`) |
 | Type | String |
 | Default value | `dev` |
 
@@ -244,17 +252,19 @@ When your solution uses the **Flows Starter**, always activate these two variabl
 
 **Pipeline setup:** After pipeline promotion, set the value to `stage` or `prod` in the environment connection settings — the same place you override any other env var value. Never commit values to Git.
 
-### `sol_FLOW_ERROR_EMAILS` — Error notification recipients
+### `smkb_sol_FlowErrorEmails` — Error notification recipients
 
 | Setting | Value |
 |---------|-------|
-| Schema name | `sol_FLOW_ERROR_EMAILS` (rename to e.g. `evt_FLOW_ERROR_EMAILS`) |
-| Type | JSON |
+| Schema name | `smkb_sol_FlowErrorEmails` (apply-config renames the `sol` segment → e.g. `smkb_evt_FlowErrorEmails`) |
+| Type | String |
 | Default value | *(none — must be set per environment)* |
 
-**Purpose:** JSON array of email addresses that receive an alert whenever a flow in this solution fails. The array is different per environment — typically the dev team in Dev, and the operations team in Stage and Prod.
+**Purpose:** Semicolon-separated list of email addresses that receive an alert whenever a flow in this solution fails. The list is different per environment — typically the dev team in Dev, and the operations team in Stage and Prod.
 
-**Format:** `["ops@smkb.ac.il", "dev@smkb.ac.il"]`
+**Format (String, semicolon-separated — NOT JSON):** `ops@smkb.ac.il;dev@smkb.ac.il`
+
+> **Do not use the JSON type for email lists.** A String consumed directly in a flow's `To` field needs no `json()` parsing, and a wrong type cannot be changed by reimport once deployed. This matches the Flows starter and CLAUDE.md → Critical Rule 5.
 
 **Pipeline setup:** Set the value for each environment via pipeline connection settings. Do not commit email addresses to Git.
 

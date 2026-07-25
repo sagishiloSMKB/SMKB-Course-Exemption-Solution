@@ -80,8 +80,8 @@
       </Addresses>
     </Publisher>
     <RootComponents>
-      <RootComponent type="1" schemaName="sol_example_table_a" behavior="0" />
-      <RootComponent type="1" schemaName="sol_example_table_b" behavior="0" />
+      <RootComponent type="1" schemaName="smkb_sol_ExampleTableA" behavior="0" />
+      <RootComponent type="1" schemaName="smkb_sol_ExampleTableB" behavior="0" />
     </RootComponents>
     <MissingDependencies />
   </SolutionManifest>

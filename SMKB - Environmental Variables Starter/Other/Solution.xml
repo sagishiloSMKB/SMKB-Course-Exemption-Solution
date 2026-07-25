@@ -84,12 +84,12 @@
         Add one entry per activated env var definition. type="380" = environmentvariabledefinition.
         The schemaName must exactly match the folder name under environmentvariabledefinitions/.
 
-        ACTIVATION STEP: For every variable folder you create (by copying sol_EXAMPLE_VAR and renaming),
+        ACTIVATION STEP: For every variable folder you create (by copying smkb_sol_ExampleVar and renaming),
         add a line here. Without this, the definition is upserted to Dataverse but is NOT linked to
-        the solution -- it will not travel through the pipeline to Stage or Production.
+        the solution; it will not travel through the pipeline to Stage or Production.
 
         Example (uncomment and update the schemaName):
-        <RootComponent type="380" schemaName="sol_EXAMPLE_VAR" behavior="0" />
+        <RootComponent type="380" schemaName="smkb_evt_PortalBaseUrl" behavior="0" />
       -->
     </RootComponents>
     <MissingDependencies />

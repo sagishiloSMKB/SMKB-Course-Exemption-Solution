@@ -80,7 +80,7 @@
           <div class="senv-mode">Unmanaged solutions</div>
           <div class="senv-desc">
             Where all active development happens. Deploy directly using <code>deploy.ps1</code>
-            or <code>pnpm deploy</code>. Components are unmanaged — freely editable.
+            or <code>pac pages upload</code>. Components are unmanaged — freely editable.
           </div>
           <div class="senv-deploy">Direct deploy ✓</div>
         </div>
@@ -169,7 +169,7 @@
         <div class="alm-arrow">↓</div>
         <div class="alm-step">
           <div class="alm-env">Dev</div>
-          <div class="alm-action">deploy.ps1 / pnpm deploy</div>
+          <div class="alm-action">deploy.ps1 / pac pages upload</div>
           <div class="alm-note">Push latest changes to Dev environment</div>
         </div>
         <div class="alm-arrow">↓</div>
@@ -195,7 +195,7 @@
       <h3>Cross-solution sharing</h3>
       <p>
         Multiple solutions can reference the same Dataverse table. If the "Events" solution
-        defines an <code>evt_registration</code> table, a flow in the "Notifications" solution
+        defines an <code>smkb_evt_Registration</code> table, a flow in the "Notifications" solution
         can read and write to it — they share the same Dataverse environment.
         Solution layers (the order in which managed solutions are imported) determine which
         customization wins when two solutions modify the same component.
@@ -236,8 +236,8 @@
           </p>
           <p>
             Dataverse also ships with <strong>standard tables</strong> (Contact, Account, Task, Email)
-            that you can extend without creating new tables. Custom tables use the solution publisher prefix:
-            <code>evt_registration</code>, <code>cfb_booking</code>, <code>smkb_name</code>.
+            that you can extend without creating new tables. Custom tables use the <code>smkb_[prefix]_[PascalName]</code> convention:
+            <code>smkb_evt_Registration</code>, <code>smkb_cfb_Booking</code>; shared columns like <code>smkb_name</code> keep the bare publisher prefix.
           </p>
           <div class="cb-facts">
             <div class="cbf-item">
@@ -374,13 +374,14 @@
             the infrastructure: authentication, page routing, site settings, and Dataverse access.
           </p>
           <p>
-            A Power Pages site is <strong>not a single record</strong>. It is hundreds of
-            interconnected Dataverse records — pages, templates, roles, settings, files,
-            language configuration, and publishing states. Every one of these must be inside
-            the solution for the portal to work correctly after pipeline promotion.
+            At SMKB the portal is a <strong>Power Pages Code Site</strong>: the built Vue SPA is
+            uploaded directly with <code>pac pages upload-code-site</code> — no Liquid template layer,
+            and no hundreds-of-records portal component tree to hand-manage. Data comes through Power
+            Automate cloud flows (the HTTP 200 + <code>errorCode</code> contract), or optionally one
+            table via the Web API.
           </p>
 
-          <h4>What a portal is made of</h4>
+          <h4>What ships in the repo</h4>
           <div class="yaml-types">
             <div v-for="yt in yamlTypes" :key="yt.file" class="yt-item">
               <code class="yt-file">{{ yt.file }}</code>
@@ -388,32 +389,18 @@
             </div>
           </div>
 
-          <InfoCallout type="warning">
-            <strong>The Maker UI "Add Existing → Power Pages" trap:</strong> This button adds only
-            the website record itself. It silently omits ~200 child components (pages, templates,
-            roles, settings, files). If you use it, those components will NOT travel through the
-            pipeline — the portal breaks in Stage and Production.
-            Always use <code>pac solution add-solution-component</code> with the full GUID loop
-            from <strong>INIT_PROJECT.md Step 11</strong>.
+          <InfoCallout type="note">
+            There is <strong>no</strong> manual "add ~200 components to the solution" step and no
+            shared-GUID page-routing hazard — those were the old Liquid-portal model. A Code Site is
+            namespaced by its publisher prefix + site name (<code>PREFIX - Name</code>), promotes to
+            Stage/Prod via the two-track ALM flow (<code>/ppcs-promote-to-env</code>), and freshens its
+            per-environment site-setting GUIDs once with <code>scripts/freshen-site-settings.ps1</code>.
           </InfoCallout>
-
-          <h4>The 3 GUIDs that must be consistent</h4>
-          <p>
-            Power Pages uses foreign key lookups to render pages. If these three identifiers
-            drift between YAML files (e.g., after a <code>pac pages download --overwrite</code>),
-            every page in the portal returns "Page Not Found":
-          </p>
-          <div class="guid-list">
-            <div v-for="g in criticalGuids" :key="g.name" class="guid-item">
-              <div class="guid-name">{{ g.name }}</div>
-              <div class="guid-where">{{ g.where }}</div>
-            </div>
-          </div>
 
           <div class="cb-facts" style="margin-top: var(--smkb-space-4)">
             <div class="cbf-item">
               <div class="cbf-label">In the starter kit</div>
-              <div>SMKB - Power Page Starter — full portal scaffold with Vue SPA, YAML files, deploy pipeline, GUID consistency scripts, and security rules</div>
+              <div>SMKB - Power Pages Code Site Starter — a Vue 3 SPA uploaded as a Power Pages Code Site (pac pages upload-code-site), with flows-backed data access, CSP config, and security rules</div>
             </div>
           </div>
         </div>
@@ -501,33 +488,12 @@ const managedRows = [
 ]
 
 const yamlTypes = [
-  { file: 'website.yml',          desc: 'The website record itself — contains the site ID (adx_websiteid)' },
-  { file: 'websitelanguage.yml',  desc: 'Language configuration — the Language ID must match all content pages' },
-  { file: 'publishingstate.yml',  desc: 'Content lifecycle states (Published, Draft) — Published State ID must match all pages and files' },
-  { file: 'sitesetting.yml',      desc: 'Hundreds of platform settings — authentication, features, display config' },
-  { file: 'webrole.yml',          desc: 'Access roles: Anonymous Users, Authenticated Users, custom roles' },
-  { file: 'webpage.yml',          desc: 'Individual portal pages and their content' },
-  { file: 'webtemplate.yml',      desc: 'Liquid templates — the SMKB App shell that loads the Vue SPA' },
-  { file: 'webfile.yml',          desc: 'Static files — the compiled app.js and app.css built from Vue' },
-  { file: 'contentsnippet.yml',   desc: 'Reusable localizable text fragments embedded in pages' },
-  { file: 'pagetemplate.yml',     desc: 'Page layout definitions — which template each page type uses' },
-  { file: 'sitemarker.yml',       desc: 'Named page references used in Liquid templates (Home, Search, Profile)' },
-  { file: 'botconsumer.yml',      desc: 'Bot/chatbot configuration — links to a Copilot Studio agent if used' },
-]
-
-const criticalGuids = [
-  {
-    name: 'Language ID',
-    where: 'website.yml → adx_defaultlanguage  ·  websitelanguage.yml → adx_portallanguageid / adx_websitelanguageid  ·  every content page → adx_webpagelanguageid',
-  },
-  {
-    name: 'Published State ID',
-    where: 'publishingstate.yml (the entry with adx_isdefault: true)  ·  all content pages → adx_publishingstateid  ·  all web file records → adx_publishingstateid',
-  },
-  {
-    name: 'Website ID (environment-specific)',
-    where: 'website.yml → adx_websiteid  ·  obtained from pac pages list  ·  must match the live Dataverse site record',
-  },
+  { file: 'src/',                        desc: 'The Vue 3 SPA — views, router, services (flow client), design-system UI' },
+  { file: 'src/config/solution.ts',      desc: 'Solution identity: prefix, site name, app titles, languages (apply-config fills it)' },
+  { file: 'src/config/flows.ts',         desc: 'Registry of Power Automate flow trigger GUIDs the SPA calls' },
+  { file: 'powerpages.config.json',      desc: 'PAC upload config — the site name (PREFIX - Name) and which built assets to sync' },
+  { file: '.powerpages-site/site-settings/', desc: 'Platform site settings incl. the two CSP files (enforced + report-only)' },
+  { file: '.claude/skills/ppcs-*',       desc: 'Task skills: provision, deploy, register-flow, enable-web-api, add-csp-domain, promote-to-env' },
 ]
 </script>
 

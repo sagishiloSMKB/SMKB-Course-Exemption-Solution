@@ -79,17 +79,19 @@
     </Publisher>
     <RootComponents>
       <!--
-        Add a RootComponent entry here for each flow in the Workflows/ folder.
+        Add a RootComponent entry here for each flow in the Workflows/ folder (the third of the
+        three files that must stay in lockstep - see Other/Customizations.xml).
         type="29"  = Workflow (Power Automate cloud flow)
-        id         = the Dataverse workflow GUID from the flow's filename (e.g. sol_example_flow-{GUID}.json)
+        id         = the Dataverse workflow GUID from the flow's filename (e.g. smkb_sol_ExampleFlowPowerPages-{GUID}.json)
         behavior   = 0 (include sub-components automatically)
 
-        NOTE: The placeholder GUID below is for the example flow skeleton only.
-        When you deploy a real flow for the first time, replace this with the
-        actual Dataverse workflow GUID assigned by the environment.
-        See deploy.ps1 for instructions on getting a flow's Dataverse GUID.
+        NOTE: The placeholder GUIDs below are for the two example skeletons only. When you deploy a
+        real flow for the first time, replace with the actual Dataverse workflow GUID assigned by the
+        environment (see README.md "Development Workflow"). Delete the skeleton entries you don't use.
+        Do NOT add connection references here - they live in Customizations.xml, not Solution.xml.
       -->
       <RootComponent type="29" id="{00000000-0000-0000-0000-000000000001}" behavior="0" />
+      <RootComponent type="29" id="{00000000-0000-0000-0000-000000000002}" behavior="0" />
     </RootComponents>
     <MissingDependencies />
   </SolutionManifest>

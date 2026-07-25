@@ -1,4 +1,5 @@
 {
-  "solutionName": "YourSolutionName",
-  "targetEnv": "https://org229c958d.crm4.dynamics.com/"
+  "solutionName": "",
+  "targetEnv": "https://your-org.crm.dynamics.com/",
+  "allowedEnvs": []
 }

@@ -37,7 +37,7 @@
         <div class="ref-card">
           <div class="ref-title">Deploy to Dev</div>
           <div class="ref-steps">
-            <div class="ref-step">Run <code>deploy.ps1</code> from the starter folder, or <code>pnpm deploy</code> for Power Pages</div>
+            <div class="ref-step">Run <code>deploy.ps1</code> from the starter folder (the Power Pages Code Site uploads via <code>pac pages upload-code-site</code>)</div>
             <div class="ref-step">Script will block if any placeholders remain or wrong environment is targeted</div>
             <div class="ref-step">Stage and Prod: use the Power Platform Pipeline only</div>
           </div>
@@ -113,7 +113,7 @@ const rules = [
   'Never deploy to Stage or Production directly — only via Power Platform Pipeline.',
   'Always verify the PAC auth profile URL before any deploy — the profile name is unreliable.',
   'Never use v-html in Vue components — always v-text or component slots.',
-  'Run guid-freshen.ps1 exactly once before the first Power Pages deploy — never a second time.',
+  'Author solution identity only in solution.config.json, then run apply-config.ps1 — never hand-edit a starter config to a different value.',
 ]
 </script>
 

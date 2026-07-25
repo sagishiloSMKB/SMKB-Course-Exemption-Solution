@@ -1,0 +1,469 @@
+﻿{
+  "properties": {
+    "connectionReferences": {
+      "shared_sharepointonline_pvch": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "smkb_SMKBSharePointConnectionUser1"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      },
+      "shared_office365_pvch": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedoffice365_c3167"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)": {
+          "defaultValue": "dev",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_EnvironmentName",
+            "description": "Logical environment name (dev/stage/prod)."
+          }
+        },
+        "ERROR_EMAILS (smkb_pvch_FlowErrorEmails)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_FlowErrorEmails",
+            "description": "Semicolon-separated email addresses for flow error notifications."
+          }
+        },
+        "SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_SharePointSiteUrl",
+            "description": "SharePoint site URL."
+          }
+        }
+      },
+      "triggers": {
+        "manual": {
+          "metadata": {
+            "operationMetadataId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "type": "Request",
+          "kind": "PowerPages",
+          "description": "Power Pages trigger — validates the OTP entered by the lecturer. Lookup is by phone number (lecturerCellPhone).",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "phone",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_1": {
+                  "title": "otp",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                }
+              },
+              "required": [
+                "text",
+                "text_1"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Main_Flow": {
+          "type": "Scope",
+          "description": "OTP validation logic. Business errors (NOT_FOUND, WRONG_OTP, LOCKED) use Terminate(Succeeded) and do NOT reach Handle_Flow_Error.",
+          "actions": {
+            "Validate_Input": {
+              "type": "If",
+              "description": "Guard: reject missing/empty phone or non-6-char OTP.",
+              "expression": "@or(empty(coalesce(triggerBody()?['text'], '')), not(equals(length(coalesce(triggerBody()?['text_1'], '')), 6)))",
+              "actions": {
+                "Respond_invalid_input": {
+                  "type": "Response", "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "INVALID_INPUT"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Terminate_after_invalid_input": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_invalid_input": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Get_Lecturer_By_Phone": {
+              "type": "OpenApiConnection",
+              "description": "Look up the lecturer row by cell phone number.",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline_pvch",
+                  "operationId": "GetItems",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                  "table": "Vouchers-LecturersDetails",
+                  "$filter": "lecturerCellPhone eq '@{replace(triggerBody()?['text'], '''', '''''')}'",
+                  "$top": 1
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {
+                "Validate_Input": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "If_OTP_Not_Found": {
+              "type": "If",
+              "description": "No lecturer found or no OTP on record.",
+              "expression": "@or(equals(length(body('Get_Lecturer_By_Phone')?['value']), 0), empty(coalesce(first(body('Get_Lecturer_By_Phone')?['value'])?['otpCode'], '')))",
+              "actions": {
+                "Respond_not_found": {
+                  "type": "Response", "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "NOT_FOUND"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Terminate_not_found": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_not_found": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "Get_Lecturer_By_Phone": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "If_Account_Locked": {
+              "type": "If",
+              "description": "Block if OtpAttempts >= 5.",
+              "expression": "@greaterOrEquals(coalesce(first(body('Get_Lecturer_By_Phone')?['value'])?['otpAttempts'], 0), 5)",
+              "actions": {
+                "Respond_locked": {
+                  "type": "Response", "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "LOCKED"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Terminate_locked": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_locked": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "If_OTP_Not_Found": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "If_OTP_Expired": {
+              "type": "If",
+              "description": "Check expiry BEFORE comparing OTP — expired codes must not increment the attempts counter.",
+              "expression": "@lessOrEquals(ticks(first(body('Get_Lecturer_By_Phone')?['value'])?['otpExpiresAt']), ticks(utcNow()))",
+              "actions": {
+                "Respond_expired": {
+                  "type": "Response", "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "EXPIRED"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Terminate_expired": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_expired": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "If_Account_Locked": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "If_OTP_Wrong": {
+              "type": "If",
+              "description": "OTP code does not match. Increment attempts and return WRONG_OTP with remaining attempts.",
+              "expression": "@not(equals(triggerBody()?['text_1'], string(first(body('Get_Lecturer_By_Phone')?['value'])?['otpCode'])))",
+              "actions": {
+                "Patch_Increment_Attempts": {
+                  "type": "OpenApiConnection",
+                  "description": "Increment OtpAttempts on the lecturer row.",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline_pvch",
+                      "operationId": "PatchItem",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                      "table": "Vouchers-LecturersDetails",
+                      "id": "@first(body('Get_Lecturer_By_Phone')?['value'])?['ID']",
+                      "item/otpAttempts": "@add(coalesce(first(body('Get_Lecturer_By_Phone')?['value'])?['otpAttempts'], 0), 1)"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                },
+                "Respond_wrong_otp": {
+                  "type": "Response", "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "WRONG_OTP",
+                      "attemptsRemaining": "@sub(5, add(coalesce(first(body('Get_Lecturer_By_Phone')?['value'])?['otpAttempts'], 0), 1))"
+                    }
+                  },
+                  "runAfter": {
+                    "Patch_Increment_Attempts": [
+                      "Succeeded",
+                      "Failed"
+                    ]
+                  }
+                },
+                "Terminate_wrong_otp": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_wrong_otp": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "If_OTP_Expired": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Compose_Generate_Session_Token": {
+              "type": "Compose",
+              "description": "Generate a UUID session token.",
+              "inputs": "@guid()",
+              "runAfter": {
+                "If_OTP_Wrong": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Patch_Clear_OTP_Write_Session": {
+              "type": "OpenApiConnection",
+              "description": "Clear OTP fields and write session token + expiry to the lecturer row.",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline_pvch",
+                  "operationId": "PatchItem",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@parameters('SHAREPOINT_SITE_URL (smkb_SharePointSiteUrl)')",
+                  "table": "Vouchers-LecturersDetails",
+                  "id": "@first(body('Get_Lecturer_By_Phone')?['value'])?['ID']",
+                  "item/otpCode": "@null",
+                  "item/otpExpiresAt": "@null",
+                  "item/otpAttempts": 0,
+                  "item/sessionToken": "@outputs('Compose_Generate_Session_Token')",
+                  "item/sessionExpiresAt": "@formatDateTime(addHours(utcNow(), 1), 'yyyy-MM-ddTHH:mm:ssZ')"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {
+                "Compose_Generate_Session_Token": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Respond_to_PowerPages": {
+              "type": "Response", "kind": "PowerPages",
+              "description": "Return user identity + session token. lecturerStatus drives client-side routing: Pending -> /registration/1, Active -> /vouchers, Archived -> locked-out.",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "inviteeId": "@string(first(body('Get_Lecturer_By_Phone')?['value'])?['ID'])",
+                  "firstName": "@first(body('Get_Lecturer_By_Phone')?['value'])?['Title']",
+                  "lastName": "@first(body('Get_Lecturer_By_Phone')?['value'])?['lecturerLName']",
+                  "email": "@first(body('Get_Lecturer_By_Phone')?['value'])?['lecturerEmail']",
+                  "lecturerStatus": "@first(body('Get_Lecturer_By_Phone')?['value'])?['lecturerStatus']",
+                  "authToken": "@outputs('Compose_Generate_Session_Token')",
+                  "authTokenExpiresAt": "@addHours(utcNow(), 1)"
+                }
+              },
+              "runAfter": {
+                "Patch_Clear_OTP_Write_Session": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runAfter": {}
+        },
+        "Handle_Flow_Error": {
+          "type": "Scope",
+          "description": "Error handler — runs ONLY on unexpected technical failures (unhandled exception in Main_Flow).",
+          "actions": {
+            "Check_Error_Emails_Configured": {
+              "type": "If",
+              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)'))))",
+              "actions": {
+                "Send_error_notification": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365_pvch",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/From": "noreply@smkb.ac.il",
+                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)')), ') [ERROR] smkb_pvch_CheckOtp failed')",
+                      "emailMessage/Body": "@concat('<p>The flow <strong>smkb_pvch_CheckOtp</strong> failed unexpectedly in <strong>', parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)'), '</strong>.</p><p><strong>Triggered by phone:</strong> ', coalesce(triggerBody()?['text'], '(unknown)'), '</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/Importance": "High"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Respond_with_error": {
+              "type": "Response", "kind": "PowerPages",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "errorCode": "ERROR"
+                }
+              },
+              "runAfter": {
+                "Check_Error_Emails_Configured": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Main_Flow": [
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ]
+          }
+        }
+      }
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}

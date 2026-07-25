@@ -1,0 +1,12 @@
+{
+  "siteName": "MY-SITE-NAME",
+  "defaultLandingPage": "index.html",
+  "compiledPath": "./dist",
+  "bundleFilePatterns": [
+    "assets/index.js",
+    "assets/vue.js",
+    "assets/smkb.js",
+    "assets/index.css",
+    "favicon.ico"
+  ]
+}

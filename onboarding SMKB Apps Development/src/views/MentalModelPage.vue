@@ -252,9 +252,9 @@ const tools = [
 ]
 
 const solutionComponents = [
-  { icon: '🗄️', type: 'Dataverse table',     example: 'evt_registration' },
-  { icon: '⚡',  type: 'Power Automate flow', example: 'Send confirmation email on submit' },
-  { icon: '⚙️',  type: 'Environment variable', example: 'EVT_PORTAL_BASE_URL (differs per env)' },
+  { icon: '🗄️', type: 'Dataverse table',     example: 'smkb_evt_Registration' },
+  { icon: '⚡',  type: 'Power Automate flow', example: 'smkb_evt_SendConfirmation' },
+  { icon: '⚙️',  type: 'Environment variable', example: 'smkb_evt_PortalBaseUrl (differs per env)' },
   { icon: '🌐',  type: 'Power Pages portal',   example: 'Public events registration site' },
   { icon: '🖥️',  type: 'Power Apps Code App',  example: 'Internal events backoffice' },
 ]
@@ -282,8 +282,8 @@ const starters = [
   },
   {
     icon: '🌐',
-    folder: 'SMKB - Power Page Starter',
-    desc: 'Full Power Pages portal: Vue SPA + YAML portal files + deploy pipeline',
+    folder: 'SMKB - Power Pages Code Site Starter',
+    desc: 'Power Pages Code Site: a Vue 3 SPA uploaded via PAC (pac pages upload-code-site)',
   },
 ]
 </script>

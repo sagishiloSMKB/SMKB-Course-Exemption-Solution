@@ -15,7 +15,7 @@
           <div class="env-url">org229c958d</div>
           <div class="env-actions">
             <div class="env-action">deploy.ps1</div>
-            <div class="env-action">pnpm deploy</div>
+            <div class="env-action">pac pages upload</div>
           </div>
           <div class="env-note">Direct deploy — you run the scripts</div>
         </div>
@@ -61,10 +61,10 @@
         Dev and imports it into Stage.
       </p>
       <p>
-        If a component isn't in the solution, it stays behind.
-        This is why the <code>pac solution add-solution-component</code> step
-        matters so much — any component not explicitly linked to the solution
-        will silently not travel through the pipeline.
+        If a component isn't in the solution, it stays behind. This is why every component must be
+        linked to the solution — tables and env vars via their <code>RootComponents</code> in
+        <code>Solution.xml</code>, flows via the three-file rule — or it silently won't travel through
+        the pipeline.
       </p>
     </div>
 
@@ -73,7 +73,7 @@
       <div class="vs-table">
         <div class="vs-row vs-header">
           <div>Aspect</div>
-          <div>deploy.ps1 / pnpm deploy</div>
+          <div>deploy.ps1 / pac pages upload</div>
           <div>Power Platform Pipeline</div>
         </div>
         <div v-for="row in vsRows" :key="row.aspect" class="vs-row">
@@ -85,39 +85,23 @@
     </div>
 
     <div class="section">
-      <h2>Power Pages — why special handling is needed</h2>
+      <h2>Power Pages Code Site — how it promotes</h2>
       <p>
-        Power Pages portals contain hundreds of YAML-backed Dataverse records (pages, templates,
-        web files, site settings). The Maker UI's "Add Existing → Power Pages" button adds only
-        the top-level site record — it silently omits ~200 child components.
+        A Power Pages Code Site is a Vue SPA uploaded with the PAC CLI (<code>pac pages upload-code-site</code>).
+        Unlike the old Liquid-portal model, there is no manual "add ~200 components to the solution"
+        step and no shared-GUID overwrite hazard — a site is namespaced by its publisher prefix and
+        site name (<code>PREFIX - Name</code>, set in <code>src/config/solution.ts</code>).
       </p>
-      <p>
-        The correct approach is to use the PAC CLI to explicitly add every component:
-      </p>
-      <CodeBlock :code="pacSolutionAddExample">
-        <template #filename>Init Project Step 11 — link portal components to solution</template>
+      <CodeBlock :code="codeSitePromoteExample">
+        <template #filename>Promote a Code Site to Stage / Prod</template>
       </CodeBlock>
 
       <InfoCallout type="note">
-        This step must be re-run after every <code>pnpm deploy</code> because new records
-        uploaded by PAC are NOT automatically linked to the solution. Run it before
-        triggering the pipeline or new portal components won't travel to Stage.
+        Per-environment values still differ: site-setting GUIDs are freshened once during
+        provisioning (the starter's <code>scripts/freshen-site-settings.ps1</code>), and Power
+        Automate flow trigger GUIDs are environment-specific — re-register them in each
+        environment after promotion.
       </InfoCallout>
-    </div>
-
-    <div class="section">
-      <h2>The GUID freshening requirement</h2>
-      <p>
-        Every portal cloned from the starter kit starts with identical hardcoded GUIDs.
-        <code>pac pages upload</code> upserts Dataverse records by primary key — if two portals
-        share GUIDs, the second upload overwrites the first portal's records. Both portals break.
-        This happened in production (CIF and Open Day portals, May 2026).
-      </p>
-      <p>
-        Run <code>guid-freshen.ps1</code> exactly once before the first deploy for any new portal.
-        After that, never run it again — running it a second time generates new GUIDs that no
-        longer match the live Dataverse records, breaking the site.
-      </p>
     </div>
 
     <InfoCallout type="rule">
@@ -143,28 +127,17 @@ const vsRows = [
   { aspect: 'Rollback',     script: 'git revert + redeploy',        pipeline: 'Restore previous solution version in Admin Center' },
 ]
 
-const pacSolutionAddExample = `# 1. Add the site record itself
-pac solution add-solution-component \\
-  --solution-unique-name SMKBEvents \\
-  --component-type powerpagesite \\
-  --component-id <site-guid-from-pac-pages-list>
+const codeSitePromoteExample = `# Code Sites promote on a two-track model:
 
-# 2. Add ALL child components (extracts every GUID from portal YAML files)
-$guids = Get-ChildItem ".\\powerpages\\smkb---events-dev" -Recurse -Include "*.yml" |
-    Select-String -Pattern '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' |
-    ForEach-Object { $_.Matches.Value } | Sort-Object -Unique
-foreach ($guid in $guids) {
-    pac solution add-solution-component \\
-      --solution-unique-name SMKBEvents \\
-      --component-type powerpagecomponent \\
-      --component-id $guid
-}
+# 1. Solution components (tables, env vars, flows, the code app)
+#    -> Power Platform Pipeline, from the Maker portal (Stage -> Prod)
 
-# 3. Add the language component
-pac solution add-solution-component \\
-  --solution-unique-name SMKBEvents \\
-  --component-type powerpagesitelanguage \\
-  --component-id <site-guid>`
+# 2. The code-site bundle itself
+#    -> pac pages upload-code-site against the target environment
+#    (drive it with the /ppcs-promote-to-env skill)
+
+# After promotion, re-register the flow trigger GUIDs for the new
+# environment (they are environment-specific): /ppcs-register-flow`
 </script>
 
 <style scoped>

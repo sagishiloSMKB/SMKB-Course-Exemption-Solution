@@ -26,9 +26,12 @@
     <div class="section">
       <h2>The placeholder system</h2>
       <p>
-        Every placeholder follows a clear naming convention. The <code>sol_</code> prefix
-        is replaced with your solution's short name. Generic display names like
-        <code>YourSolutionName</code> are replaced with the actual solution name.
+        Every placeholder follows a clear naming convention. Solution <strong>identity</strong>
+        (name, short prefix, display names, environment, site name) lives in one root file,
+        <code>solution.config.json</code>, and <code>apply-config.ps1</code> pushes it into every
+        activated starter — you never hand-edit those values per folder. The component
+        placeholders you still author yourself (example tables, flows, env vars) keep the
+        <code>sol_</code> prefix until you rename them.
       </p>
 
       <div class="placeholder-grid">
@@ -40,7 +43,7 @@
 
       <h3>What the placeholder looks like in the actual file:</h3>
       <CodeBlock :code="entityXmlExample">
-        <template #filename>SMKB - Dataverse Tables Starter/Entities/sol_example_table_a/Entity.xml</template>
+        <template #filename>SMKB - Dataverse Tables Starter/Entities/smkb_sol_ExampleTableA/Entity.xml</template>
       </CodeBlock>
       <CodeBlock :code="solutionXmlExample">
         <template #filename>SMKB - Dataverse Tables Starter/Other/Solution.xml</template>
@@ -62,7 +65,7 @@
         </div>
         <div class="naming-row">
           <div>Short name (prefix)</div>
-          <div><code>[2-4 chars]</code></div>
+          <div><code>[2-5 lowercase]</code></div>
           <div><code>evt</code></div>
         </div>
         <div class="naming-row">
@@ -72,13 +75,13 @@
         </div>
         <div class="naming-row">
           <div>Table schema name</div>
-          <div><code>[prefix]_[name]</code></div>
-          <div><code>evt_registration</code></div>
+          <div><code>smkb_[prefix]_[PascalName]</code></div>
+          <div><code>smkb_evt_Registration</code></div>
         </div>
         <div class="naming-row">
           <div>Env var schema name</div>
-          <div><code>[PREFIX]_[NAME]</code></div>
-          <div><code>EVT_PORTAL_BASE_URL</code></div>
+          <div><code>smkb_[prefix]_[PascalName]</code></div>
+          <div><code>smkb_evt_PortalBaseUrl</code></div>
         </div>
         <div class="naming-row">
           <div>Folder name</div>
@@ -144,38 +147,38 @@ const starters = [
   },
   {
     icon: '🌐',
-    folder: 'SMKB - Power Page Starter',
-    use: 'you need a public-facing portal (registration forms, application pages)',
+    folder: 'SMKB - Power Pages Code Site Starter',
+    use: 'you need a public-facing portal (registration forms, application pages) — a Vue SPA uploaded as a Power Pages Code Site',
     skip: 'solution is internal staff only (use Power Apps instead)',
   },
 ]
 
 const placeholders = [
-  { string: 'YourSolutionName',    where: 'All starters — Solution.xml' },
-  { string: 'sol_example_table_a', where: 'Tables Starter — Entity.xml, Customizations.xml' },
-  { string: 'sol_EXAMPLE_VAR',     where: 'Env Vars Starter — folder name and XML' },
-  { string: 'sol_example_flow',    where: 'Flows Starter — flow JSON, Solution.xml' },
-  { string: 'sol_example_item',    where: 'Power Apps Starter — dataService.ts, types/' },
-  { string: 'TODO-your-portal',    where: 'Power Pages Starter — deploy.mjs PORTAL_URL' },
+  { string: 'YourSolutionName',    where: 'Tables / Env Vars / Flows — Solution.xml (set by apply-config.ps1)' },
+  { string: 'smkb_sol_ExampleTableA', where: 'Tables Starter — Entity.xml, Solution.xml (you author)' },
+  { string: 'smkb_sol_ExampleVar',    where: 'Env Vars Starter — folder name and XML (you author)' },
+  { string: 'smkb_sol_ExampleFlow…',  where: 'Flows Starter — flow JSON, Customizations.xml (you author)' },
+  { string: 'Your App Display Name', where: 'Power Apps Starter — power.config.json (set by apply-config.ps1)' },
+  { string: 'CHANGEME',            where: 'Power Pages Code Site — src/config/solution.ts (set by apply-config.ps1)' },
 ]
 
 const activationSteps = [
   { title: 'Choose which starters to activate', desc: 'Claude will ask at the start of every new engagement. Unused starters stay as-is — never deploy them.' },
   { title: 'Rename the starter folder', desc: 'SMKB - X Starter → SMKB - [Component Name] - [Type]. e.g. SMKB - Events - Dataverse Tables.' },
-  { title: 'Replace all placeholders', desc: 'Find & replace: sol_ → evt_, YourSolutionName → SMKBEvents, etc. The deploy script blocks if any remain.' },
-  { title: 'Run deploy.ps1 (or pnpm deploy)', desc: 'The script builds and deploys to Dev. Never to Stage or Prod.' },
+  { title: 'Fill solution.config.json and apply it', desc: 'One root config holds the solution identity. apply-config.ps1 pushes it into every activated starter; you then author the actual tables/flows/pages.' },
+  { title: 'Run each starter\'s deploy', desc: 'Each starter deploys itself to Dev via its own deploy flow — its guard blocks while platform placeholders remain. Never to Stage or Prod (those go through Pipeline).' },
 ]
 
 const entityXmlExample = `<!-- Before activation -->
 <EntityInfo>
-  <schemaName>sol_example_table_a</schemaName>
-  <displayName>Example Table A</displayName>
+  <schemaName>smkb_sol_ExampleTableA</schemaName>
+  <displayName>SOL - Example Table A</displayName>
 </EntityInfo>
 
 <!-- After activation (Events solution, short name: evt) -->
 <EntityInfo>
-  <schemaName>evt_registration</schemaName>
-  <displayName>Registration</displayName>
+  <schemaName>smkb_evt_Registration</schemaName>   <!-- logical: smkb_evt_registration -->
+  <displayName>EVT - Registration</displayName>
 </EntityInfo>`
 
 const solutionXmlExample = `<!-- Before activation -->
@@ -190,7 +193,7 @@ const solutionXmlExample = `<!-- Before activation -->
 <SolutionManifest>
   <UniqueName>SMKBEvents</UniqueName>
   <LocalizedNames>
-    <LocalizedName description="SMKB – Events" languagecode="1033" />
+    <LocalizedName description="SMKB - Events" languagecode="1033" />
   </LocalizedNames>
 </SolutionManifest>`
 </script>

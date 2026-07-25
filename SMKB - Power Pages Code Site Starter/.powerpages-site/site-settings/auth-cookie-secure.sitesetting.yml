@@ -1,0 +1,4 @@
+description: Forces the authentication cookie to be transmitted over HTTPS only.
+id: aaaaaaaa-0002-4000-8000-000000000002
+name: Authentication/ApplicationCookie/CookieSecure
+value: Always

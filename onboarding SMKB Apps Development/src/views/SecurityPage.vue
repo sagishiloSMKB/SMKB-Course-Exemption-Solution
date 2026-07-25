@@ -55,9 +55,9 @@
             and <code>window.__SMKB_*</code> globals. Validate shape and type before using them.
           </p>
           <p>
-            <code>window.__SMKB_*</code> globals are injected by the Liquid shell — they are for
-            non-sensitive config only (environment URLs, feature flags). Never pass tokens, session
-            data, or PII through them.
+            Any globals injected into the page by the host runtime are for non-sensitive config only
+            (environment URLs, feature flags). Never pass tokens, session data, or PII through them,
+            and validate their shape before use.
           </p>
         </div>
       </div>
@@ -77,7 +77,7 @@
         </div>
         <div class="hook-detail">
           <div class="hook-detail-label">What it catches</div>
-          <div class="hook-detail-value"><code>v-html</code> usage, <code>console.log</code> statements, Vue rule violations, TypeScript errors</div>
+          <div class="hook-detail-value"><code>v-html</code> usage, <code>console.log</code> statements, Vue rule violations, TypeScript errors — plus config drift (<code>apply-config.ps1 -Check</code>) and root doc-boundary violations</div>
         </div>
         <div class="hook-detail">
           <div class="hook-detail-label">How it's activated</div>
@@ -85,7 +85,7 @@
         </div>
         <div class="hook-detail">
           <div class="hook-detail-label">Requires</div>
-          <div class="hook-detail-value"><code>pnpm install</code> must have run first — the hook calls ESLint from <code>node_modules</code></div>
+          <div class="hook-detail-value">Each starter's deps installed (pnpm or npm) — the hook lints each staged file with that starter's own local ESLint</div>
         </div>
       </div>
       <CodeBlock :code="hookBlockedExample" />
@@ -102,7 +102,7 @@
       <h3>Placeholder scan</h3>
       <p>
         The script scans all source files for unreplaced template strings. Deploying a solution
-        that still contains <code>YourSolutionName</code> or <code>sol_example_table</code> pushes
+        that still contains <code>YourSolutionName</code> or an un-renamed <code>smkb_sol_</code> schema name pushes
         placeholder schema to the shared environment — it succeeds silently, which makes it worse.
       </p>
       <CodeBlock :code="placeholderBlockExample">
@@ -127,181 +127,51 @@
       </InfoCallout>
     </div>
 
-    <!-- ── Section 4: deploy.mjs gates ──────────────────────────────────── -->
+    <!-- Section 4: Power Pages Code Site security model -->
     <div class="section">
-      <h2>Power Pages deploy pipeline — 6 sequential gates</h2>
+      <h2>Power Pages Code Site - security model</h2>
       <p>
-        When you run <code>pnpm deploy</code> in the Power Pages starter, <code>deploy.mjs</code>
-        runs six checks in order before any file is uploaded. Each gate can block the deploy.
+        The Power Pages Code Site is a Vue SPA uploaded with <code>pac pages upload-code-site</code>.
+        Its <code>deploy</code> script runs lint, tests, and the type-checked build before uploading,
+        so unsafe or broken code never reaches the site. Runtime security rests on four pillars:
       </p>
 
-      <div class="gate-list">
-        <div v-for="gate in deployGates" :key="gate.num" class="gate-item">
-          <div class="gate-num">{{ gate.num }}</div>
-          <div class="gate-body">
-            <div class="gate-name">{{ gate.name }}</div>
-            <div class="gate-desc">{{ gate.desc }}</div>
-          </div>
-          <div class="gate-block">blocks if {{ gate.blocks }}</div>
-        </div>
-      </div>
+      <h3>1 - Content Security Policy (two files, kept in sync)</h3>
+      <p>
+        The site ships two CSP site-setting files - an <strong>enforced</strong> policy and a
+        <strong>report-only</strong> policy. External domains (analytics, fonts, maps, OAuth) are added
+        to <em>both</em> via the <code>/ppcs-add-csp-domain</code> skill, which detects drift between
+        the two files before editing so report-only never falls out of sync.
+      </p>
 
-      <InfoCallout type="note">
-        These gates run automatically on every <code>pnpm deploy</code>. You do not need to
-        remember them — the script enforces them.
+      <h3>2 - Flows-only by default</h3>
+      <p>
+        The SPA has no direct Dataverse write access. Backend calls go through Power Automate cloud
+        flows using the HTTP 200 + <code>errorCode</code> contract (never a raw 4xx/5xx). Direct table
+        access is opt-in per table via <code>/ppcs-enable-web-api</code>, which also generates the
+        required table-permission records and restricts the exposed fields.
+      </p>
+
+      <h3>3 - Authentication</h3>
+      <p>
+        Anonymous by default. The site can require Power Pages OAuth, or wire in the dormant phone-OTP
+        module via <code>/ppcs-enable-otp-auth</code> (adds login and lockout routes, a router guard,
+        session-expiry handling, and the Turnstile CSP domains).
+      </p>
+
+      <h3>4 - No secrets in a public bundle</h3>
+      <p>
+        The SPA is a public static bundle - never embed tokens, connection strings, or PII. ESLint
+        bans <code>v-html</code>, <code>console.log</code>, and raw <code>fetch</code> /
+        <code>XMLHttpRequest</code> outside the sanctioned flow client.
+      </p>
+
+      <InfoCallout type="tip">
+        When a page 403s, a flow returns an error, or the browser blocks a resource, the
+        <code>/ppcs-troubleshoot</code> skill diagnoses the nine most common Code Site failures
+        (500 on promotion, portal template visible, /Profile redirect, route 404, Web API 403,
+        flow 403, CSP block, duplicate sites, stale-chunk import errors after deploy).
       </InfoCallout>
-    </div>
-
-    <!-- ── Section 5: security-check.mjs ────────────────────────────────── -->
-    <div class="section">
-      <h2>pnpm check:security — 10 automated checks</h2>
-      <p>
-        Gate #4 in the deploy pipeline runs <code>scripts/security-check.mjs</code>,
-        which performs 10 independent checks. Critical failures block the deploy.
-        Warnings are printed but do not block.
-      </p>
-
-      <div class="check-table">
-        <div class="check-row check-header">
-          <div>#</div>
-          <div>Check</div>
-          <div>Severity</div>
-          <div>What it catches</div>
-        </div>
-        <div v-for="check in securityChecks" :key="check.num" class="check-row">
-          <div class="check-num">{{ check.num }}</div>
-          <div class="check-name">{{ check.name }}</div>
-          <div>
-            <span :class="['check-badge', check.critical ? 'check-badge--critical' : 'check-badge--warning']">
-              {{ check.critical ? 'Critical' : 'Warning' }}
-            </span>
-          </div>
-          <div class="check-what">{{ check.what }}</div>
-        </div>
-      </div>
-
-      <CodeBlock :code="securityCheckOutput">
-        <template #filename>pnpm check:security — example output</template>
-      </CodeBlock>
-    </div>
-
-    <!-- ── Section 6: GUID isolation ─────────────────────────────────────── -->
-    <div class="section">
-      <h2>GUID isolation — Power Pages</h2>
-
-      <p>
-        A <strong>GUID</strong> (Globally Unique Identifier) is a 128-bit number used as a
-        unique identifier, written as a string of 32 hex digits in the format
-        <code>xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code> — for example,
-        <code>a3f1bd7e-2958-45af-90ce-e9d951422a3d</code>.
-      </p>
-      <p>
-        In Power Platform, <strong>every Dataverse record has a GUID as its primary key</strong>.
-        This includes portal configuration records: each webpage, web template, site setting,
-        content snippet, and the site itself all have their own GUID. When
-        <code>pac pages upload</code> sends YAML files to Dataverse, it performs an
-        <em>upsert</em> — if a record with that GUID already exists, it is updated; if not,
-        it is created. The GUID is the only thing that identifies which record to update.
-      </p>
-
-      <InfoCallout type="rule">
-        <strong>Real incident — May 2026:</strong> The CIF portal and the Open Day portal were both
-        initialized from this starter. Neither ran <code>guid-freshen.ps1</code> before their first
-        deploy. When the second portal was uploaded, <code>pac pages upload</code> upserted Dataverse
-        records using the same primary-key GUIDs — silently overwriting records that belonged to the
-        first portal. Both portals broke and returned "Page Not Found" on every page.
-      </InfoCallout>
-
-      <p>
-        Every portal built from this starter starts with the same hardcoded GUIDs in its YAML files.
-        <code>pac pages upload</code> upserts records in Dataverse using those GUIDs as primary keys.
-        If two portals share the same GUIDs, the second upload steals records from the first.
-      </p>
-
-      <div class="guid-steps">
-        <div class="guid-step">
-          <div class="guid-step-num">1</div>
-          <div>
-            <div class="guid-step-title">Run <code>guid-freshen.ps1</code> — exactly once</div>
-            <div class="guid-step-desc">
-              Replaces every portal-scoped GUID with a fresh random one. Preserves the live
-              <code>adx_websiteid</code> (which you set from <code>pac pages list</code> in Step 7b).
-              Run before the first deploy. After running, a <code>.guid-freshened</code> marker
-              file is written — the script will refuse to run a second time to prevent
-              accidentally breaking a live portal.
-            </div>
-          </div>
-        </div>
-        <div class="guid-step">
-          <div class="guid-step-num">2</div>
-          <div>
-            <div class="guid-step-title">Run <code>verify-consistency.ps1</code></div>
-            <div class="guid-step-desc">
-              Validates 4 things: <code>adx_websiteid</code> is set, no starter sentinel GUIDs
-              remain, all page references resolve, all weblink references resolve. Exit 1 on any failure.
-            </div>
-          </div>
-        </div>
-        <div class="guid-step">
-          <div class="guid-step-num">3</div>
-          <div>
-            <div class="guid-step-title">deploy.mjs enforces this automatically</div>
-            <div class="guid-step-desc">
-              Gate #6 scans all YAML files for the starter sentinel GUID
-              (<code>a3f1bd7e-2958-45af-90ce-e9d951422a3d</code>). If found, the deploy is
-              blocked with "Run guid-freshen.ps1 first."
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <InfoCallout type="warning">
-        Running <code>guid-freshen.ps1</code> a second time after the portal is live generates new
-        GUIDs that no longer match the records in Dataverse. Every page returns "Page Not Found."
-        This is not recoverable without a full re-upload and data migration. Run it once.
-      </InfoCallout>
-    </div>
-
-    <!-- ── Section 7: Auth & headers ─────────────────────────────────────── -->
-    <div class="section">
-      <h2>Power Pages authentication &amp; HTTP hardening</h2>
-      <p>
-        The Power Pages starter ships with a hardened <code>sitesetting.yml</code>.
-        These settings are pre-configured and verified by <code>pnpm check:security</code>
-        before every deploy.
-      </p>
-
-      <h3>Authentication settings</h3>
-      <div class="setting-table">
-        <div v-for="s in authSettings" :key="s.name" class="setting-row">
-          <code class="setting-name">{{ s.name }}</code>
-          <div class="setting-value">
-            <span :class="['setting-val', s.review ? 'setting-val--review' : 'setting-val--fixed']">
-              {{ s.value }}
-            </span>
-            <span class="setting-desc">{{ s.desc }}</span>
-          </div>
-        </div>
-      </div>
-
-      <InfoCallout type="warning">
-        <code>Authentication/Registration/OpenRegistrationEnabled</code> is set to <code>true</code>
-        in the starter (for compatibility). For any portal that should NOT allow self-registration
-        — invite-only, internal staff portals — set it to <code>false</code> before the first deploy.
-        The starter includes a TODO comment on that setting as a reminder.
-      </InfoCallout>
-
-      <h3>HTTP security headers</h3>
-      <p>Four security headers are pre-configured in <code>sitesetting.yml</code> and their presence is verified by check [5] before every deploy.</p>
-      <div class="setting-table">
-        <div v-for="h in httpHeaders" :key="h.header" class="setting-row">
-          <code class="setting-name">{{ h.header }}</code>
-          <div class="setting-value">
-            <span class="setting-val setting-val--fixed">{{ h.value }}</span>
-            <span class="setting-desc">{{ h.desc }}</span>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- ── Section 8: AI agent permission system ─────────────────────────── -->
@@ -395,8 +265,8 @@ DEPLOY BLOCKED — unreplaced placeholders found:
 
   File: Other/Solution.xml
     → "YourSolutionName"
-  File: Entities/sol_example_table_a/Entity.xml
-    → "sol_example_table_a"
+  File: Entities/smkb_sol_ExampleTableA/Entity.xml
+    → "smkb_sol_"
 
 Replace all placeholder strings before deploying.`
 
@@ -407,140 +277,10 @@ const envGuardExample = `DEPLOY BLOCKED -- This script only deploys to SMKB-Apps
 
 Stage and Production are promoted via Power Platform Pipeline only.`
 
-const securityCheckOutput = `▶ Running security checks...
 
-[1/10] Dependency vulnerabilities     ✓ No high/critical vulnerabilities
-[2/10] Secret patterns in source      ✓ No secrets found
-[3/10] .env* in .gitignore            ✓ .env* covered by .gitignore
-[4/10] LocalLoginEnabled = false      ✓ Azure AD-only auth
-[5/10] Required security headers      ✓ All 4 headers present
-[6/10] LoginTrackingEnabled           ✓ Login audit trail active
-[7/10] No v-html in Vue components    ✓ No v-html directives found
-[8/10] No console.log in source       ✓ No console.log found
-[9/10] PORTAL_URL configured          ✓ Configured
-[10/10] adx_websiteid configured      ✓ Configured
 
-Security check passed — 0 critical failures, 0 warnings.`
 
-const deployGates = [
-  {
-    num: 1,
-    name: 'Branch check',
-    desc: 'Reads current branch with git rev-parse',
-    blocks: 'branch is not main',
-  },
-  {
-    num: 2,
-    name: 'Config check',
-    desc: 'Reads PORTAL_URL and PAGES_SUBDIR from deploy.mjs',
-    blocks: 'either still contains TODO or default value',
-  },
-  {
-    num: 3,
-    name: 'ESLint gate',
-    desc: 'Runs pnpm run lint on the full src/ folder',
-    blocks: 'any ESLint error (v-html, console.log, Vue rules)',
-  },
-  {
-    num: 4,
-    name: 'Security check',
-    desc: 'Runs scripts/security-check.mjs — 10 checks (see below)',
-    blocks: 'any critical failure',
-  },
-  {
-    num: 5,
-    name: 'PAC environment verification',
-    desc: 'Reads pac auth list, confirms org229c958d is active; auto-switches if found',
-    blocks: 'no SMKB-Apps-Dev profile exists at all',
-  },
-  {
-    num: 6,
-    name: 'Sentinel GUID check',
-    desc: 'Scans all YAML files for the starter sentinel GUID a3f1bd7e-...',
-    blocks: 'guid-freshen.ps1 has not been run',
-  },
-]
 
-const securityChecks = [
-  { num: '1', name: 'Dependency vulnerabilities', critical: true,  what: 'pnpm audit — any high or critical CVE in npm packages' },
-  { num: '2', name: 'Hardcoded secrets',          critical: true,  what: 'PRIVATE_KEY, password=, secret=, api_key=, Bearer <token> in src/' },
-  { num: '3', name: '.env* in .gitignore',         critical: true,  what: '.env* pattern must be present in .gitignore' },
-  { num: '4', name: 'LocalLoginEnabled = false',   critical: true,  what: 'Local password login must be disabled in sitesetting.yml' },
-  { num: '5', name: 'Required HTTP headers',       critical: true,  what: 'All 4 security headers must exist in sitesetting.yml' },
-  { num: '6', name: 'LoginTrackingEnabled',        critical: false, what: 'Login audit trail should be active on the portal' },
-  { num: '7', name: 'No v-html in Vue files',      critical: true,  what: 'String scan of all .vue files in src/' },
-  { num: '8', name: 'No console.log in source',    critical: false, what: 'Regex scan of .ts/.vue/.js files in src/' },
-  { num: '9', name: 'PORTAL_URL configured',       critical: false, what: 'deploy.mjs PORTAL_URL must not contain TODO' },
-  { num: '10', name: 'adx_websiteid configured',   critical: false, what: 'website.yml adx_websiteid must not contain TODO' },
-]
-
-const authSettings = [
-  {
-    name: 'Authentication/Registration/LocalLoginEnabled',
-    value: 'false',
-    desc: 'Local username/password login disabled — Azure AD is the only supported auth path',
-    review: false,
-  },
-  {
-    name: 'Authentication/Registration/AzureADLoginEnabled',
-    value: 'true',
-    desc: 'Azure AD external identity provider enabled',
-    review: false,
-  },
-  {
-    name: 'Authentication/LoginThrottling/MaxInvaildAttemptsFromIPAddress',
-    value: '5',
-    desc: '5 failed login attempts within 5 minutes triggers an IP-level lockout',
-    review: false,
-  },
-  {
-    name: 'Authentication/LoginThrottling/IpAddressTimeoutTimeSpan',
-    value: '00:15:00',
-    desc: 'Locked IP must wait 15 minutes before trying again',
-    review: false,
-  },
-  {
-    name: 'HTTP/SameSite/Default',
-    value: 'Lax',
-    desc: 'Cookies are not sent on cross-origin requests — prevents CSRF attacks',
-    review: false,
-  },
-  {
-    name: 'Authentication/LoginTrackingEnabled',
-    value: 'True',
-    desc: 'Last successful login is recorded on the Contact record for audit trail',
-    review: false,
-  },
-  {
-    name: 'Authentication/Registration/OpenRegistrationEnabled',
-    value: 'true — review per project',
-    desc: 'Anyone can self-register by default. Set to false for invite-only or internal portals.',
-    review: true,
-  },
-]
-
-const httpHeaders = [
-  {
-    header: 'HTTP/X-Frame-Options',
-    value: 'DENY',
-    desc: 'Prevents the portal from being embedded in an iframe — blocks clickjacking attacks',
-  },
-  {
-    header: 'HTTP/X-Content-Type-Options',
-    value: 'nosniff',
-    desc: 'Forces browsers to respect the declared Content-Type — prevents MIME-sniffing exploits',
-  },
-  {
-    header: 'HTTP/Referrer-Policy',
-    value: 'strict-origin-when-cross-origin',
-    desc: 'Limits referrer header to origin only on cross-origin requests — prevents URL leakage',
-  },
-  {
-    header: 'HTTP/Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), payment=()',
-    desc: 'Disables sensitive browser capabilities by default — adjust per project if needed',
-  },
-]
 
 const denyGroups = [
   {
@@ -555,7 +295,7 @@ const denyGroups = [
     label: 'Environment & auth switching',
     commands: [
       { cmd: 'pac auth select',              reason: 'Prevents silent environment switching between orgs' },
-      { cmd: 'pac pages download --overwrite', reason: 'Prevents the phantom GUID pitfall (Dataverse replaces hand-crafted GUIDs)' },
+      { cmd: 'pac pages download --overwrite', reason: 'Prevents clobbering local site files with the server copy' },
     ],
   },
   {
@@ -571,7 +311,7 @@ const denyGroups = [
 
 const autonomyRules = [
   {
-    action: 'pnpm deploy / pac pages upload',
+    action: 'deploy.ps1 / pac pages upload-code-site',
     trigger: 'Only when you say "deploy" in the current message',
   },
   {

@@ -1,0 +1,260 @@
+﻿{
+  "properties": {
+    "connectionReferences": {
+      "shared_office365_pvch": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedoffice365_c3167"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)": {
+          "defaultValue": "dev",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_EnvironmentName",
+            "description": "Logical environment name (dev/stage/prod)."
+          }
+        },
+        "ERROR_EMAILS (smkb_pvch_FlowErrorEmails)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_FlowErrorEmails",
+            "description": "Semicolon-separated email addresses for flow error notifications."
+          }
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "PowerPages",
+          "description": "Power Pages trigger — fetches Israeli bank list from data.gov.il. No auth required.",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      },
+      "actions": {
+        "Main_Flow": {
+          "type": "Scope",
+          "description": "Fetch banks from data.gov.il, validate, whitelist Bank_Code + Bank_Name, cap at 200, sort by Bank_Code.",
+          "actions": {
+            "HTTP_Get_Banks": {
+              "type": "Http",
+              "description": "Fetch bank list from Israeli government open data portal, sorted by Bank_Code ascending.",
+              "inputs": {
+                "method": "GET",
+                "uri": "https://data.gov.il/api/3/action/datastore_search?resource_id=ebb61778-e34c-4e67-8fcf-0e643d9cf8c2&limit=200&sort=Bank_Code%20asc"
+              },
+              "runAfter": {}
+            },
+            "Parse_Banks_Response": {
+              "type": "ParseJson",
+              "description": "Parse the data.gov.il response envelope. Expected: { success: bool, result: { records: [...] } }",
+              "inputs": {
+                "content": "@body('HTTP_Get_Banks')",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "records": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "Bank_Code": {},
+                              "Bank_Name": {}
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "runAfter": {
+                "HTTP_Get_Banks": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "If_API_Failed": {
+              "type": "If",
+              "description": "Validate envelope: success must be true and records must be an array.",
+              "expression": "@not(equals(body('Parse_Banks_Response')?['success'], true))",
+              "actions": {
+                "Respond_bank_api_error": {
+                  "type": "Response", "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "EXTERNAL_API_ERROR"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Terminate_bank_api_error": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_bank_api_error": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "Parse_Banks_Response": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Select_Bank_Fields": {
+              "type": "Select",
+              "description": "Whitelist Bank_Code and Bank_Name only.",
+              "inputs": {
+                "from": "@body('Parse_Banks_Response')?['result']?['records']",
+                "select": {
+                  "Bank_Code": "@item()?['Bank_Code']",
+                  "Bank_Name": "@item()?['Bank_Name']"
+                }
+              },
+              "runAfter": {
+                "If_API_Failed": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Filter_Valid_Banks": {
+              "type": "Query",
+              "description": "Remove records where Bank_Code or Bank_Name is null/empty.",
+              "inputs": {
+                "from": "@body('Select_Bank_Fields')",
+                "where": "@and(not(empty(coalesce(string(item()?['Bank_Code']), ''))), not(empty(coalesce(item()?['Bank_Name'], ''))))"
+              },
+              "runAfter": {
+                "Select_Bank_Fields": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Respond_to_PowerPages": {
+              "type": "Response", "kind": "PowerPages",
+              "description": "Return the whitelisted, validated, capped bank list sorted by Bank_Code (sort applied at HTTP level).",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "banks": "@take(body('Filter_Valid_Banks'), 200)"
+                }
+              },
+              "runAfter": {
+                "Filter_Valid_Banks": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runAfter": {}
+        },
+        "Handle_Flow_Error": {
+          "type": "Scope",
+          "description": "Error handler — runs ONLY on unexpected technical failures in Main_Flow.",
+          "actions": {
+            "Check_Error_Emails_Configured": {
+              "type": "If",
+              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)'))))",
+              "actions": {
+                "Send_error_notification": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365_pvch",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/From": "noreply@smkb.ac.il",
+                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)')), ') [ERROR] smkb_pvch_GetBankList failed')",
+                      "emailMessage/Body": "@concat('<p>The flow <strong>smkb_pvch_GetBankList</strong> failed in <strong>', parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)'), '</strong>.</p><p>Run ID: ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/Importance": "High"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Respond_with_error": {
+              "type": "Response", "kind": "PowerPages",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "errorCode": "ERROR"
+                }
+              },
+              "runAfter": {
+                "Check_Error_Emails_Configured": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Main_Flow": [
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ]
+          }
+        }
+      }
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}

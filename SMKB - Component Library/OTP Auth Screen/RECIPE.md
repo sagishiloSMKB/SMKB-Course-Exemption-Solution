@@ -8,8 +8,8 @@ Copy this folder into a new solution and follow the steps below. Every `[ADAPT]`
 
 A two-step email → OTP authentication screen for Power Pages portals:
 
-- **Step 1 — Email:** User enters their email address and clicks Send. The `sol_create_otp` Power Automate flow is called. It sends a verification code via one or more channels (SMS, college email, personal email) and returns a `channels` array with masked delivery addresses.
-- **Step 2 — OTP:** User enters the 6-digit code. The `sol_check_otp` flow validates it and returns the user's identity record. On success, session is stored in `sessionStorage` (30-min TTL) and the user is redirected.
+- **Step 1 — Email:** User enters their email address and clicks Send. The `smkb_sol_CreateOtp` Power Automate flow is called. It sends a verification code via one or more channels (SMS, college email, personal email) and returns a `channels` array with masked delivery addresses.
+- **Step 2 — OTP:** User enters the 6-digit code. The `smkb_sol_CheckOtp` flow validates it and returns the user's identity record. On success, session is stored in `sessionStorage` (30-min TTL) and the user is redirected.
 
 **Dev mode (no flows needed):** When `FLOW_CREATE_OTP_URL` is empty and `import.meta.env.DEV` is true, `createOtp` returns mock channels and `checkOtp` accepts `123456` as valid. Run `pnpm dev` immediately after copying the files to verify the screen works visually.
 
@@ -23,7 +23,7 @@ A two-step email → OTP authentication screen for Power Pages portals:
 
 Before integrating:
 
-1. **`@smkb/design-ui` installed** in the target app's `package.json`. The component uses `SmkbLoginPage`, `SmkbInput`, and `SmkbButton` from this package.
+1. **`@smkbacil/design-ui` installed** in the target app's `package.json`. The component uses `SmkbLoginPage`, `SmkbInput`, and `SmkbButton` from this package.
 2. **Vue Router** configured in the app (`createRouter` / `createWebHistory`).
 3. **Two Power Automate flows deployed** — build and deploy from `flow-templates/` before going to production. Dev mode works without them.
 4. **Power Pages portal** with a web template that renders the Vue app.
@@ -139,16 +139,16 @@ Search all copied files for `[ADAPT]` and resolve each one:
 Copy both files from `flow-templates/` into your solution's `Workflows/` folder:
 
 ```
-flow-templates/sol_create_otp-TEMPLATE.json  →  Workflows/[sol]_create_otp-[guid].json
-flow-templates/sol_check_otp-TEMPLATE.json   →  Workflows/[sol]_check_otp-[guid].json
+flow-templates/smkb_sol_CreateOtp-TEMPLATE.json  →  Workflows/smkb_[sol]_CreateOtp-[guid].json
+flow-templates/smkb_sol_CheckOtp-TEMPLATE.json   →  Workflows/smkb_[sol]_CheckOtp-[guid].json
 ```
 
 Replace placeholders throughout both files:
 
 | Placeholder | Replace with |
 |------------|-------------|
-| `sol_create_otp` | `[sol]_create_otp` (your solution prefix) |
-| `sol_check_otp` | `[sol]_check_otp` |
+| `smkb_sol_CreateOtp` | `smkb_[sol]_CreateOtp` (your solution prefix) |
+| `smkb_sol_CheckOtp` | `smkb_[sol]_CheckOtp` |
 | `[yourid]` | Connection reference logical name from your environment |
 | `[sol]` | Your solution prefix |
 | `TEMPLATE` in filename | A real GUID for the flow file |
@@ -159,7 +159,7 @@ Add both files to `Other/Solution.xml` `<RootComponents>` and `Customizations.xm
 
 Both flow templates contain a `IMPLEMENT_PLACEHOLDER` Compose action that marks what needs to be built. **Replace it** with real actions before the flow goes to production.
 
-**sol_create_otp:**
+**smkb_sol_CreateOtp:**
 1. Look up the user by email in your Dataverse table (return `NOT_FOUND` if absent)
 2. Check for rate limiting (e.g. max 3 OTPs per 10 minutes per email)
 3. Generate a 6-digit random OTP: `rand(100000, 999999)` expression in Power Automate
@@ -168,7 +168,7 @@ Both flow templates contain a `IMPLEMENT_PLACEHOLDER` Compose action that marks 
 6. Build the `channels` array with masked delivery addresses
 7. Pass to `Respond_to_PowerPages` as `@variables('channels_array')`
 
-**sol_check_otp:**
+**smkb_sol_CheckOtp:**
 1. Query the Dataverse OTP record for this email
 2. Return `NOT_FOUND` if no record exists; `LOCKED` if already locked
 3. Check expiry: return `LOCKED` (with appropriate message) if expired
@@ -229,7 +229,7 @@ If no `<script>` block exists yet, wrap both lines in a `<script>` tag and place
 
 ## 6. Auth Token — Protecting Subsequent Flows
 
-After OTP verification, `sol_check_otp` generates a server-side auth token (a UUID) and stores it in Dataverse with a 1-hour expiry. The token is returned to the browser and included in every subsequent flow call. Each authenticated flow validates the token before allowing any action.
+After OTP verification, `smkb_sol_CheckOtp` generates a server-side auth token (a UUID) and stores it in Dataverse with a 1-hour expiry. The token is returned to the browser and included in every subsequent flow call. Each authenticated flow validates the token before allowing any action.
 
 ### Why it matters
 
@@ -237,24 +237,26 @@ Without a token, any flow caller can supply an arbitrary `userId` in the request
 
 ### K. Create the Dataverse sessions table
 
-Before deploying `sol_check_otp`, create a table in your solution (e.g. `[sol]_sessions`) with these fields:
+Before deploying `smkb_sol_CheckOtp`, create a table in your solution — schema name `smkb_[sol]_Sessions` (PascalCase; see CLAUDE.md → Critical Rule 3) — with these fields:
 
-| Field schema name | Type | Notes |
+| Field (logical name) | Type | Notes |
 |-------------------|------|-------|
-| `sol_token` | Single line of text | Required; add a unique index |
-| `sol_userid` | Single line of text (or Lookup to your user table) | The authenticated user's record ID |
-| `sol_email` | Single line of text | For audit/debug only |
-| `sol_expires_at` | Date and Time (Behavior: Time-Zone Independent) | When the token expires |
+| `smkb_sol_token` | Single line of text | Required; add a unique index |
+| `smkb_sol_userid` | Single line of text (or Lookup to your user table) | The authenticated user's record ID |
+| `smkb_sol_email` | Single line of text | For audit/debug only |
+| `smkb_sol_expires_at` | Date and Time (Behavior: Time-Zone Independent) | When the token expires |
 
-Token TTL is 1 hour. Expired rows accumulate over time — add a scheduled cleanup flow (e.g. daily) that deletes rows where `sol_expires_at` is in the past.
+> Create the columns with **PascalCase schema** names (`smkb_[sol]_Token`, `smkb_[sol]_ExpiresAt`, …); Dataverse exposes their lowercased **logical** names (shown above) — those are what the flow JSON and OData responses use.
 
-### L. Wire up sol_check_otp
+Token TTL is 1 hour. Expired rows accumulate over time — add a scheduled cleanup flow (e.g. daily) that deletes rows where `smkb_sol_expires_at` is in the past.
 
-The `IMPLEMENT_Create_Auth_Session` action in `sol_check_otp-TEMPLATE.json` is pre-scaffolded. After implementing `IMPLEMENT_PLACEHOLDER`:
+### L. Wire up smkb_sol_CheckOtp
 
-1. Replace `entityName` with your session table's plural logical name (e.g. `sol_sessions`)
-2. Replace `sol_token`, `sol_email`, `sol_expires_at`, `sol_userid` with your actual field schema names
-3. Set `item/sol_userid` to the user record ID retrieved in `IMPLEMENT_PLACEHOLDER`
+The `IMPLEMENT_Create_Auth_Session` action in `smkb_sol_CheckOtp-TEMPLATE.json` is pre-scaffolded. After implementing `IMPLEMENT_PLACEHOLDER`:
+
+1. Replace `entityName` with your session table's plural logical name (e.g. `smkb_sol_sessions`)
+2. Replace `smkb_sol_token`, `smkb_sol_email`, `smkb_sol_expires_at`, `smkb_sol_userid` with your actual field schema names
+3. Set `item/smkb_sol_userid` to the user record ID retrieved in `IMPLEMENT_PLACEHOLDER`
 
 `Respond_to_PowerPages` already includes `authToken` and `authTokenExpiresAt` in the response body — no changes needed there.
 
@@ -298,12 +300,12 @@ export async function doSomethingProtected(param: string): Promise<...> {
 
 After `Validate_Auth_Token` passes, get the trusted user identity from:
 ```
-@first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['sol_userid']
+@first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['smkb_sol_userid']
 ```
 
 Use this expression — not `triggerBody()?['userId']` — in every Dataverse query or update. For example:
 ```
-$filter: sol_userid eq '@{first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['sol_userid']}'
+$filter: smkb_sol_userid eq '@{first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['smkb_sol_userid']}'
 ```
 
 This ensures the authenticated user can only read and modify their own record, even if they pass a different ID in the request body.

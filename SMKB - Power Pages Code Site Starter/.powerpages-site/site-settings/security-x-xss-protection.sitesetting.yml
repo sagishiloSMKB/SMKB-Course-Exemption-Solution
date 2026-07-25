@@ -1,0 +1,4 @@
+description: Disables the legacy browser XSS auditor. Setting to 0 is the correct modern default — the auditor introduced bypass vectors and is replaced by CSP.
+id: aaaaaaaa-0006-4000-8000-000000000006
+name: HTTP/X-XSS-Protection
+value: "0"

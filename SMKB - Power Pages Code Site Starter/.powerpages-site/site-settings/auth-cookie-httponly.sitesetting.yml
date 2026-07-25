@@ -1,0 +1,4 @@
+description: Prevents JavaScript from reading the authentication session cookie.
+id: aaaaaaaa-0001-4000-8000-000000000001
+name: Authentication/ApplicationCookie/CookieHttpOnly
+value: "true"

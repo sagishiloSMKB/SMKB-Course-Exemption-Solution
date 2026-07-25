@@ -1,0 +1,6 @@
+description: >-
+  Enforced Content Security Policy. Keep the report-only setting alongside this
+  one — it catches new violations as the site evolves.
+id: aaaaaaaa-0007-4000-8000-000000000007
+name: HTTP/Content-Security-Policy
+value: "default-src 'self'; script-src 'self' content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn 'nonce'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn; frame-ancestors 'self'; form-action 'self';"

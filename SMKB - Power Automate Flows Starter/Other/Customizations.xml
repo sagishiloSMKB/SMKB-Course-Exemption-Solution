@@ -4,17 +4,23 @@
   <Roles />
   <Workflows>
     <!--
-      Each Cloud Flow needs an entry here so the solution packager includes its JSON.
-      WorkflowId  = GUID from the filename (FlowName-{GUID}.json)
-      Category    = 5  (Modern Flow / Cloud Flow)
-      Type        = 1  (Modern)
-      Scope       = 4  (Organization)
-      StateCode   = 1  (Active)
-      StatusCode  = 2  (Active)
-      JsonFileName = path to the JSON inside the solution zip
+      THE THREE-FILE RULE: every flow must be registered in THREE places or the deploy fails
+      with "component not declared in the solution file as a root component":
+        1. Workflows/<name>-<GUID>.json          the flow definition
+        2. Other/Customizations.xml              a <Workflow WorkflowId="{GUID}"> entry (this file)
+        3. Other/Solution.xml                    a <RootComponent type="29" id="{GUID}"> entry
+      The GUID must be identical (lowercase, braces in XML) in all three.
+
+      NOTE: <Workflows> is NOT childless. An earlier draft of this starter said it should be -
+      that was wrong. Without a <Workflow> entry the JSON ships in the zip but Dataverse never
+      creates the Workflow record.
+
+      Field values below are the standard Cloud Flow settings:
+        Type=1 (Modern)  Category=5 (Cloud Flow)  Scope=4 (Organization)
+        StateCode=1 / StatusCode=2 (Active)
     -->
-    <Workflow WorkflowId="{00000000-0000-0000-0000-000000000001}" Name="sol_example_flow">
-      <JsonFileName>/Workflows/sol_example_flow-00000000-0000-0000-0000-000000000001.json</JsonFileName>
+    <Workflow WorkflowId="{00000000-0000-0000-0000-000000000001}" Name="SOL - Example Flow (Power Pages)">
+      <JsonFileName>/Workflows/smkb_sol_ExampleFlowPowerPages-00000000-0000-0000-0000-000000000001.json</JsonFileName>
       <Type>1</Type>
       <Subprocess>0</Subprocess>
       <Category>5</Category>
@@ -35,7 +41,32 @@
       <IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>
       <PrimaryEntity>none</PrimaryEntity>
       <LocalizedNames>
-        <LocalizedName languagecode="1033" description="SOL - Example Flow" />
+        <LocalizedName languagecode="1033" description="SOL - Example Flow (Power Pages)" />
+      </LocalizedNames>
+    </Workflow>
+    <Workflow WorkflowId="{00000000-0000-0000-0000-000000000002}" Name="SOL - Example Flow (Power Apps V2)">
+      <JsonFileName>/Workflows/smkb_sol_ExampleFlowPowerAppV2-00000000-0000-0000-0000-000000000002.json</JsonFileName>
+      <Type>1</Type>
+      <Subprocess>0</Subprocess>
+      <Category>5</Category>
+      <Mode>0</Mode>
+      <Scope>4</Scope>
+      <OnDemand>0</OnDemand>
+      <TriggerOnCreate>0</TriggerOnCreate>
+      <TriggerOnDelete>0</TriggerOnDelete>
+      <AsyncAutodelete>0</AsyncAutodelete>
+      <SyncWorkflowLogOnFailure>0</SyncWorkflowLogOnFailure>
+      <StateCode>1</StateCode>
+      <StatusCode>2</StatusCode>
+      <RunAs>1</RunAs>
+      <IsTransacted>1</IsTransacted>
+      <IntroducedVersion>1.0.0.0</IntroducedVersion>
+      <IsCustomizable>1</IsCustomizable>
+      <BusinessProcessType>0</BusinessProcessType>
+      <IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>
+      <PrimaryEntity>none</PrimaryEntity>
+      <LocalizedNames>
+        <LocalizedName languagecode="1033" description="SOL - Example Flow (Power Apps V2)" />
       </LocalizedNames>
     </Workflow>
   </Workflows>
@@ -48,6 +79,55 @@
   <WebResources />
   <CustomControls />
   <EntityDataProviders />
+  <!--
+    SMKB CONNECTION-REFERENCE BANK - environment-level shared resources. Never create a per-solution
+    copy of these; reuse the exact logical names below. This block deploys the connection-reference
+    METADATA alongside the flows. List one <connectionreference> per CONNECTOR TYPE your flows use.
+
+    All FOUR SMKB bank connectors are declared below - this folder IS the bank. Leave them all in
+    place; if your solution's flows genuinely never touch a connector you may delete that one entry,
+    but keeping the full bank is the default so every flow can reference it without re-adding metadata.
+
+    | Local key hint  ->  Logical name (put in flow JSON)  | Display name      | Connector                       |
+    | shared_office365       -> new_sharedoffice365_c3167          | SMKB - Outlook    | shared_office365                |
+    | shared_sharepointonline-> smkb_SMKBSharePointConnectionUser1 | SMKB - SharePoint | shared_sharepointonline         |
+    | shared_commondataservice-> msdyn_Dataverse                   | SMKB - Dataverse  | shared_commondataserviceforapps |
+    | shared_approvals       -> smkb_SMKBApprovals                 | SMKB - Approvals  | shared_approvals                |
+  -->
+  <connectionreferences>
+    <connectionreference connectionreferencelogicalname="new_sharedoffice365_c3167">
+      <connectionreferencedisplayname>SMKB - Outlook</connectionreferencedisplayname>
+      <connectorid>/providers/Microsoft.PowerApps/apis/shared_office365</connectorid>
+      <iscustomizable>1</iscustomizable>
+      <promptingbehavior>0</promptingbehavior>
+      <statecode>0</statecode>
+      <statuscode>1</statuscode>
+    </connectionreference>
+    <connectionreference connectionreferencelogicalname="smkb_SMKBSharePointConnectionUser1">
+      <connectionreferencedisplayname>SMKB - SharePoint</connectionreferencedisplayname>
+      <connectorid>/providers/Microsoft.PowerApps/apis/shared_sharepointonline</connectorid>
+      <iscustomizable>1</iscustomizable>
+      <promptingbehavior>0</promptingbehavior>
+      <statecode>0</statecode>
+      <statuscode>1</statuscode>
+    </connectionreference>
+    <connectionreference connectionreferencelogicalname="msdyn_Dataverse">
+      <connectionreferencedisplayname>SMKB - Dataverse</connectionreferencedisplayname>
+      <connectorid>/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps</connectorid>
+      <iscustomizable>1</iscustomizable>
+      <promptingbehavior>0</promptingbehavior>
+      <statecode>0</statecode>
+      <statuscode>1</statuscode>
+    </connectionreference>
+    <connectionreference connectionreferencelogicalname="smkb_SMKBApprovals">
+      <connectionreferencedisplayname>SMKB - Approvals</connectionreferencedisplayname>
+      <connectorid>/providers/Microsoft.PowerApps/apis/shared_approvals</connectorid>
+      <iscustomizable>1</iscustomizable>
+      <promptingbehavior>0</promptingbehavior>
+      <statecode>0</statecode>
+      <statuscode>1</statuscode>
+    </connectionreference>
+  </connectionreferences>
   <Languages>
     <Language>1033</Language>
   </Languages>

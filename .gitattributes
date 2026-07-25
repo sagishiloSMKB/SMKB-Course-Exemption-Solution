@@ -1,0 +1,5 @@
+# Keep the shell pre-commit hook and Node enforcement scripts LF-only.
+# A CRLF shell hook fails on Git Bash ("bad interpreter: /bin/sh^M") and would
+# silently disable the config-drift / doc-boundary gates on a fresh Windows clone.
+.githooks/pre-commit text eol=lf
+*.mjs               text eol=lf

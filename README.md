@@ -1,177 +1,96 @@
-# SMKB – Power Platform Solution Starter Kit
+# SMKB - Power Platform Solution Starter Kit
 
-This repository is the source-of-truth for SMKB Power Platform solution components — custom tables, environment variables, Power Automate flows, Power Apps Code Apps, and Power Pages sites. Components are defined as code, version-controlled in Git, and deployed to Dataverse using PAC CLI.
+This repository is an **orchestrator** for building an SMKB Power Platform solution from a set of
+self-contained starters — custom tables, environment variables, Power Automate flows, a Power Apps
+Code App, and a Power Pages Code Site. Components are defined as code, version-controlled in one Git
+repo, and deployed to Dataverse via the PAC CLI.
 
-> **Working with AI (Claude)?** Claude will always ask which starters to activate before touching any files, and will refuse to deploy until you confirm all placeholders have been replaced. See `CLAUDE.md` for the full rules.
+The root holds the init flow, the one solution-wide config, and the conventions that span all
+starters. Each starter owns its own build, deploy, and architecture docs. This README is the
+entry point; the operating rules live in [`CLAUDE.md`](CLAUDE.md).
+
+> **Working with AI (Claude)?** Claude asks which starters to activate before touching files, fills
+> solution identity from one config, and refuses to deploy until each starter's own guard passes.
+> See [`CLAUDE.md`](CLAUDE.md) for the full rules and the "Root vs Starters" ownership charter.
 
 ---
 
 ## Sub-Starters
 
-| Folder | What it covers | Use it when… |
-|--------|---------------|--------------|
-| `SMKB - Dataverse Tables Starter` | Custom table schemas (entities), forms, and views | Your solution needs its own data tables |
-| `SMKB - Environmental Variables Starter` | Environment variable definitions | Your solution has configuration values that differ per environment (URLs, keys, settings) |
-| `SMKB - Power Automate Flows Starter` | Cloud flow JSON files and deployment scripts | Your solution includes automated workflows or Power Pages–triggered flows |
-| `SMKB - Power Apps Starter` | Power Apps Code App SPA (Vue 3 + TypeScript, `pac code push`) | Your solution needs a staff/admin-facing interface inside Power Apps |
-| `SMKB - Power Page Starter` | Power Pages site source (client + powerpages folders) | Your solution includes a public-facing or internal web portal |
+Each starter is independent and reusable — activate only what your solution needs; the rest stay
+untouched with their template names. Full build/deploy/architecture docs live **inside each starter**:
 
-**Not every solution needs all starters.** A simple data-entry app may only need the Tables Starter. A background-automation solution may only need Flows and Env Vars. Choose only what applies — unused starters stay untouched with their placeholder names and are never deployed.
+| Starter | What it covers | Docs |
+|--------|---------------|------|
+| `SMKB - Dataverse Tables Starter` | Custom table schemas, forms, views | [README](SMKB%20-%20Dataverse%20Tables%20Starter/README.md) |
+| `SMKB - Environmental Variables Starter` | Environment variable definitions | [README](SMKB%20-%20Environmental%20Variables%20Starter/README.md) |
+| `SMKB - Power Automate Flows Starter` | Cloud flows packaged into a solution zip | [README](SMKB%20-%20Power%20Automate%20Flows%20Starter/README.md) |
+| `SMKB - Power Apps Starter` | Power Apps Code App SPA (Vue 3 + TS), UI-only, flow-backed | [README](SMKB%20-%20Power%20Apps%20Starter/README.md) · [CLAUDE.md](SMKB%20-%20Power%20Apps%20Starter/CLAUDE.md) |
+| `SMKB - Power Pages Code Site Starter` | Power Pages Code Site (Vue 3 SPA uploaded via PAC), flows-backed | [Getting Started](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/GETTING-STARTED.md) · [CLAUDE.md](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/CLAUDE.md) |
+
+**Not every solution needs all starters.** A simple data-entry app may only need Tables. A
+background-automation solution may only need Flows and Env Vars.
+
+---
+
+## One Config, Applied to Every Starter
+
+Solution identity (unique name, display name, short prefix, target environment, app/site names) is
+authored once in [`solution.config.json`](solution.config.json) and pushed into each activated
+starter's own config by [`apply-config.ps1`](apply-config.ps1):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File apply-config.ps1 -DryRun   # preview
+powershell -ExecutionPolicy Bypass -File apply-config.ps1           # apply
+powershell -ExecutionPolicy Bypass -File apply-config.ps1 -Check    # drift guard
+```
+
+You never hand-edit a starter's config to a value that disagrees with the root config — the `-Check`
+mode (run by the pre-commit hook) fails if they ever drift apart.
 
 ---
 
 ## Git Repository
 
-The entire starter kit lives in **one git repository** — a single root `.git` covers all starter folders. There are no nested repos, no submodules, no per-folder repositories.
+The entire starter kit lives in **one git repository** — a single root `.git` covers all starter
+folders. No nested repos, no submodules, no per-folder CI. Git and CI are owned at the root.
 
 ### Naming convention for real-solution repos
 
-When you fork or copy this starter kit to start a new solution, name the new repo following the same `SMKB - [Name] - [Type]` convention used for everything else:
+When you initialize a new solution from this kit, name the repo with the same `SMKB - [Name] - [Type]`
+convention used everywhere else:
 
 ```
-SMKB - [Solution Name] - Solution
+SMKB - [Solution Name] - Solution        (GitHub: SMKB-[Solution-Name]-Solution)
 ```
 
 | Solution | Local folder / repo name | GitHub repo name |
 |----------|--------------------------|-----------------|
 | Events & Tickets | `SMKB - Events Tickets - Solution` | `SMKB-Events-Tickets-Solution` |
 | Scholarship Applications | `SMKB - Scholarship Applications - Solution` | `SMKB-Scholarship-Applications-Solution` |
-| Alumni Network | `SMKB - Alumni Network - Solution` | `SMKB-Alumni-Network-Solution` |
 
-### Gitignore structure
+### Gitignore, hooks & CI
 
-A single root `.gitignore` covers all common patterns across all starters: build artifacts (`_dist/`, `dist/`), `node_modules/`, environment files, logs, and IDE/OS files. The Power Pages Starter has its own additional `.gitignore` only for portal-specific patterns (webfile.yml stubs, font binaries).
+There is **one** `.gitignore`, at the repo root — this is a single-repository monorepo (one `.git`, no
+nested repos or submodules). It covers build artifacts (`_dist/`, `dist/`), `node_modules/`, env files,
+IDE/OS files, **and** the few starter-specific patterns (Cloud Flows `deployment-settings.json` /
+`*_unpacked/`, Power Pages Code Site `.portalconfig/*-manifest.yml`); starters do **not** carry their own
+`.gitignore`. The one pre-commit hook lives at the root in `.githooks/pre-commit`
+(opt-in: `git config core.hooksPath .githooks`); it lints each starter with its own toolchain and runs
+the config-drift and doc-boundary checks.
 
-> Do not add a per-starter `.gitignore` unless it needs patterns the root cannot express.
+Continuous integration is owned at the root too: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+runs flow-lint plus each code app's lint & unit tests on every push to `main` and every PR. It
+auto-discovers the flow-lint checker and the SPA folders, so it keeps working after Init Project renames
+the starters; set the `NPM_TOKEN` repo secret so the private `@smkbacil` package installs. An optional
+Solution Checker job is included commented-out.
 
-### First time cloning this starter kit?
+### First time using this starter kit?
 
-See [`INIT_PROJECT.md`](INIT_PROJECT.md) — the one-time setup guide that walks through disconnecting from the template remote, creating your solution repo, selecting starters, gathering specs, and building an implementation plan. This is different from starting a regular session on an already-initialized project.
-
----
-
-## Starting a New Solution — 5 Steps
-
-### Step 1 — Decide which starters you need
-
-Answer these questions:
-
-| Question | If yes → activate |
-|----------|------------------|
-| Does your solution store data in custom Dataverse tables? | Tables Starter |
-| Does your solution have config values that change per environment? | Env Vars Starter |
-| Does your solution include automated flows or Power Pages–triggered logic? | Flows Starter |
-| Does your solution need a staff/admin interface inside Power Apps? | Power Apps Starter |
-| Does your solution include a web portal? | Power Pages Starter |
-
-Starters you don't need: **leave them completely alone**. Do not rename files, do not run deploy.ps1, do not change placeholders. They are templates for future use.
-
-### Step 2 — Choose your solution short name and rename the active starter folders
-
-**Short name (component prefix):**  
-Pick a short lowercase identifier for your solution. This becomes the **prefix** for every component name.
-
-| Solution | Short name | Example component |
-|----------|-----------|-------------------|
-| Events & Tickets | `evt` | `evt_sessions`, `evt_PORTAL_URL` |
-| Scholarship Applications | `sch` | `sch_applications`, `sch_STATUS_EMAIL` |
-| Alumni Network | `alm` | `alm_members`, `alm_send_welcome` |
-
-**Rule:** short names must be 2–5 lowercase letters, no numbers, no underscores.
-
-**Folder rename convention:**  
-For each starter you are activating, rename its folder from the template name to the project-specific name:
-
-```
-SMKB - [Component Name] - [Type Label]
-```
-
-| Type Label | Used for |
-|-----------|---------|
-| `Dataverse Tables` | Tables Starter |
-| `Environmental Variables` | Env Vars Starter |
-| `Cloud Flows` | Flows Starter |
-| `Power App` | Power Apps Starter |
-| `Power Page` | Power Pages Starter |
-
-**Example — Events Tickets solution uses all 5 starters:**
-```
-SMKB - Events Tickets - Dataverse Tables
-SMKB - Events Tickets - Environmental Variables
-SMKB - Events Tickets - Cloud Flows
-SMKB - Events Backoffice - Power App
-SMKB - Events RSVP - Power Page
-```
-
-Unused starters keep their original `SMKB - X Starter` name — do not rename them.
-
-### Step 3 — Replace all placeholders in each active starter
-
-Each active starter contains placeholder strings that must be replaced before anything is deployed. See the "Activation Guide" section at the top of each starter's `README.md` for the exact list of what to replace.
-
-**Common placeholders across all starters:**
-
-| Placeholder | Replace with |
-|-------------|-------------|
-| `YourSolutionName` | Your solution's unique name (e.g. `SMKBEvents`) |
-| `Your Solution Name` | Your solution's display name (e.g. `SMKB – Events`) |
-| `sol` (prefix) | Your solution short name (e.g. `evt`) |
-| `sol_example_*` | Your actual component names |
-| `sol_EXAMPLE_*` | Your actual variable names |
-
-### Step 4 — Deploy only the active starters
-
-Run `deploy.ps1` inside each active starter folder. All deploy scripts target **SMKB-Apps-Dev only** — Stage and Production are promoted via Power Platform Pipeline, never via script.
-
-```powershell
-# Tables Starter
-powershell -ExecutionPolicy Bypass -File ".\SMKB - Dataverse Tables Starter\deploy.ps1"
-
-# Env Vars Starter
-powershell -ExecutionPolicy Bypass -File ".\SMKB - Environmental Variables Starter\deploy.ps1"
-
-# Flows Starter
-powershell -ExecutionPolicy Bypass -File ".\SMKB - Power Automate Flows Starter\deploy.ps1"
-
-# Power Apps Starter (requires pnpm install first)
-powershell -ExecutionPolicy Bypass -File ".\SMKB - Power Apps Starter\deploy.ps1"
-
-# Power Pages Starter (uses pnpm deploy, not deploy.ps1 — run from the client/ subfolder)
-cd ".\SMKB - Power Page Starter\client"
-pnpm deploy
-```
-
-> **Power Pages note:** the Power Pages Starter deploys via `pnpm deploy` (not `deploy.ps1`). Run it from inside the `client/` subfolder. See the starter's README for prerequisites and the full first-deploy checklist.
-
-### Step 5 — Leave unused starters untouched
-
-Unused starters keep their placeholder names forever (until another solution activates them). This is intentional — they are reusable templates.
-
----
-
-## Golden Rule
-
-> **Never deploy a starter that still contains placeholder names.**
->
-> If any file still says `YourSolutionName`, `sol_example_*`, or `sol_EXAMPLE_*` — stop and complete the replacement first. Deploying with placeholder names will create components with generic names that may conflict with templates used by future solutions.
-
----
-
-## Publisher & Environment Reference
-
-| Setting | Value |
-|---------|-------|
-| Publisher Unique Name | `SKMBCore` |
-| Customization Prefix | `smkb` |
-| Option Value Prefix | `39041` |
-
-| Environment | Purpose | Dataverse URL | Deploy method |
-|-------------|---------|---------------|---------------|
-| SMKB-Apps-Dev | Development & testing | `https://org229c958d.crm4.dynamics.com/` | Direct (`deploy.ps1`) |
-| SMKB-Apps-Stage | Staging / UAT | — | Power Platform Pipeline only |
-| SMKB-Apps-Prod | Production | — | Power Platform Pipeline only |
-
-> **PAC CLI auth note:** The profile named "SMKB-Apps-Dev" incorrectly targets `org1dce1895`. Always pass `--environment <url>` explicitly, or rely on the default URL in each `deploy.ps1`.
+See [`INIT_PROJECT.md`](INIT_PROJECT.md) — the one-time setup guide that disconnects from the template
+remote, creates your solution repo, gathers specs, selects and renames starters, fills
+`solution.config.json`, and deploys. Publisher, environment, naming, and deployment rules are all in
+[`CLAUDE.md`](CLAUDE.md) (the single source of truth for conventions).
 
 ---
 
@@ -179,39 +98,27 @@ Unused starters keep their placeholder names forever (until another solution act
 
 ```
 SMKB - Power Platform Solution Starter Kit/
+|
+├── CLAUDE.md                                 <- Orchestration + global rules (read first)
+├── README.md                                 <- This file
+├── INIT_PROJECT.md                           <- One-time solution setup flow
+├── solution.config.json                      <- Single source of truth for solution identity
+├── apply-config.ps1                          <- Pushes identity into every activated starter
+├── scripts/check-doc-boundaries.mjs          <- Doc-boundary + link enforcement
+├── .githooks/pre-commit                      <- The one repo-wide pre-commit hook
+├── .github/workflows/ci.yml                   <- CI: flow-lint + per-app lint/tests (rename-proof)
+├── .gitattributes                            <- Pins the hook + *.mjs to LF (Windows-clone safe)
+├── docs/                                      <- Solution-documentation TEMPLATES (filled per solution at init)
+├── TESTING-STRATEGY.md                        <- The layered testing method (house standard)
+├── audit/                                     <- Pre-go-live security / UX audit templates
+├── STARTER_AGENT_FEEDBACK_AND_NOTES.md        <- Append-only log during Init Project
 │
-├── CLAUDE.md                                ← AI assistant rules (read before doing anything)
-├── README.md                                ← This file
+├── SMKB - Dataverse Tables Starter/          <- Custom table schemas (README, deploy.ps1, Entities/, Other/)
+├── SMKB - Environmental Variables Starter/   <- Env var definitions (README, deploy.ps1, environmentvariabledefinitions/, Other/)
+├── SMKB - Power Automate Flows Starter/      <- Cloud flows (README, deploy.ps1, Workflows/, Other/, tools/flow-lint/)
+├── SMKB - Power Apps Starter/                <- Code App SPA (README, CLAUDE.md, deploy.ps1, src/, power.config.json)
+├── SMKB - Power Pages Code Site Starter/     <- Code Site SPA (CLAUDE.md, GETTING-STARTED.md, src/, .powerpages-site/, .claude/skills/)
 │
-├── SMKB - Dataverse Tables Starter/         ← Custom table schemas
-│   ├── README.md
-│   ├── deploy.ps1
-│   ├── Entities/
-│   └── Other/
-│
-├── SMKB - Environmental Variables Starter/  ← Environment variable definitions
-│   ├── README.md
-│   ├── deploy.ps1
-│   ├── environmentvariabledefinitions/
-│   └── Other/
-│
-├── SMKB - Power Automate Flows Starter/     ← Cloud flow JSON files
-│   ├── README.md
-│   ├── deploy.ps1
-│   ├── Workflows/
-│   └── Other/
-│
-├── SMKB - Power Apps Starter/               ← Power Apps Code App SPA
-│   ├── README.md
-│   ├── deploy.ps1
-│   ├── deploy.config.json
-│   ├── power.config.json
-│   ├── package.json
-│   ├── vite.config.ts
-│   └── src/
-│
-└── SMKB - Power Page Starter/               ← Power Pages site source
-    ├── README.md
-    ├── client/
-    └── powerpages/
+├── SMKB - Component Library/                 <- Reusable UI recipes (e.g. OTP Auth Screen); @smkbacil/design-ui is an external npm package
+└── onboarding SMKB Apps Development/          <- Pre-init learning app (removed during Init Project)
 ```

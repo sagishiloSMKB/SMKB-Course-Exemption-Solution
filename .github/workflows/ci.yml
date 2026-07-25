@@ -1,0 +1,106 @@
+name: CI
+
+# Deterministic quality gates for every push / PR — no cloud auth required for the core jobs.
+# The same checks run in each component's deploy script, so a deploy can never ship something CI
+# would reject.
+#
+# This workflow is FOLDER-RENAME PROOF: it auto-discovers the Cloud Flows' flow-lint checker and the
+# code-app (SPA) folders, so it keeps working after Init Project renames the starters. Jobs skip
+# gracefully when their target isn't present (e.g. a starter that wasn't activated).
+#
+# `NPM_TOKEN` (a read token for the private @smkbacil scope) must be set as a repo secret for the SPA
+# installs to resolve @smkbacil/design-ui.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  flow-lint:
+    name: flow-lint (cloud flows + solution XML)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Zero-dependency Node ESM — no install needed. Auto-discover the checker wherever the (renamed)
+      # Cloud Flows starter put it; skip if the Flows starter isn't activated.
+      - name: Run flow-lint
+        shell: bash
+        run: |
+          lint=$(find . -path '*/tools/flow-lint/lint.mjs' -not -path '*/node_modules/*' | head -1)
+          if [ -z "$lint" ]; then
+            echo "No flow-lint checker found (Cloud Flows starter not activated) — skipping."
+            exit 0
+          fi
+          echo "Running $lint"
+          node "$lint"
+
+  discover-spas:
+    name: discover code-app folders
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.find.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        shell: bash
+        # A code-app SPA folder = a top-level dir with a package.json AND an eslint config.
+        # Excludes the onboarding app (removed at init) and anything without lint wiring.
+        run: |
+          apps=$(for d in */; do
+            d="${d%/}"
+            case "$d" in onboarding*|node_modules|.*) continue;; esac
+            if [ -f "$d/package.json" ] && ls "$d"/eslint.config.* >/dev/null 2>&1; then
+              printf '%s\n' "$d"
+            fi
+          done | jq -R -s -c 'split("\n") | map(select(length>0))')
+          echo "apps=$apps" >> "$GITHUB_OUTPUT"
+          echo "Discovered: $apps"
+
+  spa-checks:
+    name: ${{ matrix.app }} (lint + unit tests)
+    needs: discover-spas
+    if: needs.discover-spas.outputs.apps != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.discover-spas.outputs.apps) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # The committed .npmrc reads ${NPM_TOKEN} for the private @smkbacil/design-ui scope.
+      - name: Install
+        working-directory: ${{ matrix.app }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm install --no-audit --no-fund
+      - name: Lint
+        working-directory: ${{ matrix.app }}
+        run: npm run lint
+      - name: Unit tests
+        working-directory: ${{ matrix.app }}
+        run: npm test --if-present
+
+  # OPTIONAL — Power Platform Solution Checker (Microsoft's static analysis, complements flow-lint).
+  # Enable by setting the AZURE_* service-principal secrets and uncommenting. Export the solution
+  # first (pac solution export) and point `path` at the zip. Use the Dev env URL from solution.config.json.
+  #
+  # solution-check:
+  #   name: Solution Checker
+  #   runs-on: windows-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: microsoft/powerplatform-actions/actions-install@v1
+  #     - uses: microsoft/powerplatform-actions/check-solution@v1
+  #       with:
+  #         environment-url: ${{ secrets.DATAVERSE_ENV_URL }}
+  #         app-id: ${{ secrets.AZURE_CLIENT_ID }}
+  #         client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+  #         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+  #         path: ./out/solution.zip   # export first with pac solution export

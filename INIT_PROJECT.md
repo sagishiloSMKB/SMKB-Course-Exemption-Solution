@@ -61,18 +61,17 @@ Init Project is a collaboration between the agent and the developer. The agent h
 | Task | Agent | Developer |
 |------|-------|-----------|
 | Rename starter folders | ✓ | |
-| Replace all placeholders in files | ✓ | |
+| Fill `solution.config.json` + run `apply-config.ps1` (identity) | ✓ | |
+| Author schema/flow/content details in each starter | ✓ | |
 | `pac --version` / `pac auth list` (verify setup) | Tries first | Run manually + paste output if agent's shell can't find `pac` |
-| `pac pages list` (get site GUID for Step 11) | Tries first | Run manually + paste output if agent's shell can't find `pac` |
+| `pac pages list` (get site GUID) | Tries first | Run manually + paste output if agent's shell can't find `pac` |
 | `pac auth select` / `pac auth create` (change active profile) | — | Must run locally — blocked in agent settings |
-| `pnpm install` in starter folders (Step 5b) | — | Must run locally — required before first commit touching .vue/.ts |
-| Run `guid-freshen.ps1` (Step 7b) | — | Must run locally (PowerShell) |
-| Run `deploy.ps1` / `pnpm deploy` | When you say "deploy" | Confirm auth is correct first |
-| Visit portal URL in browser (first provisioning) | — | Must do in browser |
+| `pnpm install` / `npm install` in starter folders (Step 5b) | — | Must run locally — required before first commit touching .vue/.ts |
+| Run `deploy.ps1` / a starter's deploy flow | When you say "deploy" | Confirm auth is correct first |
+| Provision + deploy the Power Pages Code Site (`/ppcs-provision-site`, `/ppcs-deploy`) | Drives the skills | Runs local PowerShell/`pac`, visits portal in browser |
 | Set env var values in Maker portal | — | Power Apps Maker → Solutions → your solution → Env Vars |
 | Confirm flow connection references + turn on flows | — | Power Automate portal → Solutions → your solution → Cloud Flows |
 | Create app record (`pac code init`) | — | Must run locally before first push |
-| Run Step 11 PAC CLI commands to add portal to solution | — | Must run locally (PowerShell) |
 | Stage and push commits | When you say "commit" / "push" | Confirm each time |
 
 ---
@@ -128,28 +127,27 @@ If the output already points to a solution-specific repo (e.g. `SMKB-Events-Tick
 
 ### Step 2 — Gather solution identity
 
-Collect the following from the developer:
+Collect the following from the developer. These are exactly the values you will enter into
+[`solution.config.json`](solution.config.json) in Step 7b:
 
 | Item | Format | Example |
 |------|--------|---------|
 | **Solution name** | Human display name, title case | `Events Tickets` |
 | **Solution unique name** | PascalCase, no spaces, no underscores | `SMKBEventsTickets` |
-| **Solution display name** | With org prefix and dash | `SMKB – Events Tickets` |
+| **Solution display name** | With org prefix and ASCII hyphen | `SMKB - Events Tickets` |
 | **Short name (prefix)** | 2–5 lowercase letters only, no numbers | `evt` |
+| **Target environment** | Dataverse URL + environment ID | `https://org229c958d.crm4.dynamics.com/` |
 
 Derived values (confirm with the developer):
-- Local folder / repo name: `SMKB - [Solution Name] - Solution`  
-  Example: `SMKB - Events Tickets - Solution`
-- GitHub repo name: `SMKB-[Solution-Name-Words-Joined-By-Hyphens]-Solution` — derived from the **human display name**, NOT the PascalCase unique name  
-  Example: "Events Tickets" → `SMKB-Events-Tickets-Solution` ✓  
-  NOT: "SMKBEventsTickets" → `SMKB-EventsTickets-Solution` ✗
+- Local folder / repo name: `SMKB - [Solution Name] - Solution` — e.g. `SMKB - Events Tickets - Solution`
+- GitHub repo name: derived from the **human display name**, not the PascalCase unique name — e.g. "Events Tickets" → `SMKB-Events-Tickets-Solution` ✓ (NOT `SMKB-EventsTickets-Solution` ✗)
 
 **Validation rules:**
-- Unique name must be alphanumeric, PascalCase, max 50 characters
-- Short name must be 2–5 lowercase letters only — no numbers, no underscores, no hyphens
-- Short name drives ALL component naming for this solution — every table, flow, and env var will be prefixed with it
+- Unique name: alphanumeric, PascalCase, max 50 characters
+- Short name: 2–5 lowercase letters only — no numbers, underscores, or hyphens; must be unique across all solutions in SMKB-Apps-Dev (see CLAUDE.md → Critical Rule 5)
+- **Display names use ASCII hyphens only** (` - `), never a Unicode en/em dash — see CLAUDE.md → Critical Rule 3
 
-> **Component-level names (Power Pages and Power Apps)** are collected in Step 8 when you gather specifications. Each Power Pages site and each Power App gets its own **Functional Component Name** — a short phrase describing what that specific site or app does, not just the solution name repeated. A single solution can have multiple sites and multiple apps, each with a different name.
+> **Component-level names (Power Pages and Power Apps)** are collected in Step 8. Each Power Pages Code Site and each Power App gets its own **Functional Component Name** — a short phrase describing what that specific site or app does. A single solution can have multiple sites and multiple apps, each with a different name.
 
 ---
 
@@ -222,40 +220,38 @@ git push -u origin main
 Verify the remote is set correctly:
 ```powershell
 git remote -v
-# Expected: origin  https://github.com/SMKB-AC-IL/SMKB-Events-Tickets-Solution.git (fetch)
-#           origin  https://github.com/SMKB-AC-IL/SMKB-Events-Tickets-Solution.git (push)
+# Expected: origin  https://github.com/SMKB-AC-IL/SMKB-Events-Tickets-Solution.git (fetch/push)
 ```
 
 ---
 
 ### Step 5b — Enable git hooks and install dependencies
 
-Run once to activate the pre-commit security linter for this working copy:
+Run once to activate the repo-wide pre-commit gate for this working copy:
 
 ```powershell
 git config core.hooksPath .githooks
 ```
 
-This tells Git to use the `.githooks/` folder (version-controlled) instead of `.git/hooks/`. After this, any commit that touches `.vue` or `.ts` files will automatically run ESLint before the commit completes — catching XSS patterns (`v-html`), debug statements (`console.log`), and other Vue/TS security rules.
+This tells Git to use the root `.githooks/` folder instead of `.git/hooks/`. The one root hook then, on each commit: lints staged `.vue`/`.ts`/`.tsx` files with each starter's own ESLint; runs `flow-lint` on staged Cloud Flows files (once the solution is initialized); runs `apply-config.ps1 -Check` (fails if a starter config has drifted from `solution.config.json`); and runs `scripts/check-doc-boundaries.mjs` (fails on retired-architecture references or broken doc links). Steps skip gracefully when their toolchain isn't installed.
 
-> **Note:** This is a local git config setting. Every developer who clones this repo must run this command once in their working copy.
+> **Note:** This is a local git config setting. Every developer who clones this repo runs it once.
 
-**Install dependencies for activated starters (required for the hook to work):**
+**Install dependencies for the activated code starters (required for the lint gate):**
 
-The ESLint hook calls `pnpm run lint`, which requires `node_modules` to be present. Run `pnpm install` in every starter folder that has a `package.json` — otherwise the hook will fail on the first commit that touches a `.vue` or `.ts` file.
+The lint gate calls each starter's local ESLint, which needs `node_modules`. Install in every activated starter that has a `package.json`:
 
 ```powershell
-# Run in each activated starter that has a package.json:
-# Power Pages — run inside the client/ subfolder
-cd "SMKB - [Your Portal Name] - Power Page\client"
-pnpm install
-
-# Power Apps — run inside the starter folder root
+# Power Apps — pnpm, at the starter root
 cd "SMKB - [Your App Name] - Power App"
 pnpm install
+
+# Power Pages Code Site — npm, at the starter root (it is a flat project, no client/ subfolder)
+cd "SMKB - [Your Site Name] - Power Pages Code Site"
+npm install
 ```
 
-Skip this for starters that do not have a `package.json` (Tables, Env Vars, Flows).
+Skip this for starters without a `package.json` (Tables, Env Vars, Flows).
 
 ---
 
@@ -271,9 +267,9 @@ Do NOT select starters before gathering specifications — choosing starters fro
 | Config values that differ per environment | Environmental Variables Starter |
 | Automated flows or Power Pages-triggered logic | Cloud Flows Starter |
 | Staff/admin-facing interface inside Power Apps | Power Apps Starter |
-| Public-facing or internal web portal | Power Pages Starter |
+| Public-facing or internal web portal | Power Pages Code Site Starter |
 
-Starters that are NOT activated must remain completely untouched — do not rename them, do not modify any files, do not deploy them.
+Starters that are NOT activated must remain completely untouched — do not rename them, modify files, or deploy them.
 
 ---
 
@@ -285,9 +281,7 @@ For each selected starter, rename its folder from the template name to the solut
 SMKB - X Starter  →  SMKB - [Component Name] - [Type Label]
 ```
 
-### Tables, Env Vars, and Flows — use the Solution Name as the Component Name
-
-These are solution-wide resources. Their Component Name is simply the solution name:
+**Tables, Env Vars, and Flows — use the Solution Name as the Component Name** (they are solution-wide resources):
 
 | Starter | Type Label | Example rename |
 |---------|-----------|---------------|
@@ -295,188 +289,130 @@ These are solution-wide resources. Their Component Name is simply the solution n
 | Environmental Variables Starter | `Environmental Variables` | `SMKB - Events Tickets - Environmental Variables` |
 | Power Automate Flows Starter | `Cloud Flows` | `SMKB - Events Tickets - Cloud Flows` |
 
-### Power App and Power Pages — use a Functional Component Name
+**Power App and Power Pages Code Site — use a Functional Component Name** (named after what they **do**, not the solution):
 
-These components are NOT named after the solution — they are named after what they **do**. The Component Name must describe the specific purpose of that app or site.
+| Starter | Type Label | Example rename |
+|---------|-----------|----------------|
+| Power Apps Starter | `Power App` | `SMKB - Events Backoffice - Power App` |
+| Power Pages Code Site Starter | `Power Pages Code Site` | `SMKB - Events RSVP - Power Pages Code Site` |
 
-| Starter | Type Label | Component Name | Example rename |
-|---------|-----------|---------------|----------------|
-| Power Apps Starter | `Power App` | What the app is for (e.g. staff backoffice) | `SMKB - Events Backoffice - Power App` |
-| Power Page Starter | `Power Page` | What the site is for (e.g. public RSVP form) | `SMKB - Events RSVP - Power Page` |
-
-The Component Name you choose here must be consistent across three places:
+The Component Name must be consistent across:
 
 | Object | Convention | Example |
 |--------|-----------|---------|
-| Repo folder | `SMKB - [Name] - Power App` / `Power Page` | `SMKB - Events Backoffice - Power App` |
+| Repo folder | `SMKB - [Name] - Power App` / `Power Pages Code Site` | `SMKB - Events Backoffice - Power App` |
 | Power Platform display name | `SMKB - [Name] - Dev` | `SMKB - Events Backoffice - Dev` |
-| Portal subdomain (Power Pages only) | `[name-lowercase]-dev` | `events-backoffice-dev` → `events-backoffice-dev.powerappsportals.com` |
+| Power Pages `solution.ts` `siteName` (the **bare** name — apply-config derives `[PREFIX] - [Name]`; do not pre-prefix) | `[Name]` | `Events RSVP` → site becomes `EVT - Events RSVP` |
 
-**Multiple sites and apps:** A solution can have more than one Power Pages starter and more than one Power Apps starter. Each gets its own descriptive name — never reuse the same folder for two different functions:
-
-```
-SMKB - Events RSVP - Power Page          <- public registration form
-SMKB - Events Admin Portal - Power Page  <- staff event management portal
-SMKB - Events Backoffice - Power App     <- internal management app
-```
-
-Renaming does not break any deploy script — all scripts use `$PSScriptRoot`.
+**Multiple sites and apps:** a solution can have more than one of each — give each its own descriptive name; never reuse one folder for two functions. Renaming does not break any deploy script (all use `$PSScriptRoot`).
 
 ---
 
-### Step 7b — Freshen Power Pages GUIDs (Power Pages only)
+### Step 7b — Fill the solution config and apply it
 
-> **Skip this step if the Power Pages starter was NOT activated.**
+> **Skills ship with the kit.** The starter provides `/slash` skills for the build/deploy/quality steps
+> below (auto-discovered from `.claude/skills/`, directory-scoped — see CLAUDE.md → "Skills"). Prefer them
+> over doing the task by hand. If a skill isn't in the `/` menu yet, restart Claude Code. This step has one:
+> **`/solution-config`** (interviews for identity, validates the rules, and runs apply-config for you).
 
-**Why this step exists:** Every portal initialized from this starter kit starts with identical hardcoded GUIDs. When `pac pages upload` runs, it upserts Dataverse records by primary key. If two portals share the same GUIDs, the second upload silently steals records from the first portal, breaking both. This has already happened in production (May 2026). This step replaces every portal-scoped GUID with fresh random GUIDs so your portal is completely isolated.
-
-**Before running these scripts**, make sure:
-1. The portal folder has been renamed (Step 7 is complete)
-2. `adx_websiteid` in `website.yml` has been set to the real GUID from `pac pages list`
+Solution identity lives in one file: [`solution.config.json`](solution.config.json). Fill it with the
+values from Step 2 (and the app/site names from Steps 7–8), set the `activate` flags for the starters
+you renamed, then push everything into the starters at once (or just run **`/solution-config`**):
 
 ```powershell
-# Replace <your-portal-folder> with the renamed folder (e.g. smkb---events-rsvp-dev)
-powershell -ExecutionPolicy Bypass -File "SMKB - Events RSVP - Power Page\powerpages\<your-portal-folder>\guid-freshen.ps1"
-powershell -ExecutionPolicy Bypass -File "SMKB - Events RSVP - Power Page\powerpages\<your-portal-folder>\verify-consistency.ps1"
+# 1. Edit solution.config.json — set solutionUniqueName, solutionDisplayName, shortPrefix,
+#    targetEnvUrl, environmentId, activate flags, powerApps.appDisplayName, powerPages.* names.
+
+# 2. Preview, then apply
+powershell -ExecutionPolicy Bypass -File apply-config.ps1 -DryRun
+powershell -ExecutionPolicy Bypass -File apply-config.ps1
 ```
 
-If `verify-consistency.ps1` reports errors, fix them before continuing.
+This writes the solution name, display names, short prefix, environment, Power Apps app display name,
+Power Pages site name/titles, and the ALM env-var schema names (`smkb_sol_EnvironmentName` /
+`smkb_sol_FlowErrorEmails` → `smkb_<prefix>_…`) into each activated starter's own config files. It deliberately
+leaves platform-assigned placeholders (app IDs, workflow GUIDs, site-setting GUIDs, connection
+references, table/flow scaffold names) untouched — those are resolved in Steps 9–10b. Re-running is
+safe and idempotent.
 
-> **Warning:** Run `guid-freshen.ps1` exactly once per portal — before the first deploy and never again. Running it a second time generates new GUIDs that no longer match what is in Dataverse, breaking the live site.
-
----
-
-### Step 7c — (Power Pages only) Note on blank portal default pages
-
-> **Skip this step if the Power Pages starter was NOT activated.**
-
-No action needed here — this is an awareness note for Step 10b.5.
-
-When you created the blank portal at make.powerpages.microsoft.com (before Step 7), Power Pages silently provisioned a full set of default page records in Dataverse (Home, Access Denied, Page Not Found, Profile, Search) with platform-assigned GUIDs. Those records exist in Dataverse RIGHT NOW under your website ID.
-
-After the first `pnpm deploy` (Step 10b), your pages are uploaded as ADDITIONAL records alongside the blank portal's. Both sets coexist. Power Pages URL routing picks whichever root page has the lower GUID — which may be the blank portal's page, not yours. If the blank portal's page "wins", it looks for its content page in your language → finds none → "Page Not Found".
-
-This is not visible until after the first deploy. **Step 10b.5 fixes it automatically** using `deconflict-portal.ps1`, which runs after the first deploy and creates override files to relocate the blank portal's pages to non-conflicting URLs.
+> After this step, `apply-config.ps1 -Check` should report **no drift**. The pre-commit hook runs the
+> same check, so identity can never silently diverge between the root config and a starter.
 
 ---
 
 ### Step 8 — Gather solution specifications
 
-For each activated starter, collect enough detail to drive placeholder replacements and implementation. Ask the developer:
+For each activated starter, collect enough detail to drive implementation. Ask the developer:
 
-**For each Table:**
-- Entity name and display name (e.g., `evt_session`, "CIF Session" — include a solution prefix in the display name to avoid ambiguity in shared environments)
-- Key fields: name, type, required/optional
-- Relationships to other tables (if any)
+**For each Table:** schema name `smkb_<prefix>_<PascalName>` (e.g. `smkb_evt_Session`) and display name `EVT - Session`, key fields (name, type, required/optional), relationships to other tables. (See CLAUDE.md → Critical Rule 3 for the naming rule + the Dataverse lowercase-logical-name nuance.)
 
-**For each Environment Variable:**
-- Variable name following `[PREFIX]_VAR_NAME` convention (e.g., `EVT_PORTAL_BASE_URL`)
-- Type: String / Number / Boolean / JSON / Secret
-- Default value (or none if environment-specific)
-- Purpose
+**For each Environment Variable:** schema name `smkb_<prefix>_<PascalName>` (e.g. `smkb_evt_PortalBaseUrl`), display `EVT - Portal Base URL`, type (String / Number / Boolean — **use String + semicolons for lists, never JSON**; see CLAUDE.md → Critical Rule 5), default value (or none if environment-specific), purpose.
 
-**For each Cloud Flow:**
-- Flow name following `[prefix]_flow_name` convention (e.g., `evt_send_confirmation`)
-- Trigger type: Power Pages form submission, scheduled, or other
-- What it does: the logic, recipients, subject/body
-- Input parameters (if triggered from Power Pages)
+**For each Cloud Flow:** schema name `smkb_<prefix>_<PascalName>` (e.g. `smkb_evt_SendConfirmation`), display `EVT - Send Confirmation`, trigger type (Power Pages request, scheduled, Dataverse row), what it does (logic, recipients, subject/body), input parameters. Power Pages-triggered flows follow the HTTP 200 + `errorCode` contract — see the Power Pages starter's [flow-error contract](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/FLOW-ERROR-CONTRACT.md).
 
-**For each Power App:**
-- **Functional Component Name** — the name chosen in Step 7 (e.g. `Events Backoffice`)
-- **App display name in Power Platform** — `SMKB - [Functional Component Name] - Dev` (e.g. `SMKB - Events Backoffice - Dev`)
-- Which Dataverse tables it reads and writes
-- Key screens and their purpose
+**For each Power App:** Functional Component Name (Step 7), app display name `SMKB - [Name] - Dev`, which Dataverse tables it reads/writes, key screens.
 
-**For each Power Pages site:**
-- **Functional Component Name** — the name chosen in Step 7 (e.g. `Events RSVP`)
-- **Portal display name in Power Platform** — `SMKB - [Functional Component Name] - Dev` (e.g. `SMKB - Events RSVP - Dev`)
-- **Portal subdomain** — `[functional-component-name]-dev` in lowercase with hyphens (e.g. `events-rsvp-dev`)
-- **Site address** — `[subdomain].powerappsportals.com` (e.g. `events-rsvp-dev.powerappsportals.com`)
-- Key pages and forms
-- Auth requirements: public access vs Azure AD
+**For each Power Pages Code Site:** Functional Component Name (Step 7), the **bare** site name (goes into `src/config/solution.ts` `siteName`; apply-config derives `[PREFIX] - [Name]`), app title(s) and languages, which tables/flows it uses, and auth requirements. See the [Power Pages Getting Started guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/GETTING-STARTED.md).
 
 ---
 
 ### Step 9 — Build the implementation plan (Plan Mode)
 
-> **Agent instruction:** Enter plan mode now using the `EnterPlanMode` tool before writing anything. Do not make any file changes until the developer approves the plan.
+> **Agent instruction:** Enter plan mode now using the `EnterPlanMode` tool before writing anything. Do not make file changes until the developer approves the plan.
 
-Using the specifications from Step 8, build a structured plan covering:
+Using the Step 8 specs, build a structured plan covering:
 
-1. **Solution identity summary** — all the values gathered in Step 2 in one place
-2. **Starters to activate** — derived from Step 8 specs, with the folder rename for each
-3. **Per-starter replacement checklist** — exact string-by-string placeholder replacements for each activated starter
-4. **Schema details** — table column definitions, flow logic pseudocode, env var defaults
-5. **Development sequence** — which starter to implement first (follow Critical Rule 4 in CLAUDE.md: Tables -> Env Vars -> Flows -> Power Pages)
+1. **Solution identity summary** — the values now in `solution.config.json` (already applied in Step 7b)
+2. **Starters to activate** — derived from the specs, with the folder rename for each
+3. **Content authoring checklist** — per starter, the work that is *not* identity: table column definitions, flow logic, env var defaults, Power Pages pages/flows. Identity placeholders are already handled by `apply-config.ps1`; what remains is the platform-assigned values below and the actual solution content.
+4. **Development sequence** — Critical Rule 4 order: Tables → Env Vars → Flows → Power Apps → Power Pages Code Site
 
-> **Power Apps — app record must exist before first deploy.** `pac code push` does NOT create app records. Before the first `deploy.ps1`, the developer must run:
->
-> **`pac code init` has no `--path` flag — it always writes to the current directory.** Run it from inside the Power App folder using `Push-Location`:
+> **Power Apps — app record must exist before first deploy.** `pac code push` does NOT create app records. `pac code init` has no `--path` flag — run it from inside the Power App folder:
 > ```powershell
 > Push-Location ".\SMKB - [Component Name] - Power App"
 > # Delete power.config.json first if it already exists
 > pac code init --environment "https://org229c958d.crm4.dynamics.com/" --displayName "SMKB - [Component Name] - Dev"
 > Pop-Location
 > ```
-> After `pac code init`, `appId` in `power.config.json` will be `null` — this is expected (known PAC CLI behavior). The GUID is populated automatically on the first `pac code push`.
+> After `pac code init`, `appId` in `power.config.json` will be `null` — expected; it is populated on the first push. Then re-run `apply-config.ps1` so the app display name / environment stay in sync.
 
-> **Cloud Flows — connection reference logical names must be looked up autonomously — do NOT ask the developer.** Export any existing solution that already has working flows, then read the folder names:
-> ```powershell
-> pac solution export --name <AnExistingSolutionWithFlows> --path .\inspect.zip --overwrite
-> pac solution unpack --zipFile .\inspect.zip --folder .\inspect_unpacked
-> # Each folder name under inspect_unpacked\connectionreferences\ IS the logical name
-> Remove-Item .\inspect.zip, .\inspect_unpacked -Recurse -Force
-> ```
-> Use those folder names (e.g. `shared_office365_abc123`) to replace the `[yourid]`, `[sol]`, and `[REPLACE: ...]` placeholders in the flow JSON files under `Workflows\`. See CLAUDE.md → "Connection References" for context on why connection references are shared across solutions.
+> **Cloud Flows — connection references** are shared, environment-level resources. Use the named SMKB connection-reference bank documented in the [Flows README](SMKB%20-%20Power%20Automate%20Flows%20Starter/README.md); only fall back to the export/unpack lookup (CLAUDE.md → "Connection References") if a needed connector is not already in the bank. Do NOT create a new connection reference per solution.
 
-> **Display names — all three component types** follow `[SHORT_NAME_UPPER] - [Component Display Name]` (e.g. `CFB - Booking Request`). Replace the `SOL - ` prefix in display names at the same time as schema name placeholders:
-> - Tables: `LocalizedName`, `OriginalName`, `LocalizedCollectionName` attributes and the `Description` in `Entity.xml`
-> - Env vars: `<displayname default="...">` and `<label description="...">` in `environmentvariabledefinition.xml`
-> - Flows: `<LocalizedName description="...">` in `Other/Customizations.xml`
->
-> Power Apps and Power Pages sites use their own conventions — do not apply this pattern to them.
+> **Content display names** follow `[SHORT_NAME_UPPER] - [Name]` (e.g. `EVT - Booking Request`). `apply-config.ps1` already set the `SOL - ` prefix on the ALM env vars; apply the same convention to the table/flow display names you author.
 
-Write the full plan to the plan file, then call `ExitPlanMode` to present it to the developer for approval. Do not begin Steps 10–12 until the developer approves.
+Write the full plan to the plan file, then call `ExitPlanMode`. Do not begin Steps 10–12 until the developer approves.
 
 ---
 
-### Step 10 — Post-implementation placeholder scan
+### Step 10 — Pre-deploy verification
 
-After all placeholder replacements are done for every activated starter, run a full scan to verify nothing was missed:
+Identity and boundaries are enforced by tooling — run all three; each must pass (or run **`/pre-deploy-verify`**, which runs them together):
 
 ```powershell
-$patterns = @(
-    'YourSolutionName', 'Your Solution Name',
-    'sol_example_table', 'sol_EXAMPLE_VAR', 'your-default-value-here',
-    'sol_example_flow', '00000000-0000-0000-0000-000000000001',
-    '\[yourid\]', '\[REPLACE', '\[sol\]',
-    'sol_example_item', 'Your App Display Name',
-    'TODO-your-portal', 'TODO-get-from-pac-pages-list'
-)
-Get-ChildItem "." -Recurse -File -Include "*.xml","*.json","*.ts","*.vue","*.html","*.yml" -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch '_dist|node_modules|\.git' } |
-    ForEach-Object {
-        $file = $_
-        try { $c = [System.IO.File]::ReadAllText($file.FullName) } catch { return }
-        foreach ($p in $patterns) {
-            if ($c -match $p) { Write-Host "PLACEHOLDER FOUND: '$p' in $($file.Name)" }
-        }
-    }
+# 1. No config drift between solution.config.json and any starter
+powershell -ExecutionPolicy Bypass -File apply-config.ps1 -Check
+
+# 2. Root docs stay within their boundary (no retired architecture, no broken links)
+node scripts/check-doc-boundaries.mjs
 ```
 
-If the command outputs nothing, all placeholders are replaced.
-
-> **Note:** `.ps1` files are excluded from this scan to prevent deploy scripts from flagging themselves (they contain the same placeholder strings as guard patterns).
+Then, for each activated starter, its own `deploy.ps1` (or deploy flow) runs a placeholder guard that
+blocks deploy while its platform placeholders remain (app IDs, workflow GUIDs, table/flow scaffold
+names, site-setting GUIDs). Do not bypass those guards — resolve the placeholders instead. The exact
+tokens and how to resolve them are documented in each starter's own README.
 
 ---
 
 ### Step 10b — Deploy each activated starter
 
-Deploy **one starter at a time**, in Critical Rule 4 order (Tables → Env Vars → Flows → Power Apps → Power Pages). Do not proceed to the next until the current one is confirmed working. After each deploy, the agent must log the outcome — this is mandatory, not optional.
+Deploy **one starter at a time**, in Critical Rule 4 order (Tables → Env Vars → Flows → Power Apps → Power Pages Code Site). Do not proceed to the next until the current is confirmed working. After each deploy, the agent must log the outcome (mandatory).
+
+> **`/deploy-solution`** orchestrates this entire ordered sequence (each starter via its own deploy skill,
+> the manual portal handoffs, and the mandatory `10b.F` logging). The per-starter skills it calls —
+> **`/dvt-deploy`** (runs `guid-freshen` once), **`/flow-deploy`** (draft-vs-published check),
+> **`/pa-init`** (create the app record) — can also be run individually.
 
 > **Env vars and flows must be configured before Power Pages or Power Apps can use them.**
-
----
 
 #### Dataverse Tables (skip if not activated)
 
@@ -486,14 +422,7 @@ powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Dataverse Tab
 
 Developer action: Verify tables appear in [make.powerapps.com](https://make.powerapps.com) → **Dataverse → Tables**.
 
-> **10b.F — Tables:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md) now:
-> - Did `deploy.ps1` complete without errors? Paste any unexpected output.
-> - Did `guid-freshen.ps1` run cleanly beforehand (sentinel GUID check passed)?
-> - Did the developer confirm the tables are visible in the Maker portal?
-> - Any placeholder guard false positives or missed placeholders?
-> - Any instruction in INIT_PROJECT.md that was unclear or wrong for this step?
-
----
+> **10b.F — Tables:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md): did `deploy.ps1` complete cleanly? did `guid-freshen.ps1` run once beforehand? are tables visible in the Maker portal? any guard false positives or unclear instructions?
 
 #### Environmental Variables (skip if not activated)
 
@@ -501,15 +430,9 @@ Developer action: Verify tables appear in [make.powerapps.com](https://make.powe
 powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Environmental Variables\deploy.ps1"
 ```
 
-Developer action: Set runtime values for each env var — **Power Apps Maker → Solutions → your solution → Environment Variables → each variable → Edit → Add current value**.
+Developer action: Set runtime values — **Power Apps Maker → Solutions → your solution → Environment Variables → each → Edit → Add current value**.
 
-> **10b.F — Env Vars:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md) now:
-> - Did `deploy.ps1` complete without errors?
-> - Were all env var definitions visible in the Maker portal after import?
-> - Any issues with schema names or `RootComponents` in `Solution.xml`?
-> - Any instruction that was unclear or missing?
-
----
+> **10b.F — Env Vars:** Append an entry: did deploy complete? were all definitions visible after import? any `RootComponents`/schema-name issues? anything unclear?
 
 #### Cloud Flows (skip if not activated)
 
@@ -517,21 +440,13 @@ Developer action: Set runtime values for each env var — **Power Apps Maker →
 powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Cloud Flows\deploy.ps1"
 ```
 
-Developer action: For each flow — **Power Automate portal → Solutions → your solution → Cloud Flows → open flow → Edit → confirm connection references → Save → Turn on**. Flows are imported in a disabled state; the developer must enable each one manually.
+Developer action: For each flow — **Power Automate portal → Solutions → your solution → Cloud Flows → open → Edit → confirm connection references → Save → Turn on**. Flows import disabled; enable each manually.
 
-> **10b.F — Flows:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md) now:
-> - Did `deploy.ps1` complete without errors?
-> - Were the flows visible in the Power Automate portal after import?
-> - Did the autonomous connection reference lookup (from Step 9) work, or did it require manual intervention?
-> - Any JSON parsing errors, wrong placeholder values, or missing `<Workflow>` entries in `Customizations.xml`?
-> - Any instruction that was unclear or missing?
-
----
+> **10b.F — Flows:** Append an entry: did deploy complete? were flows visible? did the connection-reference wiring work? any JSON/`Customizations.xml` issues? anything unclear?
 
 #### Power Apps (skip if not activated)
 
 ```powershell
-# pac code init has no --path flag — run from inside the Power App folder:
 Push-Location "SMKB - [Component Name] - Power App"
 # First time only — developer must run locally:
 # pac code init --environment "https://org229c958d.crm4.dynamics.com/" --displayName "SMKB - [Component Name] - Dev"
@@ -539,160 +454,77 @@ powershell -ExecutionPolicy Bypass -File deploy.ps1
 Pop-Location
 ```
 
-> **10b.F — Power Apps:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md) now:
-> - Did `pac code init` complete and populate `power.config.json` correctly?
-> - Did `deploy.ps1` (pnpm build + pac code push) complete without errors?
-> - Was the app visible in the Power Platform environment?
-> - Any TypeScript, build, or `pac code push` errors?
-> - Any instruction that was unclear or missing?
+> **10b.F — Power Apps:** Append an entry: did `pac code init` populate `power.config.json`? did `deploy.ps1` (build + push) complete? was the app visible in the environment? any build/push errors? anything unclear?
+
+#### Power Pages Code Site (skip if not activated)
+
+The Code Site provisions and deploys through its own skills — the agent drives them; the developer runs the local `pac`/browser steps they require:
+
+1. **Provision (first time):** run **`/ppcs-provision-site`** — creates the site, runs the starter's `scripts/freshen-site-settings.ps1`, and applies the post-provision settings. Follow the [Getting Started guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/GETTING-STARTED.md).
+2. **Register flows:** for each Power Automate flow the site calls, run **`/ppcs-register-flow`** to add its trigger GUID to `src/config/flows.ts`.
+3. **(Optional) table access:** to read/write a Dataverse table directly from the SPA, run **`/ppcs-enable-web-api`**.
+4. **Deploy:** run **`/ppcs-deploy`** (builds and uploads via `pac pages upload-code-site`).
+5. **Verify:** open the site URL in a browser; the Vue app should load.
+
+> **10b.F — Power Pages Code Site:** Append an entry: did provisioning and deploy complete? did flows register? any CSP or 403 errors (see the starter's `/ppcs-troubleshoot`)? anything unclear?
 
 ---
 
-#### Power Pages (skip if not activated)
+### Step 11 — Promote through ALM (Stage / Prod)
 
-**10b.1 — First deploy:**
+Everything deployed above went to **SMKB-Apps-Dev only**. Stage and Production are reached through
+**Power Platform Pipeline**, never a deploy script.
 
-```powershell
-# From inside the client/ subfolder of the Power Pages starter:
-cd "SMKB - [Component Name] - Power Page\client"
-pnpm deploy
-```
+- **Tables, Env Vars, Flows, Power Apps** travel in the solution — ensure their components are in the
+  solution (env var `RootComponents`, flow `RootComponents`, the Code App's linked solution) and run
+  the pipeline from the Maker portal.
+- **Power Pages Code Site** promotes on its own two-track model: run **`/ppcs-promote-to-env`** and
+  follow the [Code Site ALM guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/ALM-CODE-SITES.md).
+  Flow GUIDs are environment-specific, so re-register them (`/ppcs-register-flow`) in each target
+  environment after promotion.
 
-**10b.2 — Visit the portal URL** to verify it responds (may show "Page Not Found" at this point — that is expected before Step 10b.5).
-
-Developer action: Open the portal URL in a browser. Any response — including "Page Not Found" — means the portal is provisioned and reachable.
-
----
-
-### Step 10b.5 — Deconflict blank portal default pages (Power Pages only)
-
-> **Skip if Power Pages was NOT activated.**
-
-> **CRITICAL — must run after every first deploy.** Skipping this step leaves the blank portal's default page records competing with your pages for URL routing. The symptom is "Page Not Found" on the home page even though the deploy succeeded.
-
-**Why this is required — the full explanation:**
-
-When you created the blank portal at make.powerpages.microsoft.com, Power Pages provisioned a set of default pages (Home, Access Denied, Page Not Found, etc.) with platform-assigned GUIDs directly in Dataverse. These records exist under your website ID before you ever run a deploy.
-
-`guid-freshen.ps1` generates different GUIDs for your pages. When `pac pages upload` runs, it upserts by primary key — so your freshened-GUID pages are inserted as **new records** alongside the blank portal's original records. Both sets exist in Dataverse simultaneously.
-
-Power Pages URL routing works like this: when a request arrives for `/`, it queries for root pages with `adx_partialurl = /`, finds potentially TWO records (blank portal's home + your home), and picks whichever has the **lexicographically lower `adx_webpageid`**. If the blank portal's page wins, Power Pages looks for its content page in your portal's language — finds none (wrong language ID) — and returns "Page Not Found".
-
-The fix: download the current Dataverse state, find the orphan records, and upload override YAML files that change their `adx_partialurl` to non-conflicting values so they no longer compete with your pages.
-
-**Run the deconflict script:**
-
-```powershell
-# Run from the solution root (adjust the portal folder name):
-powershell -ExecutionPolicy Bypass -File "SMKB - [Component Name] - Power Page\powerpages\<portal-folder>\deconflict-portal.ps1"
-```
-
-The script will:
-1. Download the current Dataverse state for your portal (~30-60 seconds)
-2. Compare downloaded page GUIDs against your local YAML files
-3. For each orphan page (blank portal's record, not in your YAML), create override YAML files in `web-pages/blank-portal-default-*/` with a non-conflicting URL (`z-portal-default-XXXXXXXX`) and `adx_hiddenfromsitemap: true`
-4. Report which files were created and print the next step
-
-**Then deploy again to upload the overrides:**
-
-```powershell
-cd "SMKB - [Component Name] - Power Page\client"
-pnpm deploy
-```
-
-**Then verify:**
-
-Open the portal URL in a browser. It should now load your Vue app (not "Page Not Found").
-
-> **After deconflict runs cleanly once, it is safe to commit the generated `web-pages/blank-portal-default-*/` folders.** These YAML files are permanent — they ensure the blank portal's pages remain at non-conflicting URLs even after future deploys. Do not delete them.
-
-> **Diagnostic — if the portal is still broken:** Run `pac pages download --websiteId <id> --path ./temp-check` and inspect the `web-pages/` folder. If you see multiple folders with similar names (e.g. two `home_*/` folders), duplicate records still exist. Check that the deconflict script ran without errors and that the second `pnpm deploy` completed.
-
-> **10b.F — Power Pages:** Append an entry to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md) now:
-> - Did `pnpm deploy` complete without errors?
-> - Did `guid-freshen.ps1` run before this (Step 7b)? Did `verify-consistency.ps1` pass?
-> - Did `deconflict-portal.ps1` find any orphan pages? How many?
-> - Was the portal accessible at the expected URL after the deconflict deploy?
-> - Any GUID consistency errors, CSP errors, or asset loading failures in DevTools?
-> - Any instruction that was unclear or missing?
+There is no manual "add ~200 portal components to the solution" step in the Code Site model — that was
+the old Liquid-portal workflow and no longer applies.
 
 ---
 
-### Step 11 — Add Power Pages site to solution (if Power Pages was activated)
+### Step 12 — Document the solution
 
-> **Agent task — run these commands autonomously using the PowerShell tool. Do NOT ask the developer to run them manually. All `pac solution add-solution-component` commands are permitted in agent settings.**
+The starter ships a [`docs/`](docs/README.md) folder of solution-documentation **templates** (executive
+summary, architecture, tech stack, cloud flows, integrations, data model, data privacy, security, testing,
+deployment/ALM). Now — with the whole solution built and deployed — populate them. Run **`/document-solution`**
+(it drafts each doc from the built solution); then review.
 
-After `pnpm deploy` for the Power Pages starter, the site record exists in Dataverse but is NOT yet linked to the Power Platform solution. Without this step, the site will not travel through the pipeline to Stage and Prod.
+> **Agent instruction:** You have full context of the solution you just built. Draft each `docs/NN-*.md`
+> by replacing every `[FILL IN: …]` prompt with this solution's real details (tables, columns, flows,
+> integrations, env vars, external systems, auth model, and the design decisions made). Keep the general
+> SMKB guidance already in each template, **cite the source file** for every non-obvious fact, and remove
+> the `TEMPLATE` callout from the top of each file once populated. Then hand the drafts to the developer to review.
 
-> **Do NOT use the Power Apps Maker "Add Existing → Power Pages" button** — it adds only the site record and silently misses ~200 child portal components (pages, templates, content snippets, web files). Use PAC CLI instead.
+- Fill in `docs/README.md` (index + one-paragraph summary) and `docs/00`–`docs/09`.
+- Delete any section or row for a starter this solution did **not** activate.
+- Keep component-name examples on the `smkb_<prefix>_<PascalName>` / `PREFIX - Name` convention (CLAUDE.md → Critical Rule 3).
+- The docs are **not** scanned by the deploy guards or `check-doc-boundaries.mjs`, so `[FILL IN]` placeholders never block a deploy — but a half-filled doc set is a review smell; complete them before promoting to Production.
 
-**Step 1 — Get the site GUID:**
-```powershell
-pac pages list
-```
-Copy the GUID from the row matching your portal's display name.
-
-**Step 2 — Add the site record:**
-```powershell
-pac solution add-solution-component `
-    --solution-unique-name YourSolutionName `
-    --component-type powerpagesite `
-    --component-id <site-guid>
-```
-
-**Step 3 — Add all child components (loop — takes ~1–2 minutes):**
-```powershell
-# Replace the path with your renamed portal folder
-$portalFolder = "SMKB - [Your Portal Name] - Power Page\powerpages\<your-portal-folder>"
-
-$guids = Get-ChildItem $portalFolder -Recurse -Include "*.yml" |
-    Select-String -Pattern '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' |
-    ForEach-Object { $_.Matches.Value } |
-    Sort-Object -Unique
-
-foreach ($guid in $guids) {
-    pac solution add-solution-component `
-        --solution-unique-name YourSolutionName `
-        --component-type powerpagecomponent `
-        --component-id $guid
-}
-Write-Host "Done. Added $($guids.Count) portal components."
-```
-
-> **Expected output for Step 3:** The portal YAML files contain ~141 unique GUIDs. Expect ~130 successful additions — some GUIDs (like `adx_websiteid` and publishing state GUIDs) will return errors because they are global platform components, not portal components. A ~130/141 success rate is normal and does not indicate a problem.
-
-**Step 4 — Add the site language component:**
-
-> **Note:** The `powerpagesitelanguage` component type reliably fails when the portal was initialized from a freshened starter (the language GUID in your YAML no longer matches the platform's language record). **Skip Step 4** — the language component is already linked through the portal's content structure. Missing this step does not prevent the portal from traveling through the pipeline.
-
-```powershell
-# Skip this — see note above. Kept for reference only.
-# pac solution add-solution-component `
-#     --solution-unique-name YourSolutionName `
-#     --component-type powerpagesitelanguage `
-#     --component-id <site-guid>
-```
-
-After Steps 1–3 complete, the portal and all its components are linked to the solution and will travel through the pipeline on the next promotion.
+Developer action: read the drafted `docs/` and correct anything the agent got wrong or could not know
+(business intent, retention decisions, approver identities).
 
 ---
 
-### Step 12 — Commit the initialized state
+### Step 13 — Commit the initialized state
 
-After folder renames are done (Step 7), the scan is clean (Step 10), and the Power Pages linkage is done (Step 11):
+After folder renames (Step 7), config applied (Step 7b), verification clean (Step 10), deploys done, and the docs drafted (Step 12):
 
 ```powershell
-# Review what will be staged before committing
-git status
-# Stage specific folders rather than -A to avoid accidentally including .env or credential files
-git add "SMKB - [Solution Name] - Dataverse Tables" "SMKB - [Solution Name] - Environmental Variables" ...
-git commit -m "chore: activate starters and rename folders for [Solution Name]"
+git status                       # review what will be staged
+git add "SMKB - [Solution Name] - Dataverse Tables" "SMKB - [Solution Name] - Environmental Variables" solution.config.json docs ...
+git commit -m "chore: activate starters and apply solution config for [Solution Name]"
 git push
 ```
 
-> **Prefer staging specific folder names over `git add -A`** — `git add -A` can accidentally include `.env` files, credential JSON, or other sensitive files if they were created during setup. Run `git status` first and stage only the folders you intentionally modified.
+> **Prefer staging specific paths over `git add -A`** — it avoids accidentally committing `.env`/credential files created during setup. Run `git status` first and stage only what you intentionally changed.
 
-This marks the boundary between "initialized from template" and "active development". All future commits are solution-specific work.
+This marks the boundary between "initialized from template" and "active development".
 
 ---
 
@@ -701,6 +533,7 @@ This marks the boundary between "initialized from template" and "active developm
 From this point on, every new Claude session is a **regular session start**:
 - Claude reads CLAUDE.md, checks which starters are active, confirms solution identity
 - Claude will NOT offer to run Init Project again (the remote no longer points to the starter kit)
-- Development, placeholder replacement, and deployment follow the normal workflow in each starter's README
+- Development and deployment follow each starter's own README; solution-wide identity changes go through `solution.config.json` + `apply-config.ps1`
+- Keep [`docs/`](docs/README.md) current as the solution evolves, and run the [audit templates](audit/README.md) before promoting to Stage/Prod
 
 See [CLAUDE.md](CLAUDE.md) for the complete rules governing regular sessions.

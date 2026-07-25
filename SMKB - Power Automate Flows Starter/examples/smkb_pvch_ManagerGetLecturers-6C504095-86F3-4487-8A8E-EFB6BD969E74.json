@@ -1,0 +1,289 @@
+﻿{
+  "properties": {
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "smkb_SMKBSharePointConnectionUser1"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      },
+      "shared_office365": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedoffice365_c3167"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "undefined",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "SharePoint Site URL (smkb_SharePointSiteUrl)": {
+          "defaultValue": "https://smkb365.sharepoint.com/teams/SMKBAppsFiles",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_SharePointSiteUrl"
+          }
+        },
+        "Environment Name (smkb_pvch_EnvironmentName)": {
+          "defaultValue": "dev",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_EnvironmentName"
+          }
+        },
+        "Flow Error Emails (smkb_pvch_FlowErrorEmails)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_pvch_FlowErrorEmails"
+          }
+        }
+      },
+      "triggers": {
+        "manual": {
+          "metadata": {
+            "operationMetadataId": "82e2ea7d-e3ef-4084-8dce-9b74d76c9590"
+          },
+          "type": "Request",
+          "kind": "PowerAppV2",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "search": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "description": "Returns lecturers from Vouchers-LecturersDetails. Optional: status (Pending/Active/Archived) filters via OData; search (text) filters client-side on name and email."
+        }
+      },
+      "actions": {
+        "Main_Flow": {
+          "actions": {
+            "Build_Status_Filter": {
+              "runAfter": {},
+              "metadata": {
+                "operationMetadataId": "ad5cdce1-0dd6-4a60-91b0-4bc5c0845550"
+              },
+              "type": "Compose",
+              "inputs": "@if(not(empty(coalesce(triggerBody()?['status'], ''))), concat('lecturerStatus eq ''', replace(triggerBody()?['status'], '''', ''''''), ''''), '')",
+              "description": "Build OData filter string for lecturerStatus if provided; empty string means no filter."
+            },
+            "Get_Lecturers": {
+              "runAfter": {
+                "Build_Status_Filter": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "bde0f30d-868a-41aa-af9b-72bb7aabb5bf"
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "GetItems",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@parameters('SharePoint Site URL (smkb_SharePointSiteUrl)')",
+                  "table": "Vouchers-LecturersDetails",
+                  "$filter": "@outputs('Build_Status_Filter')",
+                  "$top": 500
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Filter_By_Search": {
+              "runAfter": {
+                "Get_Lecturers": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "3f07064b-b3fb-4a03-bca1-9567b8c8c353"
+              },
+              "type": "Query",
+              "inputs": {
+                "from": "@body('Get_Lecturers')?['value']",
+                "where": "@or(contains(toLower(string(item()?['Title'])), toLower(coalesce(triggerBody()?['search'], ''))), contains(toLower(string(item()?['lecturerLName'])), toLower(coalesce(triggerBody()?['search'], ''))), contains(toLower(string(item()?['lecturerEmail'])), toLower(coalesce(triggerBody()?['search'], ''))))"
+              },
+              "description": "Post-filter by search text across first name, last name, email."
+            },
+            "Resolve_Results": {
+              "runAfter": {
+                "Filter_By_Search": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "83dc045e-1fbb-435d-bebf-a11d28c5a8d4"
+              },
+              "type": "Compose",
+              "inputs": "@if(not(empty(coalesce(triggerBody()?['search'], ''))), body('Filter_By_Search'), body('Get_Lecturers')?['value'])",
+              "description": "Use search-filtered array when search was provided; otherwise use raw SP results."
+            },
+            "Select_Lecturer_Fields": {
+              "runAfter": {
+                "Resolve_Results": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "c13fdaf5-4427-4ea7-b41f-0eed5c0ed1b1"
+              },
+              "type": "Select",
+              "inputs": {
+                "from": "@outputs('Resolve_Results')",
+                "select": {
+                  "id": "@string(item()?['ID'])",
+                  "lecturerFName": "@item()?['Title']",
+                  "lecturerLName": "@item()?['lecturerLName']",
+                  "lecturerEmail": "@item()?['lecturerEmail']",
+                  "lecturerCellPhone": "@item()?['lecturerCellPhone']",
+                  "lecturerID": "@item()?['lecturerID']",
+                  "lecturerBirthDate": "@item()?['lecturerBirthDate']",
+                  "lecturerAddress": "@item()?['lecturerAddress']",
+                  "lecturerTown": "@item()?['lecturerTown']",
+                  "lecturerHomePhone": "@item()?['lecturerHomePhone']",
+                  "lecturerWorkPlace": "@item()?['lecturerWorkPlace']",
+                  "lecturerTaxStatus": "@item()?['lecturerTaxStatus']",
+                  "lecturerAcademicDegree": "@item()?['lecturerAcademicDegree']",
+                  "paymentType": "@item()?['paymentType']",
+                  "companyName": "@item()?['companyName']",
+                  "companyNumber": "@item()?['companyNumber']",
+                  "bankUpdatePending": "@item()?['bankUpdatePending']",
+                  "lecturerStatus": "@item()?['lecturerStatus']",
+                  "inviteSentOn": "@item()?['inviteSentOn']",
+                  "registrationCompletedOn": "@item()?['registrationCompletedOn']",
+                  "createdByManager": "@item()?['createdByManager']",
+                  "defaultFaculty": "@item()?['defaultFaculty']",
+                  "defaultDepartment": "@item()?['defaultDepartment']",
+                  "defaultActivityType": "@item()?['defaultActivityType']"
+                }
+              },
+              "description": "Whitelist lecturer fields for the manager response — keeps payload lean after removing $select from GetItems."
+            },
+            "Respond_to_caller": {
+              "runAfter": {
+                "Select_Lecturer_Fields": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "72f0c514-50b1-480d-b289-0fe29155b36b"
+              },
+              "type": "Response",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "lecturers": "@body('Select_Lecturer_Fields')"
+                }
+              }
+            }
+          },
+          "runAfter": {},
+          "metadata": {
+            "operationMetadataId": "1121b83c-7874-4fe2-9a96-f1363f37407f"
+          },
+          "type": "Scope"
+        },
+        "Handle_Flow_Error": {
+          "actions": {
+            "Check_Error_Emails_Configured": {
+              "actions": {
+                "Send_error_notification": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "11c74c00-31ef-49bf-b6f8-c3fbc6cae557"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/To": "@parameters('Flow Error Emails (smkb_pvch_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('Environment Name (smkb_pvch_EnvironmentName)')), ') [ERROR] smkb_pvch_ManagerGetLecturers failed')",
+                      "emailMessage/Body": "@concat('<p><strong>smkb_pvch_ManagerGetLecturers</strong> failed in <strong>', parameters('Environment Name (smkb_pvch_EnvironmentName)'), '</strong>.</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/From": "noreply@smkb.ac.il",
+                      "emailMessage/Importance": "High"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              },
+              "runAfter": {},
+              "expression": "@not(empty(trim(parameters('Flow Error Emails (smkb_pvch_FlowErrorEmails)'))))",
+              "metadata": {
+                "operationMetadataId": "feb258ee-2c67-428b-8528-9fecbd435c64"
+              },
+              "type": "If"
+            },
+            "Respond_with_error": {
+              "runAfter": {
+                "Check_Error_Emails_Configured": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "7384d7dd-9bee-4ec3-ac81-5d173e6707fe"
+              },
+              "type": "Response",
+              "inputs": {
+                "statusCode": 500,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "code": "ERROR"
+                }
+              }
+            }
+          },
+          "runAfter": {
+            "Main_Flow": [
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "1622a1cd-02ca-4073-9ade-7195447d90b6"
+          },
+          "type": "Scope",
+          "description": "Error handler — runs ONLY on unexpected failures in Main_Flow."
+        }
+      }
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}

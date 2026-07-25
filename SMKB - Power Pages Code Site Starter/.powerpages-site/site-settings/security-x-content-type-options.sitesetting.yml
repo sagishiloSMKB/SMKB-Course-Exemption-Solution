@@ -1,0 +1,4 @@
+description: Prevents browsers from MIME-type sniffing responses away from the declared Content-Type.
+id: aaaaaaaa-0005-4000-8000-000000000005
+name: HTTP/X-Content-Type-Options
+value: nosniff

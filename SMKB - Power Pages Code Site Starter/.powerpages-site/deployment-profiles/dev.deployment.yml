@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Deployment profile: dev
+#
+# This file defines environment-specific overrides for site setting VALUES —
+# it updates existing downloaded records, it does NOT create new ones.
+#
+# HOW TO USE:
+#   NOTE: `pac pages upload-code-site` (the code-site command) has NO
+#   --deploymentProfile flag as of PAC CLI v2.8.1 — the target environment is
+#   chosen by the active `pac auth` profile, and this profile file is NOT
+#   consumed by that command. Deployment profiles apply to the traditional
+#   `pac pages upload --deploymentProfile <name>` command, or via a Power
+#   Platform Pipeline. For code sites, keep environment-specific values in this
+#   file for documentation/future-CLI use, but apply overrides today by editing
+#   the target site's settings (or per-env site-settings records) directly.
+#   See docs/ALM-CODE-SITES.md → "Deployment Profiles".
+#
+# HOW TO FILL IN:
+#   1. Run: pac pages download --path "./.powerpages-site" --webSiteId <GUID> --modelVersion 2
+#   2. Open .powerpages-site/site-settings/*.sitesetting.yml files to find adx_sitesettingid values
+#   3. Add entries below for any setting that should differ in dev vs other environments
+#   4. Use ${OS.VARIABLE_NAME} for secrets — PAC CLI reads from OS environment
+#      variables at upload time, so the secret never enters source control
+#
+# EXAMPLE — uncomment and replace with real values:
+# adx_sitesetting:
+#   - adx_sitesettingid: <GUID-from-your-downloaded-site-settings>
+#     adx_name: Authentication/OpenAuth/AzureAD/ClientId
+#     adx_value: ${OS.DEV_AZURE_AD_CLIENT_ID}
+#
+#   - adx_sitesettingid: <another-GUID>
+#     adx_name: Authentication/OpenAuth/AzureAD/ClientSecret
+#     adx_value: ${OS.DEV_AZURE_AD_CLIENT_SECRET}
+#
+# Docs: https://learn.microsoft.com/en-us/power-pages/configure/deployment-profiles
+# ─────────────────────────────────────────────────────────────────────────────

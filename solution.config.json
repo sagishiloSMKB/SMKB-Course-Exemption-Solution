@@ -1,0 +1,32 @@
+{
+  "__doc__": "SINGLE SOURCE OF TRUTH for this solution's identity. Fill these in, then run 'powershell -ExecutionPolicy Bypass -File apply-config.ps1' to push the values into every activated starter's own config files. See CLAUDE.md -> 'Solution Config + Apply Script' and Critical Rule 3 for the component naming convention (schema smkb_<prefix>_PascalName, display 'PREFIX - Name'). Notes: powerPages.siteName is the BARE site name (apply-config derives the 'PREFIX - Name' form - do not pre-prefix it); publisherPrefix and powerApps.region are fixed informational constants; the Power Pages language set is authored in that starter's src/config/solution.ts. This file ships uninitialized (placeholder values); apply-config.ps1 refuses to run until the placeholders are replaced.",
+
+  "solutionUniqueName": "YourSolutionName",
+  "solutionDisplayName": "Your Solution Name",
+  "shortPrefix": "sol",
+  "publisherPrefix": "smkb",
+
+  "targetEnvUrl": "https://org229c958d.crm4.dynamics.com/",
+  "environmentId": "00000000-0000-0000-0000-000000000000",
+
+  "activate": {
+    "dataverseTables": false,
+    "environmentVariables": false,
+    "powerAutomateFlows": false,
+    "powerApps": false,
+    "powerPages": false
+  },
+
+  "powerApps": {
+    "appDisplayName": "Your App Display Name",
+    "region": "prod"
+  },
+
+  "powerPages": {
+    "siteName": "CHANGEME-SITE-NAME",
+    "appNameHe": "CHANGEME-APP-NAME-HE",
+    "appNameEn": "CHANGEME-APP-NAME-EN",
+    "documentTitle": "CHANGEME-TITLE",
+    "defaultLanguage": "he"
+  }
+}

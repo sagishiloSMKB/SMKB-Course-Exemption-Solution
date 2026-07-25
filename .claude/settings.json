@@ -33,6 +33,11 @@
       "Bash(pac pages list)",
       "Bash(pac solution list*)",
       "Bash(pac solution export*)",
+      "Bash(pac solution unpack*)",
+
+      "Bash(powershell*apply-config.ps1*-Check*)",
+      "Bash(powershell*apply-config.ps1*-DryRun*)",
+      "Bash(node*flow-lint*lint.mjs*)",
 
       "Bash(ls*)",
       "Bash(find*)",
