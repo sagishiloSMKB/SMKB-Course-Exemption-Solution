@@ -81,16 +81,20 @@
     </Publisher>
     <RootComponents>
       <!--
-        Add one entry per activated env var definition. type="380" = environmentvariabledefinition.
+        One entry per env var definition. type="380" = environmentvariabledefinition.
         The schemaName must exactly match the folder name under environmentvariabledefinitions/.
 
-        ACTIVATION STEP: For every variable folder you create (by copying smkb_sol_ExampleVar and renaming),
-        add a line here. Without this, the definition is upserted to Dataverse but is NOT linked to
-        the solution; it will not travel through the pipeline to Stage or Production.
+        Without an entry here, the definition is upserted to Dataverse but is NOT linked to the
+        solution; it will not travel through the pipeline to Stage or Production. flow-lint's
+        env-var-rootcomponents-complete rule fails the build if a definition folder has no entry.
 
-        Example (uncomment and update the schemaName):
-        <RootComponent type="380" schemaName="smkb_evt_PortalBaseUrl" behavior="0" />
+        ACTIVATION STEP: add a line for every variable folder you create (by copying
+        smkb_sol_ExampleVar and renaming). When you delete the smkb_sol_ExampleVar folder, delete
+        its line below too. apply-config.ps1 rewrites the `sol` segment of the two ALM entries.
       -->
+      <RootComponent type="380" schemaName="smkb_sol_EnvironmentName" behavior="0" />
+      <RootComponent type="380" schemaName="smkb_sol_FlowErrorEmails" behavior="0" />
+      <RootComponent type="380" schemaName="smkb_sol_ExampleVar" behavior="0" />
     </RootComponents>
     <MissingDependencies />
   </SolutionManifest>

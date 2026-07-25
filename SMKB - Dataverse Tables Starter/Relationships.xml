@@ -7,24 +7,27 @@
   block below into Other/Customizations.xml inside the <EntityRelationships> element.
   Also add the lookup attribute to the referencing table's Entity.xml.
 
-  Naming conventions:
+  Naming conventions (all names below are the LOWERCASE logical forms — Dataverse lowercases
+  logical names; only schemaName / PhysicalName keep PascalCase. See CLAUDE.md Critical Rule 3):
     Relationship Name:  [referencing_table]_[referenced_table]
-      e.g. sol_registration_sol_session
-    ReferencedAttributeName: [referenced_table]id  (primary key of the parent table)
-    ReferencingAttributeName: [referenced_table]   (the lookup column on the child table)
+      e.g. smkb_evt_course_smkb_evt_session
+    ReferencedAttributeName:  the parent table's primary key, [referenced_table]id
+    ReferencingAttributeName: the lookup column's logical name on the child table
 
-  Example: many sol_registration rows each belong to one sol_session.
+  Example: many smkb_evt_session rows each belong to one smkb_evt_course.
+  Easiest path: run the /dvt-add-lookup skill instead of hand-editing.
 -->
 <ImportExportXml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <EntityRelationships>
     <!--
       Copy this block into Other/Customizations.xml → <EntityRelationships> for each lookup column.
+      Replace `evt` with your solution short prefix.
 
-      <EntityRelationship Name="sol_registration_sol_session">
+      <EntityRelationship Name="smkb_evt_course_smkb_evt_session">
         <EntityRelationshipType>ManyToOne</EntityRelationshipType>
         <IsCustomizable>1</IsCustomizable>
-        <ReferencedEntityName>sol_session</ReferencedEntityName>
-        <ReferencingEntityName>sol_registration</ReferencingEntityName>
+        <ReferencedEntityName>smkb_evt_course</ReferencedEntityName>
+        <ReferencingEntityName>smkb_evt_session</ReferencingEntityName>
         <CascadeAssign>NoCascade</CascadeAssign>
         <CascadeDelete>RemoveLink</CascadeDelete>
         <CascadeReparent>NoCascade</CascadeReparent>
@@ -32,10 +35,10 @@
         <CascadeUnshare>NoCascade</CascadeUnshare>
         <CascadeRollupView>NoCascade</CascadeRollupView>
         <IsValidForAdvancedFind>1</IsValidForAdvancedFind>
-        <ReferencedAttributeName>sol_sessionid</ReferencedAttributeName>
-        <ReferencingAttributeName>sol_session</ReferencingAttributeName>
-        <ReferencingEntityNavigationPropertyName>sol_session_sol_registration</ReferencingEntityNavigationPropertyName>
-        <ReferencedEntityNavigationPropertyName>sol_session_sol_registration_sol_session</ReferencedEntityNavigationPropertyName>
+        <ReferencedAttributeName>smkb_evt_courseid</ReferencedAttributeName>
+        <ReferencingAttributeName>smkb_evt_courseid</ReferencingAttributeName>
+        <ReferencingEntityNavigationPropertyName>smkb_evt_courseid</ReferencingEntityNavigationPropertyName>
+        <ReferencedEntityNavigationPropertyName>smkb_evt_course_smkb_evt_session</ReferencedEntityNavigationPropertyName>
         <RelationshipDescription />
       </EntityRelationship>
     -->

@@ -42,6 +42,27 @@ const FORBIDDEN_ALWAYS = [
 // them in the deployment-method summary and the init flow.
 const FORBIDDEN_PROSE = ['pnpm dev', 'pnpm build', 'npm run dev', 'npm run build']
 
+// ── Retired component-naming shape ──────────────────────────────────────────
+// The canonical schema name is smkb_<prefix>_<PascalName> (CLAUDE.md Critical Rule 3).
+// A bare `sol_x` / `[sol]_x` token with no `smkb_` publisher segment is the retired
+// pre-canonical shape. These files are the ones developers copy from, so a stale example
+// here propagates the wrong convention into real solutions.
+const RETIRED_NAMING = /(?<!smkb_)(?<!\w)(?:sol_[a-z]|\[sol\]_)/
+const NAMING_FILES = [
+  ...DOCS,
+  'SMKB - Dataverse Tables Starter/README.md',
+  'SMKB - Dataverse Tables Starter/Other/Customizations.xml',
+  'SMKB - Dataverse Tables Starter/Relationships.xml',
+  'SMKB - Environmental Variables Starter/README.md',
+  'SMKB - Environmental Variables Starter/Other/Solution.xml',
+  'SMKB - Power Automate Flows Starter/README.md',
+]
+// Legitimate exceptions:
+//   • a line that documents the retirement itself (CLAUDE.md's deployed-placeholder warning)
+//   • sol_exampleflow — a live, tool-generated data-source token in the Power Apps starter
+//     scaffold that `pnpm pa add-flow` regenerates; its deploy guard blocks on it by design.
+const NAMING_ALLOW = [/old naming/i, /sol_exampleflow/]
+
 const errors = []
 const warnings = []
 
@@ -83,7 +104,18 @@ function checkDoc(rel) {
   }
 }
 
+function checkNaming(rel) {
+  const abs = path.join(repoRoot, rel)
+  if (!fs.existsSync(abs)) return
+  fs.readFileSync(abs, 'utf8').split(/\r?\n/).forEach((line, i) => {
+    if (!RETIRED_NAMING.test(line)) return
+    if (NAMING_ALLOW.some((re) => re.test(line))) return
+    errors.push(`${rel}:${i + 1}  retired naming shape (use smkb_<prefix>_<PascalName>) -> ${line.trim().slice(0, 80)}`)
+  })
+}
+
 for (const d of DOCS) checkDoc(d)
+for (const f of NAMING_FILES) checkNaming(f)
 
 if (warnings.length) {
   console.log('doc-boundaries: warnings')

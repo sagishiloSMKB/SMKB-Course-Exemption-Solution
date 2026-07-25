@@ -27,16 +27,27 @@ jobs:
           node-version: 20
       # Zero-dependency Node ESM — no install needed. Auto-discover the checker wherever the (renamed)
       # Cloud Flows starter put it; skip if the Flows starter isn't activated.
+      #
+      # Gated on an INITIALIZED solution, exactly like .githooks/pre-commit: while the repo is still
+      # the uninitialized template, the example flows carry starter placeholders ON PURPOSE and
+      # flow-lint (correctly) errors on them. deploy.ps1 is the placeholder gate for a real solution.
       - name: Run flow-lint
         shell: bash
         run: |
+          if [ ! -f solution.config.json ] || grep -q 'YourSolutionName' solution.config.json; then
+            echo "Repo is still the uninitialized starter-kit template — skipping flow-lint."
+            exit 0
+          fi
           lint=$(find . -path '*/tools/flow-lint/lint.mjs' -not -path '*/node_modules/*' | head -1)
           if [ -z "$lint" ]; then
             echo "No flow-lint checker found (Cloud Flows starter not activated) — skipping."
             exit 0
           fi
-          echo "Running $lint"
-          node "$lint"
+          # Pass the Workflows folder explicitly (same as deploy.ps1 / the pre-commit hook) so the
+          # run never depends on folder-name auto-discovery.
+          flows="$(dirname "$(dirname "$(dirname "$lint")")")/Workflows"
+          echo "Running $lint against $flows"
+          node "$lint" "$flows"
 
   discover-spas:
     name: discover code-app folders

@@ -188,10 +188,16 @@ SMKB - Dataverse Tables Starter/
 
 ### Adding a new table
 
+> Easiest path: run the **`/dvt-add-table`** skill, which does all of this (including the case-sensitive
+> two-token replace and fresh form/view GUIDs) for you.
+
 1. Copy an existing entity folder (e.g. `smkb_sol_ExampleTableA`).
-2. Rename the folder to `[sol]_your_table_name`.
-3. In `Entity.xml`, replace all occurrences of `smkb_sol_ExampleTableA` with `smkb_<prefix>_YourTableName`.
-4. Update display names, descriptions, EntitySetName, and the primary key `PhysicalName`/`Name`/`LogicalName`.
+2. Rename the folder to the new table's **PascalCase schema name**, `smkb_<prefix>_YourTableName`.
+3. In `Entity.xml`, replace the two token forms **case-sensitively**: `smkb_sol_ExampleTableA` →
+   `smkb_<prefix>_YourTableName` (schema slots) and `smkb_sol_exampletablea` →
+   `smkb_<prefix>_yourtablename` (logical slots). A case-insensitive replace flattens both and breaks the import.
+4. Update display names (`PREFIX - Name`), descriptions, `EntitySetName`, and the primary key `PhysicalName`/`Name`/`LogicalName`.
+5. Generate **fresh GUIDs** for every `FormXml/*` and `SavedQueries/*` filename and its internal id — reusing the copied ones causes a duplicate-key import failure.
 5. Add a RootComponent line in `Other/Solution.xml`:
    ```xml
    <RootComponent type="1" schemaName="smkb_<prefix>_YourTableName" behavior="0" />

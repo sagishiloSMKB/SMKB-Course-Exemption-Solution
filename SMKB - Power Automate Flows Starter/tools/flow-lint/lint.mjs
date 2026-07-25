@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────────────────────
-// flow-lint — static checks for the Payment Vouchers cloud flows + solution XML.
+// flow-lint — static checks for this solution's cloud flows + solution XML.
 //
 // Zero-dependency Node ESM (only built-ins), so it runs from a pre-commit hook,
 // deploy.ps1, or CI *without* an npm install.
@@ -19,7 +19,6 @@ import { fileURLToPath } from 'node:url'
 import { rules, globalRules } from './rules.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const repoRoot = path.resolve(__dirname, '..', '..')
 
 const argv = process.argv.slice(2)
 const strict = argv.includes('--strict')
@@ -27,16 +26,38 @@ const asJson = argv.includes('--json')
 const flowsDirArg = argv.find((a) => !a.startsWith('--'))
 
 // ── Discovery ────────────────────────────────────────────────────────────────
-function findDir(root, endsWith) {
-  const hit = fs.readdirSync(root, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && d.name.endsWith(endsWith))
-    .map((d) => path.join(root, d.name))
-  return hit[0] ?? null
+// This script lives at <repo>/<flows starter>/tools/flow-lint/, but a solution renames
+// its starter folders, so never rely on a fixed depth: walk up to the folder that holds
+// solution.config.json (the repo root marker).
+function findRepoRoot(start) {
+  let cur = start
+  for (let i = 0; i < 8; i++) {
+    if (fs.existsSync(path.join(cur, 'solution.config.json'))) return cur
+    const up = path.dirname(cur)
+    if (up === cur) break
+    cur = up
+  }
+  return path.resolve(start, '..', '..')
+}
+const repoRoot = findRepoRoot(__dirname)
+
+// A starter folder is either still template-named ("... Starter") or renamed by the
+// solution ("SMKB - <Name> - Cloud Flows"), so match any of the accepted suffixes.
+function findDir(root, ...endsWithAny) {
+  let entries
+  try { entries = fs.readdirSync(root, { withFileTypes: true }) } catch { return null }
+  for (const suffix of endsWithAny) {
+    const hit = entries.filter((d) => d.isDirectory() && d.name.endsWith(suffix))
+    if (hit.length) return path.join(root, hit[0].name)
+  }
+  return null
 }
 
-const cloudFlowsDir = flowsDirArg ? path.dirname(path.resolve(flowsDirArg)) : findDir(repoRoot, 'Cloud Flows')
+const cloudFlowsDir = flowsDirArg
+  ? path.dirname(path.resolve(flowsDirArg))
+  : findDir(repoRoot, 'Cloud Flows', 'Power Automate Flows Starter')
 const workflowsDir = flowsDirArg ? path.resolve(flowsDirArg) : (cloudFlowsDir && path.join(cloudFlowsDir, 'Workflows'))
-const envVarsDir = findDir(repoRoot, 'Environmental Variables')
+const envVarsDir = findDir(repoRoot, 'Environmental Variables', 'Environmental Variables Starter')
 
 if (!workflowsDir || !fs.existsSync(workflowsDir)) {
   console.error(`flow-lint: could not find a Workflows folder (looked under ${repoRoot}). Pass one explicitly.`)

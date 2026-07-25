@@ -211,6 +211,10 @@ if ($cfg.activate.environmentVariables) {
     elseif (Test-Path -LiteralPath $xmlNew) { Invoke-AlmToken -Path $xmlNew -Label "EnvVars $newFolder schema/display" }
     Rename-AlmFolder -Base $evBase -OldName $oldFolder -NewName $newFolder -Label "EnvVars folder $oldFolder"
   }
+  # The two ALM vars are also declared as RootComponents in Solution.xml - keep those
+  # schemaNames in lockstep with the folder/schemaname rename above, or the definitions
+  # import unlinked from the solution and never reach Stage/Prod.
+  Invoke-AlmToken -Path (Join-Path $evRoot 'Other\Solution.xml') -Label 'EnvVars Solution.xml ALM RootComponents'
 }
 if ($cfg.activate.powerAutomateFlows) {
   $wf = Join-Path $flRoot 'Workflows'

@@ -90,7 +90,9 @@
         A Power Pages Code Site is a Vue SPA uploaded with the PAC CLI (<code>pac pages upload-code-site</code>).
         Unlike the old Liquid-portal model, there is no manual "add ~200 components to the solution"
         step and no shared-GUID overwrite hazard — a site is namespaced by its publisher prefix and
-        site name (<code>PREFIX - Name</code>, set in <code>src/config/solution.ts</code>).
+        site name. You set the <strong>bare</strong> name in <code>src/config/solution.ts</code>
+        (<code>siteName</code>); the canonical <code>PREFIX - Name</code> form is derived from it, so
+        never type the prefix yourself or it doubles.
       </p>
       <CodeBlock :code="codeSitePromoteExample">
         <template #filename>Promote a Code Site to Stage / Prod</template>

@@ -31,9 +31,10 @@ See the Tables [README](../../../README.md) lookup section and
 2. **Child `Entity.xml`** — add the lookup `<attribute>` inside `<attributes>` (block in the reference).
    Its `<LookupTypes><LookupType>` and `<Name>`/`<LogicalName>` use the **lowercase** forms; `PhysicalName`
    is PascalCase. Set `<RequiredLevel>` (`none`/`required`).
-3. **`Other/Customizations.xml`** — add an `<EntityRelationship>` (one-to-many parent→child) using the
-   naming `smkb_<prefix>_<parentlower>_<childlower>` and the referencing/referenced attribute + navigation
-   properties (block in the reference).
+3. **`Other/Customizations.xml`** — add an `<EntityRelationship>` (one-to-many parent→child). Its `Name`
+   is the two **full lowercase logical** names joined: `<parent_logical>_<child_logical>` (e.g.
+   `smkb_evt_course_smkb_evt_session`). Then set the referencing/referenced attribute + navigation
+   properties (exact block in the reference).
 4. Verify the referencing attribute name in the relationship matches the lookup column's logical name
    exactly (case-sensitive grep):
    ```powershell
