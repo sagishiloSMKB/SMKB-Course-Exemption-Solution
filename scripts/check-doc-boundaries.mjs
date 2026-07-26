@@ -52,14 +52,35 @@ const FORBIDDEN_PROSE = ['pnpm dev', 'pnpm build', 'npm run dev', 'npm run build
 // pre-canonical shape. These files are the ones developers copy from, so a stale example
 // here propagates the wrong convention into real solutions.
 const RETIRED_NAMING = /(?<!smkb_)(?<!\w)(?:sol_[a-z]|\[sol\]_)/
+// Resolve a starter folder by its TYPE SUFFIX so these paths survive the Step 7 renames.
+// Prefer the RENAMED form: `checkNaming` returns early on a missing file, so addressing the
+// template name after a rename silently stopped scanning the real folder - the same silent-skip
+// this resolver exists to prevent. (A pristine template has only the template name, so it still
+// resolves there.)
+function starterDir(templateName, typeSuffix) {
+  let renamed = []
+  try {
+    renamed = fs.readdirSync(repoRoot, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && d.name.startsWith('SMKB - ') && d.name.endsWith(` - ${typeSuffix}`))
+      .map((d) => d.name)
+      .sort()
+  } catch { /* fall through to the template name */ }
+  if (renamed.length) return renamed[0]
+  return templateName
+}
+
+const TABLES_DIR = starterDir('SMKB - Dataverse Tables Starter', 'Dataverse Tables')
+const ENVVAR_DIR = starterDir('SMKB - Environmental Variables Starter', 'Environmental Variables')
+const FLOWS_DIR = starterDir('SMKB - Power Automate Flows Starter', 'Cloud Flows')
+
 const NAMING_FILES = [
   ...DOCS,
-  'SMKB - Dataverse Tables Starter/README.md',
-  'SMKB - Dataverse Tables Starter/Other/Customizations.xml',
-  'SMKB - Dataverse Tables Starter/Relationships.xml',
-  'SMKB - Environmental Variables Starter/README.md',
-  'SMKB - Environmental Variables Starter/Other/Solution.xml',
-  'SMKB - Power Automate Flows Starter/README.md',
+  `${TABLES_DIR}/README.md`,
+  `${TABLES_DIR}/Other/Customizations.xml`,
+  `${TABLES_DIR}/Relationships.xml`,
+  `${ENVVAR_DIR}/README.md`,
+  `${ENVVAR_DIR}/Other/Solution.xml`,
+  `${FLOWS_DIR}/README.md`,
 ]
 // Legitimate exceptions:
 //   • a line that documents the retirement itself (CLAUDE.md's deployed-placeholder warning)

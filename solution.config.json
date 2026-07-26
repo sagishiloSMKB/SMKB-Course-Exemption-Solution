@@ -1,5 +1,5 @@
 {
-  "__doc__": "SINGLE SOURCE OF TRUTH for this solution's identity. Fill these in, then run 'powershell -ExecutionPolicy Bypass -File apply-config.ps1' to push the values into every activated starter's own config files. See CLAUDE.md -> 'Solution Config + Apply Script' and Critical Rule 3 for the component naming convention (schema smkb_<prefix>_PascalName, display 'PREFIX - Name'). Notes: powerPages.siteName is the BARE site name (apply-config derives the 'PREFIX - Name' form - do not pre-prefix it); publisherPrefix and powerApps.region are fixed informational constants; the Power Pages language set is authored in that starter's src/config/solution.ts. This file ships uninitialized (placeholder values); apply-config.ps1 refuses to run until the placeholders are replaced.",
+  "__doc__": "SINGLE SOURCE OF TRUTH for this solution's identity. Fill these in, then run 'powershell -ExecutionPolicy Bypass -File apply-config.ps1' to push the values into every activated starter's own config files. See CLAUDE.md -> 'Solution Config + Apply Script' and Critical Rule 3 for the component naming convention (schema smkb_<prefix>_PascalName, display 'PREFIX - Name'). apply-config.ps1 also RENAMES each activated starter folder to 'SMKB - <Component> - <Type>' and fixes the starter links in the root docs, in the same run: Tables/EnvVars/Flows take their Component from solutionDisplayName, the Power App from powerApps.componentName (falling back to appDisplayName minus the 'SMKB - ' / ' - Dev' wrapper), the site from powerPages.siteName. Do NOT rename a starter folder by hand. Notes: powerPages.siteName is the BARE site name (apply-config derives the 'PREFIX - Name' display form - do not pre-prefix it); powerPages.webUrlSlug is the web address typed at reactivation, conventionally '<prefix>-<kebab siteName>' plus '-dev'/'-stage' (bare for prod) - *.powerappsportals.com is a namespace shared with every Microsoft tenant, so an unprefixed slug is liable to be taken; publisherPrefix and powerApps.region are fixed informational constants; the Power Pages language set is authored in that starter's src/config/solution.ts. This file ships uninitialized (placeholder values); apply-config.ps1 refuses to run until the placeholders are replaced.",
 
   "solutionUniqueName": "YourSolutionName",
   "solutionDisplayName": "Your Solution Name",
@@ -18,6 +18,7 @@
   },
 
   "powerApps": {
+    "componentName": "CHANGEME-APP-COMPONENT-NAME",
     "appDisplayName": "Your App Display Name",
     "region": "prod"
   },
@@ -27,6 +28,7 @@
     "appNameHe": "CHANGEME-APP-NAME-HE",
     "appNameEn": "CHANGEME-APP-NAME-EN",
     "documentTitle": "CHANGEME-TITLE",
-    "defaultLanguage": "he"
+    "defaultLanguage": "he",
+    "webUrlSlug": "CHANGEME-WEB-URL-SLUG"
   }
 }

@@ -75,7 +75,15 @@ jobs:
         run: |
           apps=$(for d in */; do
             d="${d%/}"
-            case "$d" in onboarding*|node_modules|.*) continue;; esac
+            case "$d" in
+              onboarding*|node_modules|.*) continue;;
+              # A folder still named "SMKB - <X> Starter" is a NON-ACTIVATED starter: Init Project
+              # renames every activated one, and Critical Rule 1 requires the rest to be left
+              # untouched. Gating CI on a pristine template spends a job (and an NPM_TOKEN install)
+              # on code that will never be deployed, and shows a red X for a starter the solution
+              # is required not to touch.
+              "SMKB - "*" Starter") echo "Skipping non-activated starter: $d" >&2; continue;;
+            esac
             if [ -f "$d/package.json" ] && ls "$d"/eslint.config.* >/dev/null 2>&1; then
               printf '%s\n' "$d"
             fi
@@ -97,6 +105,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      # Diagnose the credential BEFORE installing. An `npm error 404 @smkbacil/design-ui` names
+      # the wrong culprit: it reads as a missing package, and looks identical whether the secret
+      # is absent or merely expired. That ambiguity cost a real initialization a wrong diagnosis.
+      # Skipped entirely when the app declares no @smkbacil dependency, so a solution that uses
+      # none is never gated on a token it does not need.
+      - name: Check @smkbacil credential
+        working-directory: ${{ matrix.app }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if ! grep -q '"@smkbacil/' package.json; then
+            echo "No @smkbacil dependency in this app - skipping the credential check."
+            exit 0
+          fi
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::NPM_TOKEN secret is not set on this repository. Add a token with read access to the @smkbacil scope (Settings -> Secrets -> Actions)."
+            exit 1
+          fi
+          # Use a THROWAWAY userconfig rather than writing ~/.npmrc: clobbering the runner's home
+          # config is fine on an ephemeral runner and destructive on a self-hosted one.
+          cfg="$(mktemp)"
+          printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$cfg"
+          if ! npm whoami --userconfig "$cfg" >/dev/null 2>&1; then
+            rm -f "$cfg"
+            echo "::error::NPM_TOKEN is set but the registry rejected it - expired or revoked. Mint a new one and update the secret in every consuming repo."
+            exit 1
+          fi
+          rm -f "$cfg"
+          echo "@smkbacil credential OK."
+
       # The committed .npmrc reads ${NPM_TOKEN} for the private @smkbacil/design-ui scope.
       - name: Install
         working-directory: ${{ matrix.app }}

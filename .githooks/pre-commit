@@ -44,22 +44,39 @@ lint_starter() {
   return 0
 }
 
-lint_starter "SMKB - Power Apps Starter"            || status=1
-lint_starter "SMKB - Power Pages Code Site Starter" || status=1
+# Match BOTH the template folder name and the renamed form (Init Project Step 7 renames every
+# activated starter). Addressing only the template name made this dispatch silently inert on all
+# real solution code the moment the folders moved. The globs are unquoted on purpose so the shell
+# expands them; `for` does not word-split its results, so the spaces in the names are safe.
+for dir in "SMKB - Power Apps Starter" "SMKB - "*" - Power App"; do
+  [ -d "$dir" ] || continue
+  lint_starter "$dir" || status=1
+done
+for dir in "SMKB - Power Pages Code Site Starter" "SMKB - "*" - Power Pages Code Site"; do
+  [ -d "$dir" ] || continue
+  lint_starter "$dir" || status=1
+done
 
 # ── flow-lint for the Cloud Flows starter (static JSON/XML checks) ────────────
 # Only once the solution is initialized — the template's example flows carry placeholders
 # on purpose, and flow-lint (correctly) blocks on those. deploy.ps1 is the placeholder gate.
-FLOWS_DIR="SMKB - Power Automate Flows Starter"
-FLOW_STAGED=$(printf '%s\n' "$STAGED" | grep -E "^${FLOWS_DIR}/(Workflows/.*\.json|Other/.*\.xml)$" || true)
-if [ "$INITIALIZED" = 1 ] && [ -n "$FLOW_STAGED" ]; then
+for FLOWS_DIR in "SMKB - Power Automate Flows Starter" "SMKB - "*" - Cloud Flows"; do
+  [ -d "$FLOWS_DIR" ] || continue
+  # An anchored `case` glob, not `grep -E`: the folder name is DATA, and passing it to a regex
+  # let its own characters be interpreted as pattern syntax.
+  FLOW_STAGED=$(printf '%s\n' "$STAGED" | while IFS= read -r f; do
+    case "$f" in
+      "$FLOWS_DIR"/Workflows/*.json|"$FLOWS_DIR"/Other/*.xml) printf '%s\n' "$f" ;;
+    esac
+  done)
+  [ "$INITIALIZED" = 1 ] && [ -n "$FLOW_STAGED" ] || continue
   if command -v node >/dev/null 2>&1 && [ -f "$FLOWS_DIR/tools/flow-lint/lint.mjs" ]; then
     echo "pre-commit: [$FLOWS_DIR] running flow-lint ..."
     node "$FLOWS_DIR/tools/flow-lint/lint.mjs" "$FLOWS_DIR/Workflows" || status=1
   else
     echo "pre-commit: [$FLOWS_DIR] node/flow-lint unavailable — skipping flow-lint"
   fi
-fi
+done
 
 # ── Enforcement: root/starter boundary + solution-config drift (Part C) ───────
 if command -v node >/dev/null 2>&1 && [ -f "scripts/check-doc-boundaries.mjs" ]; then

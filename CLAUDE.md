@@ -190,8 +190,18 @@ powershell -ExecutionPolicy Bypass -File apply-config.ps1           # write iden
 powershell -ExecutionPolicy Bypass -File apply-config.ps1 -Check    # fail if any starter has drifted (used in pre-commit)
 ```
 
-The script writes **only identity** (solution name, prefix, display names, site name, env URL/ID, and
-the ALM env-var schema names) into each activated starter's own config files. It deliberately does
+**The script also owns the starter folder renames.** Init Project Step 7 is a *decision*, not a manual
+`mv`: `apply-config.ps1` writes identity, then renames each activated starter to
+`SMKB - <Component> - <Type>`, then rewrites the starter links in `CLAUDE.md` / `README.md` /
+`INIT_PROJECT.md` — one atomic run, renames last. Renaming by hand instead makes all root tooling
+silently inert (this script writes nothing and `-Check` reports "No drift"; the pre-commit lint
+dispatch matches nothing; `check-doc-boundaries.mjs` hard-fails on the broken links and blocks every
+commit). Every starter path is resolved at runtime, so apply / `-DryRun` / `-Check` behave identically
+before and after the rename. **Restart Claude Code after a rename** — directory-scoped skills are
+discovered once per session and keep pointing at the old paths.
+
+Beyond that the script writes **only identity** (solution name, prefix, display names, site name, env
+URL/ID, and the ALM env-var schema names) into each activated starter's own config files. It deliberately does
 **not** touch platform-assigned placeholders — app IDs, workflow GUIDs, site-setting GUIDs, connection
 references — so each starter's own `deploy.ps1` placeholder guard stays armed for the values a human or
 `pac` must still supply. Re-running is safe (idempotent); after a config change, re-running reconciles.
@@ -277,7 +287,7 @@ The short name is the **middle segment** of every component's schema name and th
 
 > **Shared columns keep the bare publisher prefix** (`smkb_name`, `smkb_description`) with no solution segment — they are intentionally shared across all SMKB tables. **Connection references** keep their fixed environment-level names (never prefix them). See Critical Rule 5.
 
-**Folder naming:** Before touching a starter, verify its folder has been renamed from the template name to `SMKB - [Component Name] - [Type Label]`, where the type labels are `Dataverse Tables`, `Environmental Variables`, `Cloud Flows`, `Power App`, `Power Pages Code Site`. A folder still named `SMKB - X Starter` means the starter has not been activated — rename it first.
+**Folder naming:** Before touching a starter, verify its folder has been renamed from the template name to `SMKB - [Component Name] - [Type Label]`, where the type labels are `Dataverse Tables`, `Environmental Variables`, `Cloud Flows`, `Power App`, `Power Pages Code Site`. A folder still named `SMKB - X Starter` means the starter has not been activated. **Do not rename it by hand** — set the name in [`solution.config.json`](solution.config.json) and run `apply-config.ps1`, which renames the folder and fixes the doc links in the same run (see "Solution Config + Apply Script" above).
 
 **Power App and Power Pages Code Site naming:** For these two types the Component Name must describe the **function** of that specific app or site, and be consistent across all three places:
 

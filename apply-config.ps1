@@ -81,6 +81,17 @@ $ppTitle     = "$($cfg.powerPages.documentTitle)"
 $ppLang      = "$($cfg.powerPages.defaultLanguage)"
 $derivedSite = "$prefixUpper - $ppSite"
 
+# -- Derived starter folder names (INIT_PROJECT Step 7) ------------------------
+# An activated starter is renamed from its template name to 'SMKB - <Component> - <Type>'.
+# Tables / Env Vars / Flows are solution-wide, so their Component is the solution name; the
+# Power App and the Power Pages site are named after what they DO (Critical Rule 3).
+$solutionName = ($displayName -replace '^\s*SMKB\s*-\s*', '').Trim()
+$paComponent  = "$($cfg.powerApps.componentName)".Trim()
+if ($paComponent -eq '' -or $paComponent -like 'CHANGEME*') {
+  # Fall back to the app display name, which is 'SMKB - <Component> - Dev'.
+  $paComponent = (($appDisplay -replace '^\s*SMKB\s*-\s*', '') -replace '\s*-\s*Dev\s*$', '').Trim()
+}
+
 function Test-Initialized {
   return ($uniqueName -ne 'YourSolutionName' -and
           $displayName -ne 'Your Solution Name' -and
@@ -98,6 +109,7 @@ function Assert-Valid {
   if ($envId -eq '00000000-0000-0000-0000-000000000000') { $errs += 'environmentId is still all-zeros.' }
   if ($targetUrl -notmatch '^https://.+/$') { $errs += 'targetEnvUrl must be an https URL ending in "/".' }
   if ($cfg.activate.powerApps -and ($appDisplay -eq 'Your App Display Name' -or $appDisplay -eq '')) { $errs += 'powerApps.appDisplayName is unset.' }
+  if ($cfg.activate.powerApps -and $paComponent -eq '') { $errs += 'powerApps.componentName is unset and could not be derived from appDisplayName (it names the Power App folder).' }
   if ($cfg.activate.powerPages) {
     foreach ($pair in @(@('siteName',$ppSite),@('appNameHe',$ppHe),@('appNameEn',$ppEn),@('documentTitle',$ppTitle))) {
       if ($pair[1] -like 'CHANGEME*' -or $pair[1] -eq '') { $errs += "powerPages.$($pair[0]) is unset (still CHANGEME)." }
@@ -165,12 +177,110 @@ function Rename-AlmFolder {
   $script:writes++; Write-Host "  renamed: $Label -> $NewName" -ForegroundColor Green
 }
 
+# -- Starter folder renames + the doc pointers that follow them ----------------
+# INIT_PROJECT Step 7 used to be a MANUAL rename, and every piece of root tooling addressed the
+# starters by their TEMPLATE names - so renaming broke all of it, mostly silently:
+#   * this script wrote nothing and -Check reported "No drift" (it found no files to compare),
+#   * the pre-commit lint dispatch stopped matching any staged file,
+#   * check-doc-boundaries.mjs hard-failed on 21 now-broken links and blocked every commit.
+# Renaming and pointer-fixing are therefore one atomic operation owned by this script.
+$script:DocFiles = @('CLAUDE.md', 'README.md', 'INIT_PROJECT.md')
+$script:renames  = @()
+
+# Resolve a starter to wherever it currently lives: the renamed form once applied, the
+# template form before that.
+function Get-StarterRoot {
+  param([hashtable]$S)
+  $t = Join-Path $root $S.Target
+  if (Test-Path -LiteralPath $t) { return $t }
+  return (Join-Path $root $S.Template)
+}
+
+function Invoke-StarterRename {
+  param([hashtable]$S)
+  if ($S.Template -eq $S.Target) { return }
+  $old = Join-Path $root $S.Template
+  $new = Join-Path $root $S.Target
+  $oldThere = Test-Path -LiteralPath $old
+  $newThere = Test-Path -LiteralPath $new
+  if ($Check) {
+    if ($oldThere) { $script:drift += "$($S.Label) folder still '$($S.Template)' (expected '$($S.Target)')" }
+    # Neither name present is NOT "nothing to do" - it means the path was unreadable, almost
+    # always MAX_PATH on Windows PowerShell 5.1 (Test-Path returns $false instead of throwing).
+    # -Check is the mode the pre-commit hook and /pre-deploy-verify run, so staying silent here
+    # would let a truncated or hand-renamed tree pass the gate.
+    elseif (-not $newThere) { $script:drift += "$($S.Label) folder: neither '$($S.Template)' nor '$($S.Target)' found (path too long, or renamed by hand?)" }
+    return
+  }
+  if ($DryRun) {
+    if ($oldThere) { Write-Host "  WOULD RENAME $($S.Label) -> $($S.Target)" }
+    elseif ($newThere) { Write-Host ("  ok:      {0} folder (already '{1}')" -f $S.Label, $S.Target) }
+    else { Write-Host "  WARNING: $($S.Label) - neither folder name found (path too long?)" -ForegroundColor Yellow }
+    return
+  }
+  if (-not $oldThere) {
+    if ($newThere) { Write-Host ("  ok:      {0} folder (already '{1}')" -f $S.Label, $S.Target) }
+    else {
+      Write-Host "  WARNING: $($S.Label) - neither '$($S.Template)' nor '$($S.Target)' found under" -ForegroundColor Yellow
+      Write-Host "           $root" -ForegroundColor Yellow
+      Write-Host "           Nothing renamed. If that path is longer than 260 characters, clone the repo" -ForegroundColor Yellow
+      Write-Host "           closer to the drive root (or enable Windows long paths) and re-run." -ForegroundColor Yellow
+      $script:warned = $true
+    }
+    return
+  }
+  if ($newThere) {
+    Write-Host "  WARNING: $($S.Label) - both '$($S.Template)' and '$($S.Target)' exist; not renaming." -ForegroundColor Yellow
+    $script:warned = $true
+    return
+  }
+  Rename-Item -LiteralPath $old -NewName $S.Target
+  $script:writes++
+  Write-Host "  renamed: $($S.Label) -> $($S.Target)" -ForegroundColor Green
+}
+
+# Rewrite folder pointers inside markdown LINK TARGETS only - '](...)' and '](<...>)'. Root docs
+# URL-encode spaces, so both the raw and the %20 form are rewritten. Prose is left alone
+# deliberately: INIT_PROJECT.md names the template folders as instructions, and rewriting those
+# would turn the guide into nonsense. The link grammar here matches what
+# scripts/check-doc-boundaries.mjs validates, so the rewriter can never miss a link the checker
+# will then fail on.
+function Invoke-DocPointers {
+  if (-not $script:renames.Count) { return }
+  foreach ($doc in $script:DocFiles) {
+    $p = Join-Path $root $doc
+    if (-not (Test-Path -LiteralPath $p)) { continue }
+    $orig = Read-Text $p
+    $new  = [regex]::Replace($orig, '\]\(\s*(<[^>]*>|[^)\s]*)([^)]*)\)', {
+      param($m)
+      $t = $m.Groups[1].Value
+      $rest = $m.Groups[2].Value
+      # Only relative links point at a starter folder. Leave absolute/anchor targets alone - the
+      # same set check-doc-boundaries.mjs skips - so a URL that merely contains a starter name is
+      # never rewritten.
+      if ($t -match '^\s*<?\s*(https?:|mailto:|#)') { return $m.Value }
+      foreach ($r in $script:renames) {
+        $t = $t.Replace(($r.Template -replace ' ', '%20'), ($r.Target -replace ' ', '%20'))
+        $t = $t.Replace($r.Template, $r.Target)
+      }
+      return '](' + $t + $rest + ')'
+    })
+    $changed = ($new -ne $orig)
+    $lbl = "root doc starter links ($doc)"
+    if ($Check)  { if ($changed) { $script:drift += $lbl }; continue }
+    if ($DryRun) { Write-Host ("  {0} {1}" -f $(if($changed){'WOULD UPDATE'}else{'ok         '}), $lbl); continue }
+    if ($changed) { Write-Text $p $new; $script:writes++; Write-Host "  updated: $lbl" -ForegroundColor Green }
+    else { Write-Host "  ok:      $lbl" }
+  }
+}
+
 # -- Guard: refuse destructive prefix re-map after platform GUIDs were freshened -
 function Test-PrefixGuard {
   $markers = Get-ChildItem -Path $root -Recurse -Filter '.guid-freshened' -Force -ErrorAction SilentlyContinue
   if ($markers -and -not $Force -and -not $Check -and -not $DryRun) {
     # Only a concern if a starter still holds the OLD 'sol_' ALM tokens (i.e. a prefix change is pending).
-    $envBase = Join-Path $root 'SMKB - Environmental Variables Starter\environmentvariabledefinitions'
+    # Resolved from the starter's CURRENT folder, never a hardcoded template name.
+    $envBase = Join-Path $evRoot 'environmentvariabledefinitions'
     if (Test-Path (Join-Path $envBase 'smkb_sol_EnvironmentName')) {
       Write-Host "Refusing to re-map shortPrefix: a .guid-freshened marker exists and renaming schema names post-deploy is destructive. Re-run with -Force if you are sure." -ForegroundColor Red
       exit 1
@@ -186,6 +296,29 @@ if ($Check -and -not $initialized) {
   exit 0
 }
 if (-not $Check) { Assert-Valid }
+
+# Resolve every starter to its CURRENT folder before anything reads a starter path. A
+# non-activated starter is never renamed, so its Target is its Template.
+$starters = @(
+  @{ Key='dataverseTables';      Template='SMKB - Dataverse Tables Starter';        Target="SMKB - $solutionName - Dataverse Tables";        Label='Dataverse Tables' },
+  @{ Key='environmentVariables'; Template='SMKB - Environmental Variables Starter'; Target="SMKB - $solutionName - Environmental Variables"; Label='Environmental Variables' },
+  @{ Key='powerAutomateFlows';   Template='SMKB - Power Automate Flows Starter';    Target="SMKB - $solutionName - Cloud Flows";             Label='Cloud Flows' },
+  @{ Key='powerApps';            Template='SMKB - Power Apps Starter';              Target="SMKB - $paComponent - Power App";                Label='Power App' },
+  @{ Key='powerPages';           Template='SMKB - Power Pages Code Site Starter';   Target="SMKB - $ppSite - Power Pages Code Site";         Label='Power Pages Code Site' }
+)
+$byKey = @{}
+foreach ($s in $starters) {
+  if (-not $cfg.activate.($s.Key)) { $s.Target = $s.Template }
+  $s.Current = Get-StarterRoot $s
+  $byKey[$s.Key] = $s
+  if ($s.Template -ne $s.Target) { $script:renames += $s }
+}
+$tbRoot = $byKey['dataverseTables'].Current
+$evRoot = $byKey['environmentVariables'].Current
+$flRoot = $byKey['powerAutomateFlows'].Current
+$paRoot = $byKey['powerApps'].Current
+$ppRoot = $byKey['powerPages'].Current
+
 Test-PathHeadroom
 if ($initialized) { Test-PrefixGuard }
 
@@ -195,11 +328,8 @@ Write-Host "solution.config.json -> starters   [$mode]" -ForegroundColor Cyan
 Write-Host ("  solution: {0} ({1})   prefix: {2}   env: {3}" -f $displayName, $uniqueName, $prefix, $targetUrl)
 Write-Host ""
 
-$paRoot = Join-Path $root 'SMKB - Power Apps Starter'
-$ppRoot = Join-Path $root 'SMKB - Power Pages Code Site Starter'
-$flRoot = Join-Path $root 'SMKB - Power Automate Flows Starter'
-$tbRoot = Join-Path $root 'SMKB - Dataverse Tables Starter'
-$evRoot = Join-Path $root 'SMKB - Environmental Variables Starter'
+# (Starter roots are resolved above via Get-StarterRoot - never hardcoded to a template name,
+#  or every write below silently becomes a no-op once Step 7 renames the folders.)
 
 # Solution.xml identity (UniqueName + solution display name) - the 3 XML starters.
 $solXmlPattern = '(<SolutionManifest>\s*<UniqueName>)[^<]*(</UniqueName>\s*<LocalizedNames>\s*<LocalizedName description=")[^"]*(")'
@@ -263,6 +393,21 @@ if ($cfg.activate.powerAutomateFlows) {
       Invoke-AlmToken -Path $_.FullName -Label "Flows $($_.Name) env-var refs"
     }
   }
+}
+
+# -- Folder renames + doc pointers (LAST) -------------------------------------
+# Every content write above addressed each starter at its pre-rename path, so the renames run
+# only once all of them are done. The doc pointers follow, in the same run, so the repo is never
+# left in the state where the folders moved but the links still point at the old names.
+foreach ($s in $script:renames) { Invoke-StarterRename $s }
+Invoke-DocPointers
+
+if ($script:renames.Count -and -not $Check -and -not $DryRun) {
+  Write-Host ""
+  Write-Host "Starter folders were renamed. RESTART Claude Code before continuing:" -ForegroundColor Yellow
+  Write-Host "  directory-scoped skills are discovered once per session, so /dvt-*, /env-*, /flow-*," -ForegroundColor Yellow
+  Write-Host "  /pa-* and /ppcs-* still resolve to the OLD paths - every relative link inside them" -ForegroundColor Yellow
+  Write-Host "  (reference files, READMEs, CLAUDE.md) points into a folder that no longer exists." -ForegroundColor Yellow
 }
 
 # -- Report -----------------------------------------------------------------

@@ -273,13 +273,34 @@ Starters that are NOT activated must remain completely untouched — do not rena
 
 ---
 
-### Step 7 — Rename activated starter folders
+### Step 7 — Choose the activated starters' names
 
-For each selected starter, rename its folder from the template name to the solution-specific name:
+Each activated starter's folder becomes `SMKB - [Component Name] - [Type Label]`:
 
 ```
 SMKB - X Starter  →  SMKB - [Component Name] - [Type Label]
 ```
+
+> **Do NOT rename a folder by hand.** Decide the names here, put them in `solution.config.json`,
+> and let **Step 7b** (`apply-config.ps1`) perform the renames. Renaming manually breaks every
+> piece of root tooling that addresses a starter — and it breaks it *silently*: `apply-config.ps1`
+> writes nothing and `-Check` reports "No drift" (it found no files to compare), the pre-commit
+> lint dispatch stops matching any staged file, and `check-doc-boundaries.mjs` hard-fails on the
+> now-broken doc links so you cannot commit at all. The script renames the folders **and** fixes
+> the doc links in one atomic run.
+
+**Where each folder name comes from:**
+
+| Starter folder | Component Name is taken from |
+|---|---|
+| `… - Dataverse Tables` / `… - Environmental Variables` / `… - Cloud Flows` | `solutionDisplayName`, minus the leading `SMKB - ` |
+| `… - Power App` | `powerApps.componentName` (falls back to `appDisplayName` minus `SMKB - ` / ` - Dev`) |
+| `… - Power Pages Code Site` | `powerPages.siteName` |
+
+> **Multiple apps or sites:** `apply-config.ps1` derives names for exactly **one** Power App and
+> **one** Power Pages Code Site. A solution with two of either must name the second folder by hand,
+> and that folder is **not** covered by the `-Check` drift gate. If multi-app solutions become
+> common, a `components: []` array in `solution.config.json` is the clean fix.
 
 **Tables, Env Vars, and Flows — use the Solution Name as the Component Name** (they are solution-wide resources):
 
@@ -308,7 +329,7 @@ The Component Name must be consistent across:
 
 ---
 
-### Step 7b — Fill the solution config and apply it
+### Step 7b — Fill the solution config and apply it (this performs the Step 7 renames)
 
 > **Skills ship with the kit.** The starter provides `/slash` skills for the build/deploy/quality steps
 > below (auto-discovered from `.claude/skills/`, directory-scoped — see CLAUDE.md → "Skills"). Prefer them
@@ -328,9 +349,25 @@ powershell -ExecutionPolicy Bypass -File apply-config.ps1 -DryRun
 powershell -ExecutionPolicy Bypass -File apply-config.ps1
 ```
 
-This writes the solution name, display names, short prefix, environment, Power Apps app display name,
-Power Pages site name/titles, and the ALM env-var schema names (`smkb_sol_EnvironmentName` /
-`smkb_sol_FlowErrorEmails` → `smkb_<prefix>_…`) into each activated starter's own config files. It deliberately
+`apply-config.ps1` does **three** things, in this order:
+
+1. **Writes identity** — solution name, display names, short prefix, environment, Power Apps app
+   display name, Power Pages site name/titles + `SOLUTION_UNIQUE_NAME`, and the ALM env-var schema
+   names (`smkb_sol_EnvironmentName` / `smkb_sol_FlowErrorEmails` → `smkb_<prefix>_…`).
+2. **Renames the activated starter folders** (the Step 7 names) — non-activated starters keep their
+   template names, untouched.
+3. **Fixes the starter links in the root docs** so `check-doc-boundaries.mjs` still passes.
+
+Renames run **last**, after every content write has addressed each starter at its pre-rename path.
+`-DryRun` lists the renames and pointer updates before anything moves, and `-Check` reports a
+pending rename or a stale doc pointer as drift — so the fix is always "run apply-config".
+
+> **Restart Claude Code after a run that renames folders.** Directory-scoped skills are discovered
+> once per session, so `/dvt-*`, `/env-*`, `/flow-*`, `/pa-*` and `/ppcs-*` keep resolving to the
+> old paths and every relative link inside them points into a folder that no longer exists. The
+> script prints this reminder when it renames anything.
+
+It deliberately
 leaves platform-assigned placeholders (app IDs, workflow GUIDs, site-setting GUIDs, connection
 references, table/flow scaffold names) untouched — those are resolved in Steps 9–10b. Re-running is
 safe and idempotent.

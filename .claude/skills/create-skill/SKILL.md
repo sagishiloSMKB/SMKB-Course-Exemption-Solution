@@ -20,14 +20,22 @@ when working on files in that starter; root skills live in the repo-root `.claud
 scaffolds a new one in the right place with valid frontmatter so you don't hand-roll it. Owner → location +
 prefix:
 
-| Owner | Location | Prefix / name |
+**Locate the starter folder by its type suffix, not by the template name.** Init Project Step 7
+renames every activated starter to `SMKB - <Component> - <Type>`, so the template names below only
+exist in a pristine kit — after init, use whichever folder ends in that type suffix.
+
+| Owner | Location (`<starter>` = the folder ending in the Type below) | Prefix / name |
 |-------|----------|---------------|
 | root | `.claude/skills/<verb-noun>/` | unprefixed · `name: SMKB Solution — <Title>` |
-| tables | `SMKB - Dataverse Tables Starter/.claude/skills/dvt-<verb-noun>/` | `dvt-` · `Dataverse Tables — <Title>` |
-| envvars | `SMKB - Environmental Variables Starter/.claude/skills/env-<verb-noun>/` | `env-` · `Environment Variables — <Title>` |
-| flows | `SMKB - Power Automate Flows Starter/.claude/skills/flow-<verb-noun>/` | `flow-` · `Cloud Flows — <Title>` |
-| powerapps | `SMKB - Power Apps Starter/.claude/skills/pa-<verb-noun>/` | `pa-` · `Power Apps — <Title>` |
-| powerpages | `SMKB - Power Pages Code Site Starter/.claude/skills/ppcs-<verb-noun>/` | `ppcs-` (use that starter's `/ppcs-create-skill`) |
+| tables | `<… - Dataverse Tables>/.claude/skills/dvt-<verb-noun>/` | `dvt-` · `Dataverse Tables — <Title>` |
+| envvars | `<… - Environmental Variables>/.claude/skills/env-<verb-noun>/` | `env-` · `Environment Variables — <Title>` |
+| flows | `<… - Cloud Flows>/.claude/skills/flow-<verb-noun>/` | `flow-` · `Cloud Flows — <Title>` |
+| powerapps | `<… - Power App>/.claude/skills/pa-<verb-noun>/` | `pa-` · `Power Apps — <Title>` |
+| powerpages | `<… - Power Pages Code Site>/.claude/skills/ppcs-<verb-noun>/` | `ppcs-` (use that starter's `/ppcs-create-skill`) |
+
+> Template names in a pristine kit: `SMKB - Dataverse Tables Starter`,
+> `SMKB - Environmental Variables Starter`, `SMKB - Power Automate Flows Starter`,
+> `SMKB - Power Apps Starter`, `SMKB - Power Pages Code Site Starter`.
 
 ## Steps
 
