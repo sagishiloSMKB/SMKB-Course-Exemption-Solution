@@ -28,6 +28,12 @@ export default tseslint.config(
       parserOptions: { parser: tseslint.parser },
     },
     rules: {
+      // `no-undef` (from js.configs.recommended) cannot see TypeScript types, so it reports
+      // type-only DOM references such as `IntersectionObserverInit` or `ScrollIntoViewOptions`
+      // as undefined globals. typescript-eslint recommends turning it off on TS files for
+      // exactly this reason - nothing is lost, because `vue-tsc` (run by `npm run build`)
+      // already fails on any genuinely undefined identifier.
+      'no-undef': 'off',
       'vue/no-v-html': 'error',
       'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-restricted-syntax': [

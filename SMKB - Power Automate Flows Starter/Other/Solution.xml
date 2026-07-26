@@ -82,8 +82,13 @@
         Add a RootComponent entry here for each flow in the Workflows/ folder (the third of the
         three files that must stay in lockstep - see Other/Customizations.xml).
         type="29"  = Workflow (Power Automate cloud flow)
-        id         = the Dataverse workflow GUID from the flow's filename (e.g. smkb_sol_ExampleFlowPowerPages-{GUID}.json)
+        id         = the Dataverse workflow GUID, i.e. the trailing GUID of the flow's own filename
+                     under Workflows/ (the files are named <schemaName>-<GUID>.json)
         behavior   = 0 (include sub-components automatically)
+
+        DO NOT write the placeholder schema-name prefix literally anywhere in this comment. Both
+        deploy.ps1 and flow-lint's xml-no-placeholders rule are plain text greps over this file, so
+        naming it here makes them fire on their own documentation and block a correct deploy.
 
         NOTE: The placeholder GUIDs below are for the two example skeletons only. When you deploy a
         real flow for the first time, replace with the actual Dataverse workflow GUID assigned by the

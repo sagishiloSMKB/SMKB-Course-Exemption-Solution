@@ -100,7 +100,11 @@ Never invent GUIDs by hand. The `.powerpages-site/site-settings/` folder ships 8
 `vite.config.ts` includes a custom `cache-buster` plugin that appends `?v=<buildTimestamp>` to asset URLs in `index.html` **and** rewrites cross-chunk import specifiers (`from"./vue.js"`, `import("./x.js")`) inside the emitted chunks. Because filenames are stable (see above), the URLs never change between builds — without the query-string versioning, an edge cache can serve a fresh `index.js` alongside a stale `vue.js`, producing runtime errors like `"does not provide an export named X"`. This fixed a real production bug. **Do not remove the plugin or strip the `?v=` rewrites.**
 
 ### `powerpages.config.json` — `bundleFilePatterns`
-Lists files cleaned before each upload. Current entries (matching the pre-configured `manualChunks` in `vite.config.ts`): `assets/index.js`, `assets/index.css`, `assets/vue.js`, `assets/smkb.js`, plus `favicon.ico`. If you add a new `manualChunks` entry (e.g., `assets/mylib.js`), add it here too — otherwise the old file persists as a stale Web File record. **Static files copied from `public/` land at the `dist/` root (not under `assets/`) — they need their own entry too** (that's why `favicon.ico` is listed); any output file not matched here is served as `index.html`, causing 404/MIME errors.
+Per [Microsoft's docs](https://learn.microsoft.com/power-pages/configure/create-code-sites), this is a **delete-before-upload cleanup list**: wildcard patterns identifying files in the site's `web-files` that the CLI **removes before uploading** the new build, so old content-hashed bundles don't accumulate as stale Web File records. Entries are **wildcard patterns**, not literal filenames.
+
+The starter ships `assets/*.js`, `assets/*.css` and `favicon.ico` — extension wildcards rather than a literal list, so the config keeps covering the build after a `manualChunks` rename or a new chunk. **Static files copied from `public/` land at the `dist/` root (not under `assets/`) and need their own entry** (that is why `favicon.ico` is listed); add a pattern for any new root-level asset type you ship.
+
+> An unlisted output file is **not** blocked from being served — it simply isn't cleaned up, so a stale copy can linger. The runtime 404/MIME failures come from the separate problem below: a chunk that the deployed `index.html` references but that was never uploaded.
 
 ### No lazy-loaded route imports
 Always use direct imports for route components — never `() => import('../views/Foo.vue')`. Dynamic imports cause Vite to emit a separate chunk file per view. Power Pages only serves files listed in `bundleFilePatterns`; any unlisted output file returns `index.html` instead, causing 404s and MIME-type errors at runtime.
@@ -340,7 +344,9 @@ import '@smkbacil/design-ui/tokens-nofonts.css'  // design tokens — load first
 import '@smkbacil/design-ui/style.css'           // component styles
 import './assets/main.css'                       // app overrides — load last
 ```
-`tokens-nofonts.css` is the default on purpose: `tokens.css` references bundled `.woff2` files that Vite emits as `assets/*.woff2`, which are **not** in `bundleFilePatterns` — Power Pages serves `index.html` for them, causing 404/MIME errors. To opt back into the bundled fonts, switch to `tokens.css` **and** add the woff2 patterns to `bundleFilePatterns` in `powerpages.config.json`.
+`tokens-nofonts.css` is the default: `tokens.css` pulls in bundled `.woff2` files that Vite emits as `assets/*.woff2`, and the starter keeps the shipped build free of binary font assets.
+
+> The original rationale here was that unlisted files "are served as `index.html`". That rested on reading `bundleFilePatterns` as an upload allow-list, which Microsoft's docs contradict (see above) — `upload-code-site` uploads all of `dist/`. **Treat the font question as unverified:** if you want the bundled fonts, switch to `tokens.css`, add `assets/*.woff2` to `bundleFilePatterns` (so superseded font bundles are cleaned up), confirm `font-src` in both CSP files still covers them, and check the fonts actually load on the deployed site before relying on it.
 
 ### Key components
 `SmkbButton` (variants: `primary`, `secondary`, `ghost`, `danger`), `SmkbInput`, `SmkbSelect`, `SmkbTable` (sortable + paginated), `SmkbDialog`, `SmkbNotification`, `SmkbIcon` (kebab-case icon name), `SmkbCard`, `SmkbLoading`, `SmkbEmpty`, `SmkbSkeleton`

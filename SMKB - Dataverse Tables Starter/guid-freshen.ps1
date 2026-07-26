@@ -50,6 +50,10 @@ Write-Host "Replacing $($guidMap.Count) sentinel GUIDs with fresh values..." -Fo
 
 $entityDir = Join-Path $scriptDir "Entities"
 
+# Track which sentinels were actually found, so the summary can tell a real run from a no-op.
+$matched = @{}
+foreach ($k in $guidMap.Keys) { $matched[$k] = $false }
+
 # Pass 1: update file CONTENT
 # Must complete before Pass 2 so renamed files are not re-processed.
 $xmlFiles = Get-ChildItem $entityDir -Recurse -Include "*.xml" -File -ErrorAction SilentlyContinue
@@ -58,6 +62,7 @@ foreach ($file in $xmlFiles) {
     $content = [System.IO.File]::ReadAllText($file.FullName)
     $original = $content
     foreach ($old in $guidMap.Keys) {
+        if ($content -match [regex]::Escape($old)) { $matched[$old] = $true }
         $content = $content -ireplace [regex]::Escape($old), $guidMap[$old]
     }
     if ($content -ne $original) {
@@ -74,6 +79,7 @@ $renamedFiles = 0
 foreach ($file in $xmlFiles) {
     $newName = $file.Name
     foreach ($old in $guidMap.Keys) {
+        if ($newName -match [regex]::Escape($old)) { $matched[$old] = $true }
         $newName = $newName -ireplace [regex]::Escape($old), $guidMap[$old]
     }
     if ($newName -ne $file.Name) {
@@ -84,11 +90,23 @@ foreach ($file in $xmlFiles) {
 }
 
 Write-Host ""
-Write-Host "Done. $contentChanged file(s) updated, $renamedFiles file(s) renamed." -ForegroundColor Green
-Write-Host ""
-Write-Host "GUID assignments:"
-foreach ($old in $guidMap.Keys) {
-    Write-Host "  $old  ->  $($guidMap[$old])"
+# Report how many sentinels were actually found, so a no-op is visibly a no-op. Cloning a table
+# via /dvt-add-table already freshens its GUIDs, so this script legitimately finds nothing - but
+# printing "Done." plus a table of 8 "assignments" that were never applied made a no-op
+# indistinguishable from real work.
+$replaced = @($guidMap.Keys | Where-Object { $matched[$_] }).Count
+Write-Host ("Done. $replaced of $($guidMap.Count) sentinel GUID(s) replaced " +
+            "- $contentChanged file(s) updated, $renamedFiles file(s) renamed.") -ForegroundColor Green
+if ($replaced -eq 0) {
+    Write-Host ""
+    Write-Host "No sentinel GUIDs were present - nothing to do. That is expected if your tables were" -ForegroundColor Yellow
+    Write-Host "cloned with fresh GUIDs (/dvt-add-table step 4) or this project was already freshened." -ForegroundColor Yellow
+} else {
+    Write-Host ""
+    Write-Host "GUID assignments applied:"
+    foreach ($old in $guidMap.Keys) {
+        if ($matched[$old]) { Write-Host "  $old  ->  $($guidMap[$old])" }
+    }
 }
 
 # Write marker so this script cannot run again against a deployed solution

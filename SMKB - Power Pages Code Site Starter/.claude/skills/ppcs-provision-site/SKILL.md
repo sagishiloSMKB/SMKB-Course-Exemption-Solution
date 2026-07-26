@@ -141,6 +141,39 @@ For detailed recovery procedures, see [provision-reference.md](provision-referen
 16. Report success with the site URL and remind the user to verify the SPA loads
     (not the portal template). Ask them to open the site in a browser and confirm.
 
+### Phase 5 — Convert to Production (manual step, do NOT defer)
+
+17. **Every Power Pages site is created as a trial — in every environment type — and a trial
+    site is deleted.** This is not a trial-*environment* concern. Per Microsoft's
+    [Power Pages lifecycle](https://learn.microsoft.com/power-pages/admin/lifecycle):
+
+    | Site created in | Trial expires | Then |
+    |---|---|---|
+    | Trial environment | 30 days (or when the environment expires, whichever is first) | suspended, host **deleted** 7 days later |
+    | Non-expiring environment (production / sandbox) | **90 days** | suspended, host **deleted** 7 days later |
+
+    The 90 days runs from **site creation, not last use** — an actively developed site still
+    expires. On deletion the site *host* goes: URL, configuration, web files. Dataverse data
+    survives, but the site must be rebuilt and re-provisioned, and the URL is not guaranteed to
+    be reclaimable.
+
+    **PAUSE** and have the developer convert it now:
+    > [Power Platform Admin Center](https://admin.powerplatform.microsoft.com) →
+    > **Manage → Power Pages** → select the site → **Convert to production**. Wait 2-5 minutes.
+
+    Prerequisites: a Power Pages / Power Platform admin role, and available Power Pages capacity
+    in the tenant. A site in a **developer or trial environment cannot be converted at all** —
+    it can only be migrated to a supported environment first.
+
+18. **Verify, do not assume.** Re-read the site list and confirm the type no longer says trial:
+    ```
+    pac pages list -v
+    ```
+    If it still reports `Trial (n days)`, the conversion did not take effect — stop and resolve
+    it before treating provisioning as complete. This is the last step of the longest workflow in
+    the repo, which is exactly where instructions get skipped, so it is checked rather than
+    trusted. Repeat this in **every** environment the site is promoted to.
+
 ## Error Handling
 
 - **Build fails (TypeScript errors):** Fix all errors before proceeding. Run
@@ -161,5 +194,8 @@ For detailed recovery procedures, see [provision-reference.md](provision-referen
 - After this workflow completes, all subsequent deploys use `/ppcs-deploy`.
 - Flow GUIDs and table permissions are site-specific — set those up separately
   via `/ppcs-register-flow` and `/ppcs-enable-web-api` after provisioning.
-- Trial environments: convert to production after provisioning via PPAC →
-  Manage → Power Pages → site → **Convert to production**.
+- **Converting to production is not a trial-environment-only concern** (an earlier version of
+  this note said so, and it was wrong). *Every* site is created as a trial regardless of
+  environment type, and an unconverted site is suspended and its host **deleted** — 90 days from
+  creation in a normal environment, 30 in a trial one. Phase 5 / step 17 is therefore mandatory
+  for every site in every environment, not an optional cleanup.

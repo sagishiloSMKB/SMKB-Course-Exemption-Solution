@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  REFERENCE TEMPLATE — DO NOT PLACE IN Other/ — pac solution pack reads all XML files there.
+  REFERENCE TEMPLATE - DO NOT PLACE IN Other/ - pac solution pack reads all XML files there.
   This file is for documentation only and is not imported into Dataverse.
 
   When you add lookup columns that link two tables, copy the <EntityRelationship>
   block below into Other/Customizations.xml inside the <EntityRelationships> element.
   Also add the lookup attribute to the referencing table's Entity.xml.
 
-  Naming conventions (all names below are the LOWERCASE logical forms — Dataverse lowercases
+  Naming conventions (all names below are the LOWERCASE logical forms - Dataverse lowercases
   logical names; only schemaName / PhysicalName keep PascalCase. See CLAUDE.md Critical Rule 3):
     Relationship Name:  [referencing_table]_[referenced_table]
       e.g. smkb_evt_course_smkb_evt_session
@@ -20,7 +20,7 @@
 <ImportExportXml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <EntityRelationships>
     <!--
-      Copy this block into Other/Customizations.xml → <EntityRelationships> for each lookup column.
+      Copy this block into Other/Customizations.xml -> <EntityRelationships> for each lookup column.
       Replace `evt` with your solution short prefix.
 
       <EntityRelationship Name="smkb_evt_course_smkb_evt_session">

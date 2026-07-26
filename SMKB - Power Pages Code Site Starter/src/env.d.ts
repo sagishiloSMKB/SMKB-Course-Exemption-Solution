@@ -32,3 +32,10 @@ interface Window {
     }
   }
 }
+
+// NOTE: this file must stay a GLOBAL SCRIPT - no top-level import or export.
+// Adding one turns it into a module, and the `Window` / `ImportMetaEnv` interfaces
+// above stop being global augmentations - which breaks every `window.Microsoft`
+// reference with an error that looks unrelated to the edit that caused it.
+// Module augmentations (e.g. vue-router's RouteMeta) therefore need their own file
+// under src/types/ instead.

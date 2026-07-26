@@ -22,7 +22,10 @@ $zipPath   = Join-Path $distDir "solution.zip"
 
 # -- Placeholder safety check -------------------------------------------------
 # Blocks deployment if any template placeholders remain unreplaced.
-$placeholders = @('YourSolutionName', 'Your Solution Name', 'smkb_sol_')
+# 'Example Table' is a backstop for the human display names. The primary-key attribute carries a
+# bare `<displayname description="Example Table A">` with no prefix, so a rename that only handled
+# the schema tokens would ship a PK column still labelled "Example Table A" in every form and view.
+$placeholders = @('YourSolutionName', 'Your Solution Name', 'smkb_sol_', 'Example Table')
 $violations   = @()
 $scanFiles = Get-ChildItem $scriptDir -Recurse -File -Include "*.xml" -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -notmatch '_dist' }
@@ -71,13 +74,58 @@ if ($staleFiles) {
 }
 # -----------------------------------------------------------------------------
 
+# -- pac wrapper: never trust the exit code -----------------------------------
+# pac CLI exits 0 even when the operation FAILED. Confirmed on a real deploy: a failed
+# async import printed "Asynchronous operation ... failed" and still returned 0, so the
+# script reported success. Always parse stdout as well as $LASTEXITCODE.
+#
+# Back-to-back starter deploys (the order this kit prescribes) also routinely hit
+# "Cannot start another [Import] because there is a previous [Import] running" while the
+# previous starter's import finalises. That one just needs a short wait, so retry it.
+function Invoke-Pac {
+    param([string[]]$PacArgs, [string]$What, [int]$MaxAttempts = 3)
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        $lines = & pac @PacArgs 2>&1
+        $code  = $LASTEXITCODE
+        $out   = ($lines | Out-String)
+        $lines | ForEach-Object { Write-Host $_ }
+
+        $busy   = $out -match 'because there is a previous \[Import\] running'
+        # A busy import means the import did NOT happen, so it counts as a failure even when
+        # pac reports it without an "Error:" line - otherwise we would fall through to
+        # "Done." having imported nothing.
+        $failed = $busy -or
+                  ($code -ne 0) -or
+                  ($out -match '(?im)^\s*Error:') -or
+                  ($out -match '(?i)Asynchronous operation.*failed') -or
+                  ($out -match '(?i)\bimport failed\b')
+        if (-not $failed) { return }
+
+        if ($busy -and $attempt -lt $MaxAttempts) {
+            Write-Host ""
+            Write-Host "Another solution import is still finalising - waiting 20s, then retry $($attempt + 1) of $MaxAttempts ..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 20
+            continue
+        }
+
+        Write-Host ""
+        Write-Host "DEPLOY FAILED -- $What did not succeed (pac exit $code)." -ForegroundColor Red
+        if ($busy) { Write-Host "Another import was still running. Wait a few seconds and re-run." -ForegroundColor Yellow }
+        exit 1
+    }
+}
+# -----------------------------------------------------------------------------
+
 if (-not (Test-Path $distDir)) { New-Item -ItemType Directory -Path $distDir | Out-Null }
 if (Test-Path $zipPath) { Remove-Item $zipPath }
 
 Write-Host "Packing solution..."
-pac solution pack --zipFile $zipPath --folder $scriptDir --packageType Unmanaged
+Invoke-Pac -What 'pac solution pack' -PacArgs @(
+    'solution', 'pack', '--zipFile', $zipPath, '--folder', $scriptDir, '--packageType', 'Unmanaged')
 
 Write-Host "Importing to $TargetEnv ..."
-pac solution import --path $zipPath --environment $TargetEnv --force-overwrite --async --max-async-wait-time 10
+Invoke-Pac -What 'pac solution import' -PacArgs @(
+    'solution', 'import', '--path', $zipPath, '--environment', $TargetEnv,
+    '--force-overwrite', '--async', '--max-async-wait-time', '10')
 
 Write-Host "Done." -ForegroundColor Green

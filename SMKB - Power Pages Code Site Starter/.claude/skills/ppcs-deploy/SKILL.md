@@ -2,13 +2,14 @@
 name: Power Pages Code Site — Deploy
 description: >-
   Pre-flight validated deploy for a Power Pages Code Site: checks bundleFilePatterns
-  vs manualChunks sync, no lazy route imports, no CHANGEME placeholders, active pac
-  auth profile targets Dev, lint + test + TypeScript clean — then runs npm run deploy.
+  vs manualChunks sync, no lazy route imports, no unreplaced placeholder sentinels,
+  active pac auth profile targets Dev, lint + test + TypeScript clean — then runs
+  npm run deploy and reconciles the site + its components into the Dataverse solution.
 when_to_use: >-
   User says "deploy", "push to Power Pages", "upload", "publish", "redeploy".
   Not for first-ever deploy — use /ppcs-provision-site instead.
 disable-model-invocation: true
-allowed-tools: Bash(pac auth list) Bash(npm run lint) Bash(npm run test) Bash(npm run build) Bash(pac pages upload-code-site *) Read Grep
+allowed-tools: Bash(pac auth list) Bash(npm run lint) Bash(npm run test) Bash(npm run build) Bash(pac pages upload-code-site *) Bash(npm run solution:sync) Bash(npm run solution:check) Read Grep
 ---
 
 ## Context
@@ -96,7 +97,36 @@ Current config state (injected at invocation):
    pac pages upload-code-site --rootPath .
    ```
 
-7. Report the site URL from `powerpages.config.json` (`siteName` field).
+7. **Reconcile the site into the solution — part of the deploy, not an afterthought.**
+   ```
+   powershell -ExecutionPolicy Bypass -File scripts/add-site-to-solution.ps1
+   ```
+   `npm run deploy` already chains this as `npm run solution:sync`; run it explicitly only if
+   you uploaded with a raw `pac pages upload-code-site`.
+
+   Why it must run every time: `upload-code-site` creates the site and its components as loose
+   Dataverse records. **Solution membership is a separate act that nothing else performs.** A
+   Power Platform Pipeline promotes only what the solution contains, so a component left out
+   means the pipeline *succeeds* and the target site is quietly misconfigured. Any deploy that
+   adds a site setting, web role, page template or CSP edit creates new components — which is
+   exactly why this belongs in the deploy rather than a checklist someone remembers.
+
+   The script diffs and adds only what is missing, so a clean site costs two queries and no
+   writes. Expected output on a healthy site:
+   ```
+   Site record : in the solution
+   Solution is complete - nothing to add.
+   ```
+   If it reports additions, that is normal after a config change — not an error.
+
+   **Web Files are included** (`-WebFiles All`, the default) — every component belonging to the
+   site goes in the solution. Excluding them as "build output the uploader delivers anyway" was
+   tried and lost 5 real components: the theme assets Power Pages creates at provisioning
+   (`bootstrap.min.css`, `theme.css`, `portalbasictheme.css`, and two images) exist in `dist/`
+   nowhere, so nothing would ever deliver them to Stage or Prod. `-WebFiles NonBuildOutput|None`
+   exist for a strict two-track setup; they are opt-outs, not the default.
+
+8. Report the site URL from `powerpages.config.json` (`siteName` field).
    The `cache-buster` plugin in `vite.config.ts` stamps `?v=<buildTimestamp>`
    on asset URLs in `index.html` and on cross-chunk imports, so browsers and
    the CDN pick up fresh chunks after a normal deploy. If changes still don't

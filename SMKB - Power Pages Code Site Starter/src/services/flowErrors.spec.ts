@@ -1,18 +1,26 @@
 import { describe, it, expect } from 'vitest'
 import { flowErrorMessage, FLOW_ERROR_MESSAGES } from './flowErrors'
 import { unwrapFlowResult, FlowError } from './cloudFlow'
+import { SOLUTION } from '../config/solution'
+
+// A test that asserts "the default" must READ the default, not restate one possible value.
+// flowErrorMessage() falls back to SOLUTION.defaultLanguage, so hardcoding Hebrew here made
+// `npm run test` fail for any solution configured with defaultLanguage: 'en' - and the test
+// script is inside `npm run deploy`, so the Code Site could not deploy at all.
+const DEFAULT_MESSAGES = FLOW_ERROR_MESSAGES[SOLUTION.defaultLanguage]
 
 describe('flowErrorMessage', () => {
   it('maps a known code to the default-language message', () => {
-    expect(flowErrorMessage('NOT_FOUND')).toBe(FLOW_ERROR_MESSAGES.he.NOT_FOUND)
+    expect(flowErrorMessage('NOT_FOUND')).toBe(DEFAULT_MESSAGES.NOT_FOUND)
   })
 
   it('maps a known code per requested language', () => {
     expect(flowErrorMessage('NOT_FOUND', undefined, 'en')).toBe(FLOW_ERROR_MESSAGES.en.NOT_FOUND)
+    expect(flowErrorMessage('NOT_FOUND', undefined, 'he')).toBe(FLOW_ERROR_MESSAGES.he.NOT_FOUND)
   })
 
   it('falls back to the generic ERROR message for unknown codes', () => {
-    expect(flowErrorMessage('SOME_UNKNOWN_CODE')).toBe(FLOW_ERROR_MESSAGES.he.ERROR)
+    expect(flowErrorMessage('SOME_UNKNOWN_CODE')).toBe(DEFAULT_MESSAGES.ERROR)
   })
 
   it('prefers an explicit fallback over the generic message', () => {

@@ -16,7 +16,7 @@ $projectRoot = Join-Path $PSScriptRoot ".."
 $settingsDir = Join-Path (Join-Path $projectRoot ".powerpages-site") "site-settings"
 $markerPath  = Join-Path $projectRoot ".guid-freshened"
 
-# Safety gate — refuse to run twice on the same site
+# Safety gate - refuse to run twice on the same site
 if (Test-Path $markerPath) {
     Write-Error "Already freshened. See .guid-freshened to reset for a brand-new site."
     exit 1
@@ -36,7 +36,7 @@ if ($targetFiles.Count -eq 0) {
     exit 0
 }
 
-# Build a 1:1 replacement map — one fresh GUID per unique placeholder
+# Build a 1:1 replacement map - one fresh GUID per unique placeholder
 $guidMap = @{}
 foreach ($file in $targetFiles) {
     $content = Get-Content $file.FullName -Raw -Encoding UTF8

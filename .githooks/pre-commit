@@ -66,6 +66,14 @@ if command -v node >/dev/null 2>&1 && [ -f "scripts/check-doc-boundaries.mjs" ];
   node "scripts/check-doc-boundaries.mjs" || status=1
 fi
 
+# ── Enforcement: the template must not trip its own guards ────────────────────
+# A shipped file that documents the sentinel its own guard greps for makes that guard fire
+# on its own prose and block a correct deploy. This happened four times in one real
+# initialization, so it is checked mechanically. Also enforces ASCII-only .ps1 / solution XML.
+if command -v node >/dev/null 2>&1 && [ -f "scripts/check-template-guards.mjs" ]; then
+  node "scripts/check-template-guards.mjs" || status=1
+fi
+
 if [ -f "apply-config.ps1" ]; then
   PS=""
   if command -v pwsh >/dev/null 2>&1; then PS=pwsh

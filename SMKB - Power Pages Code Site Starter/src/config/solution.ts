@@ -5,9 +5,13 @@
 // starter (App.vue header, document title, session-storage keys, flow error
 // language) reads from here — never hardcode these values elsewhere.
 //
-// The literal string 'CHANGEME' is a machine-checkable sentinel:
-// /ppcs-provision-site and /ppcs-deploy grep this file and HALT while any
-// CHANGEME remains (same role as "MY-SITE-NAME" in powerpages.config.json).
+// The starter ships every value below as a machine-checkable placeholder sentinel;
+// /ppcs-provision-site and /ppcs-deploy grep this file for it and HALT while any
+// remains (powerpages.config.json carries the equivalent sentinel for the site name).
+//
+// Do NOT write that sentinel token literally in this comment. Both guards are plain
+// text greps, so naming it here makes them fire on their own documentation and block
+// a fully configured solution.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type LanguageCode = 'he' | 'en'
@@ -81,3 +85,15 @@ export const SESSION_STORAGE_KEY = `smkb-${SOLUTION.prefix}-auth`
  * /ppcs-deploy verifies the two still agree.
  */
 export const POWER_PAGES_SITE_NAME = `${SOLUTION.prefix.toUpperCase()} - ${SOLUTION.siteName}`
+
+/**
+ * Dataverse solution unique name (e.g. 'SMKBEvents') - written here by the root
+ * `apply-config.ps1` from `solution.config.json`.
+ *
+ * Deploy tooling only; the SPA never reads it, so Vite tree-shakes it out of the
+ * bundle. `scripts/add-site-to-solution.ps1` needs it to reconcile this site's
+ * components against the solution on every deploy, and the starter has no other
+ * way to learn the name - `powerpages.config.json` follows a Microsoft schema and
+ * must not carry custom keys.
+ */
+export const SOLUTION_UNIQUE_NAME = 'CHANGEME-SOLUTION-UNIQUE-NAME'

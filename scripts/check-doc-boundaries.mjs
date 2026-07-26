@@ -33,8 +33,12 @@ const FORBIDDEN_ALWAYS = [
   'check:security',
   'SMKB-App.webtemplate',
   'sol_example_item',
-  'powerpagecomponent',
   'SMKB - Power Page Starter',
+  // NOTE: 'powerpagecomponent' was listed here as retired Liquid-portal vocabulary. It is NOT
+  // retired - it is the enhanced-data-model (modelVersion 2) Dataverse table that Code Sites
+  // use, and the literal `--componentType` value the site-to-solution reconcile requires. The
+  // ban made the kit structurally unable to document its own fix: the pre-commit hook rejected
+  // the Step 10b text as an "obsolete token". Do not re-add it.
 ]
 
 // Pure per-starter build/dev commands that should never be inlined in root prose

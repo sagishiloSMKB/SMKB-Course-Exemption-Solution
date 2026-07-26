@@ -170,29 +170,47 @@ config and behaves incorrectly.
 This is most likely to cause problems on the **first** dev-to-stage promotion. Subsequent
 promotions are safer once the solution is known-complete.
 
-### How to check and fix before promoting
+### This is automated — `npm run deploy` already does it
 
-1. Open [make.powerapps.com](https://make.powerapps.com) → switch to the **Dev**
-   environment → open your solution
-2. Click **Add existing** → browse the component types below
-3. For each component type, sort the picker list by the **Site** column and look for
-   components belonging to your site that are not yet in the solution
-   _(components already in the solution are hidden from the picker — an empty list means
-   you're complete for that type)_
-4. Select all orphaned components → **Add**
+`scripts/add-site-to-solution.ps1` reconciles the site **and every component belonging to it**
+into the solution. `npm run deploy` chains it as `npm run solution:sync` after
+`upload-code-site`, so a normal deploy leaves the solution complete. It is diff-based and
+idempotent: a clean site costs two queries and zero writes.
 
-**Component types to check:**
+```powershell
+npm run solution:sync    # add whatever is missing (also chained into npm run deploy)
+npm run solution:check   # report only; exit 1 if anything is missing (gates + CI)
+```
 
-| Type | Where in "Add existing" |
-|---|---|
-| Site settings | **More → Other → Site Setting** |
-| Page templates | **More → Other → Page Template** |
-| Web roles | **More → Other → Web Role** |
-| Table permissions | **More → Other → Table Permission** |
-| Content snippets | **More → Other → Content Snippet** |
-| Cloud flow registrations | **More → Other → Cloud Flow** |
+Run `solution:check` before every promotion. It is not a one-off: **any** deploy that touches
+site configuration — one new site setting, one CSP edit, one web-role change, registering a
+cloud flow — creates components that are born outside the solution.
 
-5. Once the solution is complete, run the Power Platform Pipeline
+**Two separate gaps, and fixing the first does not fix the second:**
+
+1. The **site record** itself is not in the solution.
+2. Its **components** are not either. `--AddRequiredComponents` on the site record does **not**
+   pull them in (verified by round-trip export: `powerpagecomponents/` came back empty). Each
+   component needs its own add call.
+
+**Web Files are included** (`-WebFiles All`, the default). Excluding them as "just the compiled
+SPA that `upload-code-site` delivers anyway" was tried and is wrong: most are build output, but
+Power Pages also creates theme assets at provisioning (`bootstrap.min.css`, `theme.css`,
+`portalbasictheme.css`, and two images) that exist in `dist/` nowhere — the uploader never
+recreates them, so excluding them means they reach **no other environment, ever**.
+`-WebFiles NonBuildOutput|None` remain available for a strict two-track setup; they are
+opt-outs, not the default.
+
+**Two `pac` traps this script works around — assume they apply anywhere else you call `pac`:**
+
+- **`--componentType` takes the type NAME, not the numeric id.** A numeric id is rejected
+  outright, and the ids are environment-specific (Microsoft's own docs contradict themselves),
+  so the script discovers them at runtime from `solutioncomponentdefinition` instead of
+  hardcoding.
+- **`pac` exits 0 on failure.** Confirmed for a rejected component type *and* for a failed
+  solution import. The script parses stdout and never gates on `$LASTEXITCODE`.
+
+Once `solution:check` is clean, run the Power Platform Pipeline.
 
 ---
 
@@ -300,7 +318,8 @@ are the GitHub environment name and the `PP_ENVIRONMENT_URL` variable value:
 | Site appears under Inactive Sites after solution import | Normal after Pipeline import — Power Pages doesn't auto-activate | Power Pages home → target environment → **Inactive Sites** → **Reactivate** → wait 2–3 min |
 | `pac pages list -v` shows `Single Page Application: No` | Site not promoted as a Code Site; SPA flag didn't transfer | Re-run solution import or verify site type in Power Pages Studio |
 | `.js` uploads blocked (403) | Fresh Dataverse environments block `.js` uploads by default | PPAC → target environment → Settings → Product → Features → **Blocked Attachments** → remove `js` |
-| Pipeline succeeds but target site has missing features or config errors (not a 500) | Some site components exist in Dev but were never added to the solution — they don't transfer via Pipeline | In Dev: solution → **Add existing** → check each component type, sort by Site, add all missing components → re-run Pipeline |
+| Pipeline succeeds but target site has missing features or config errors (not a 500) | Some site components exist in Dev but were never added to the solution — they don't transfer via Pipeline | In Dev: `npm run solution:sync` (or just `npm run deploy`), confirm with `npm run solution:check`, then re-run the Pipeline |
+| Pipeline succeeds but the target has **no site at all** | The site *record* was never added to the solution — `upload-code-site` creates it as a loose Dataverse record | Same fix: `npm run solution:sync` adds the site record and its components |
 
 ---
 

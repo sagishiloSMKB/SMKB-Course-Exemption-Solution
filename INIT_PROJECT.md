@@ -465,8 +465,35 @@ The Code Site provisions and deploys through its own skills — the agent drives
 3. **(Optional) table access:** to read/write a Dataverse table directly from the SPA, run **`/ppcs-enable-web-api`**.
 4. **Deploy:** run **`/ppcs-deploy`** (builds and uploads via `pac pages upload-code-site`).
 5. **Verify:** open the site URL in a browser; the Vue app should load.
+6. **Convert the site to Production — do this now, not later. MANDATORY.**
+   Every Power Pages site is created as a **trial in every environment type**, and an unconverted
+   site is suspended at day 90 (30 in a trial environment) with its **host deleted** 7 days later —
+   URL, configuration and web files gone. The clock runs from *site creation*, not last use, so an
+   actively developed site still expires.
+   [Power Platform Admin Center](https://admin.powerplatform.microsoft.com) →
+   **Manage → Power Pages** → select the site → **Convert to production**, then confirm with
+   `pac pages list -v` that it no longer reports `Trial`. Requires an admin role and available
+   Power Pages capacity; a site in a **developer/trial environment cannot be converted** (migrate
+   it first). `/ppcs-provision-site` Phase 5 walks through and verifies this.
+7. **Reconcile the site into the solution — MANDATORY.**
+   `pac pages upload-code-site` creates the site and its components as **loose Dataverse records**;
+   solution membership is a separate act that nothing else performs. A Power Platform Pipeline
+   promotes only what the solution contains, so a missing component means the promotion
+   **succeeds** and delivers a quietly misconfigured site to Stage/Prod — nothing fails at Dev
+   time. `/ppcs-deploy` step 7 runs this (and `npm run deploy` chains it as `npm run solution:sync`):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Power Pages Code Site\scripts\add-site-to-solution.ps1"
+   ```
+   Two separate gaps: the **site record** is not in the solution, and neither are its
+   **components** — `--AddRequiredComponents` does *not* pull them in. Re-run before every
+   promotion: any later site-config change (one site setting, one CSP edit, registering a flow)
+   creates components that are born outside the solution. Verify with `npm run solution:check`
+   (exit 1 on drift).
+   > **The same gap applies to the Power Apps starter** (`--componentType "canvasapp"`, using the
+   > app's *unique* name). That path is **unverified** — this was found on a solution that did not
+   > activate the Power Apps starter — so check the app is in the solution before promoting.
 
-> **10b.F — Power Pages Code Site:** Append an entry: did provisioning and deploy complete? did flows register? any CSP or 403 errors (see the starter's `/ppcs-troubleshoot`)? anything unclear?
+> **10b.F — Power Pages Code Site:** Append an entry: did provisioning and deploy complete? did flows register? was the site converted to Production and verified? did `solution:check` report the site + all components in the solution? any CSP or 403 errors (see the starter's `/ppcs-troubleshoot`)? anything unclear?
 
 ---
 

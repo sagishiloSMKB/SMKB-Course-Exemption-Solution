@@ -1,12 +1,11 @@
 {
+  "$schema": "https://www.schemastore.org/powerpages.config.json",
   "siteName": "MY-SITE-NAME",
   "defaultLandingPage": "index.html",
   "compiledPath": "./dist",
   "bundleFilePatterns": [
-    "assets/index.js",
-    "assets/vue.js",
-    "assets/smkb.js",
-    "assets/index.css",
+    "assets/*.js",
+    "assets/*.css",
     "favicon.ico"
   ]
 }

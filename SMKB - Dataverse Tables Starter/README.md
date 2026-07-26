@@ -79,11 +79,18 @@ Work through this for **each active table**. The example renames `smkb_sol_Examp
 > Get-ChildItem $dir -Recurse -File | ForEach-Object {
 >     ((Get-Content $_.FullName -Raw) `
 >       -creplace 'smkb_sol_ExampleTableA','smkb_evt_Sessions' `   # PascalCase: schema / PhysicalName / optionset / entity Name
->       -creplace 'smkb_sol_exampletablea','smkb_evt_sessions') |  # lowercase: LogicalName / EntitySetName / fetchxml / PK
+>       -creplace 'smkb_sol_exampletablea','smkb_evt_sessions' `   # lowercase: LogicalName / EntitySetName / fetchxml / PK
+>       -creplace 'SOL - Example Table As','EVT - Sessions' `      # display: plural (collection name)
+>       -creplace 'SOL - Example Table A','EVT - Session' `        # display: singular
+>       -creplace 'Example Table A','Session') |                   # display: the PK's UNPREFIXED name
 >       Set-Content $_.FullName -NoNewline
 > }
 > Rename-Item $dir "smkb_evt_Sessions"
 > ```
+> The last three replacements are the display names, and the unprefixed one is not redundant: the
+> primary-key attribute ships `<displayname description="Example Table A">` with no `SOL - ` prefix,
+> so without it the new table's PK column stays labelled "Example Table A" everywhere. `deploy.ps1`
+> now blocks on `Example Table` as a backstop.
 > **GUID files:** when you *copy* an entity folder to create an extra table, also generate fresh GUIDs for every `FormXml/*.xml` + `SavedQueries/*.xml` filename and internal ID (reusing them causes "Cannot insert duplicate key" on import). `[System.Guid]::NewGuid().ToString().ToLower()`. For the shipped example tables, `guid-freshen.ps1` (Step 3b) already does this.
 
 ### Step 3b — Freshen the sentinel GUIDs (run once, before first deploy)

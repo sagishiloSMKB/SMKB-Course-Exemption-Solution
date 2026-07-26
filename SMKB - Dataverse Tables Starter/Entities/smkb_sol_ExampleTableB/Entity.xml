@@ -14,7 +14,7 @@
       </Descriptions>
       <attributes>
 
-        <!-- ═══ SYSTEM FIELDS — boilerplate identical for every custom UserOwned table ═══ -->
+        <!-- === SYSTEM FIELDS - boilerplate identical for every custom UserOwned table === -->
 
         <attribute PhysicalName="CreatedBy">
           <Type>lookup</Type>
@@ -456,7 +456,7 @@
           </displaynames>
         </attribute>
 
-        <!-- ═══ PRIMARY KEY ═══ -->
+        <!-- === PRIMARY KEY === -->
 
         <attribute PhysicalName="smkb_sol_ExampleTableBId">
           <Type>primarykey</Type>
@@ -493,7 +493,7 @@
           </displaynames>
         </attribute>
 
-        <!-- ═══ CUSTOM FIELDS ═══ -->
+        <!-- === CUSTOM FIELDS === -->
 
         <attribute PhysicalName="smkb_name">
           <Type>nvarchar</Type>
@@ -533,35 +533,35 @@
           </displaynames>
         </attribute>
 
-        <!-- ═══ COLUMN TYPE QUICK REFERENCE (copy-paste for new custom attributes) ═══
+        <!-- === COLUMN TYPE QUICK REFERENCE (copy-paste for new custom attributes) ===
 
-          MULTILINE TEXT — <Type>ntext</Type>  (NOT memo or Memo — those are invalid and fail import)
+          MULTILINE TEXT - <Type>ntext</Type>  (NOT memo or Memo - those are invalid and fail import)
             <MaxLength>2000</MaxLength>
-            ← no <Format> element for ntext
+            <- no <Format> element for ntext
 
-          SINGLE-LINE TEXT — <Type>nvarchar</Type>  (see smkb_name above for full example)
+          SINGLE-LINE TEXT - <Type>nvarchar</Type>  (see smkb_name above for full example)
             <MaxLength>100</MaxLength>
-            <Format>text</Format>         ← required for nvarchar
+            <Format>text</Format>         <- required for nvarchar
 
-          INTEGER — <Type>int</Type>
+          INTEGER - <Type>int</Type>
             <Format>none</Format>
             <MinValue>0</MinValue>
             <MaxValue>2147483647</MaxValue>
 
-          DATE/TIME — <Type>datetime</Type>
+          DATE/TIME - <Type>datetime</Type>
             <Format>DateAndTime.UserLocal</Format>
 
-          CHOICE/OPTION SET — <Type>picklist</Type>
-            ← requires <optionset> block; see Dataverse starter docs for full example
+          CHOICE/OPTION SET - <Type>picklist</Type>
+            <- requires <optionset> block; see Dataverse starter docs for full example
 
-          LOOKUP — <Type>lookup</Type>
-            ← requires EntityRelationship entry in Other/Customizations.xml; see Relationships.xml
+          LOOKUP - <Type>lookup</Type>
+            <- requires EntityRelationship entry in Other/Customizations.xml; see Relationships.xml
 
-          YES/NO — <Type>bit</Type>
+          YES/NO - <Type>bit</Type>
             <DefaultValue>0</DefaultValue>
         -->
 
-        <!-- ═══ STATE / STATUS ═══ -->
+        <!-- === STATE / STATUS === -->
 
         <attribute PhysicalName="statecode">
           <Type>state</Type>

@@ -173,7 +173,44 @@ if (Test-Path $settingsFile) {
     Write-Host "No deployment-settings.json (copy deployment-settings-template.json to create one for stage/prod). Proceeding without it." -ForegroundColor DarkGray
 }
 
+# -- Import: never trust the exit code ----------------------------------------
+# pac CLI exits 0 even when the import FAILED. Confirmed on a real deploy: the run printed
+# "Asynchronous operation ... failed", then "Deploy complete.", and returned 0 - so an agent
+# or CI job keying on the exit code treats a failed deploy as a success. $LASTEXITCODE alone
+# is not enough with --async; the stdout text is the only reliable signal.
+#
+# Back-to-back starter deploys (the order this kit prescribes) also routinely hit "Cannot
+# start another [Import] because there is a previous [Import] running" while the previous
+# starter's import finalises. That just needs a short wait, so retry it.
 Write-Host "Importing into $TargetEnv..." -ForegroundColor Cyan
-pac @importArgs
-if ($LASTEXITCODE -ne 0) { throw "pac solution import failed (exit $LASTEXITCODE)" }
+$maxAttempts = 3
+for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+    $lines = & pac @importArgs 2>&1
+    $code  = $LASTEXITCODE
+    $out   = ($lines | Out-String)
+    $lines | ForEach-Object { Write-Host $_ }
+
+    $busy   = $out -match 'because there is a previous \[Import\] running'
+    # A busy import means the import did NOT happen, so it counts as a failure even when pac
+    # reports it without an "Error:" line - otherwise we would fall through to
+    # "Deploy complete." having imported nothing.
+    $failed = $busy -or
+              ($code -ne 0) -or
+              ($out -match '(?im)^\s*Error:') -or
+              ($out -match '(?i)Asynchronous operation.*failed') -or
+              ($out -match '(?i)\bimport failed\b')
+    if (-not $failed) { break }
+
+    if ($busy -and $attempt -lt $maxAttempts) {
+        Write-Host ""
+        Write-Host "Another solution import is still finalising - waiting 20s, then retry $($attempt + 1) of $maxAttempts ..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 20
+        continue
+    }
+
+    Write-Host ""
+    Write-Host "DEPLOY FAILED -- pac solution import did not succeed (pac exit $code)." -ForegroundColor Red
+    if ($busy) { Write-Host "Another import was still running. Wait a few seconds and re-run." -ForegroundColor Yellow }
+    exit 1
+}
 Write-Host "Deploy complete." -ForegroundColor Green

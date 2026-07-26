@@ -40,13 +40,20 @@ Get-ChildItem $folder -Recurse -File | ForEach-Object {
   $t = $t -creplace 'smkb_sol_ExampleTableA', $new_p `
           -creplace 'smkb_sol_exampletablea', $new_l `
           -creplace 'SOL - Example Table As', "$($prefix.ToUpper()) - Sessions" `
-          -creplace 'SOL - Example Table A',  "$($prefix.ToUpper()) - Session"
+          -creplace 'SOL - Example Table A',  "$($prefix.ToUpper()) - Session" `
+          -creplace 'Example Table A',        'Session'
   [System.IO.File]::WriteAllText($_.FullName, $t, (New-Object System.Text.UTF8Encoding($false)))
 }
 ```
 
-> Adjust the two `SOL - Example Table A…` display replacements to your real singular/plural human names.
+> Adjust the `SOL - Example Table A…` display replacements to your real singular/plural human names.
 > Use ASCII ` - ` (hyphen) — never a Unicode en-dash (garbles on Hebrew-locale Windows).
+>
+> **The third, unprefixed `-creplace` is not redundant.** The primary-key attribute carries a bare
+> display name — `<displayname description="Example Table A" …>` — with no `SOL - ` prefix. Without
+> that line the new table's PK column ships displaying "Example Table A" in every form and view, and
+> nothing catches it: the deploy guard scans for schema tokens, not human strings. Run it **after**
+> the two prefixed replacements so those are consumed first.
 
 ## Fresh GUIDs (only when cloning to a NEW table)
 

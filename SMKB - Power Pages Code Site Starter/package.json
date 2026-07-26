@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "deploy": "npm run lint && npm run test && npm run build && pac pages upload-code-site --rootPath ."
+    "deploy": "npm run lint && npm run test && npm run build && pac pages upload-code-site --rootPath . && npm run solution:sync",
+    "solution:sync": "powershell -ExecutionPolicy Bypass -File scripts/add-site-to-solution.ps1",
+    "solution:check": "powershell -ExecutionPolicy Bypass -File scripts/add-site-to-solution.ps1 -Check"
   },
   "dependencies": {
     "@smkbacil/design-ui": "^0.16.1",

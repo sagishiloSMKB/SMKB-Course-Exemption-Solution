@@ -34,7 +34,16 @@ nothing). See [INIT_PROJECT.md](../../../INIT_PROJECT.md) Step 10.
    Select-String -Path ".\SMKB - *\**\*.xml",".\SMKB - *\**\*.ts",".\SMKB - *\**\*.json" -Pattern "smkb_sol_|YourSolutionName|CHANGEME|sol_exampleflow|00000000-0000-0000-0000-000000000000" -List
    ```
    Any hit in an **activated** starter is a blocker (an inactive starter keeping its placeholders is fine).
-4. Report each check as PASS/FAIL with the offending file(s). Deploy only if all three pass.
+4. **Power Pages solution membership** — only if the Code Site starter is activated. A site's
+   components are created as loose Dataverse records; solution membership is a separate act, so a
+   Pipeline promotion **succeeds** and delivers a misconfigured site. Run from the Code Site folder:
+   ```powershell
+   npm run solution:check
+   ```
+   Exit 1 = components are missing from the solution. Fix with `npm run solution:sync` (or just
+   `npm run deploy`, which chains it). Needs an active `pac auth` profile; if `pac` is
+   unavailable, report this check as SKIPPED rather than passed.
+5. Report each check as PASS/FAIL with the offending file(s). Deploy only if all four pass.
 
 ## Error Handling
 

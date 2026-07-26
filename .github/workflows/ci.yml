@@ -17,6 +17,18 @@ on:
   pull_request:
 
 jobs:
+  # The template must not trip its own guards, and .ps1 / solution XML must stay ASCII-only.
+  # Zero-dependency, zero-auth — runs on every push regardless of activation state.
+  template-guards:
+    name: template-guards (self-consistency + ASCII)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/check-template-guards.mjs
+
   flow-lint:
     name: flow-lint (cloud flows + solution XML)
     runs-on: ubuntu-latest

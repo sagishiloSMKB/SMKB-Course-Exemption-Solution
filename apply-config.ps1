@@ -230,6 +230,12 @@ if ($cfg.activate.powerPages) {
   Invoke-Op -Path $st -Pattern "(appName:\s*\{\s*he:\s*)'[^']*'(,\s*en:\s*)'[^']*'" -Replacement ("`${1}'" + (Esc $ppHe) + "'`${2}'" + (Esc $ppEn) + "'") -Label 'PowerPages solution.ts appName'
   Invoke-Op -Path $st -Pattern "(documentTitle:\s*)'[^']*'" -Replacement ("`${1}'" + (Esc $ppTitle) + "'") -Label 'PowerPages solution.ts documentTitle'
   Invoke-Op -Path $st -Pattern "(defaultLanguage:\s*)'[^']*'" -Replacement ("`${1}'" + (Esc $ppLang) + "'") -Label 'PowerPages solution.ts defaultLanguage'
+  # Deploy tooling only (scripts/add-site-to-solution.ps1 reconciles the site's components
+  # against this solution on every deploy). The starter cannot learn the name any other way -
+  # powerpages.config.json follows a Microsoft schema and must not carry custom keys.
+  # NOTE the variable is $uniqueName: PowerShell expands an undefined variable to an empty
+  # string, so a typo here would silently write '' and still pass every gate.
+  Invoke-Op -Path $st -Pattern "(SOLUTION_UNIQUE_NAME\s*=\s*)'[^']*'" -Replacement ("`${1}'" + (Esc $uniqueName) + "'") -Label 'PowerPages solution.ts SOLUTION_UNIQUE_NAME'
   $ppc = Join-Path $ppRoot 'powerpages.config.json'
   Invoke-Op -Path $ppc -Pattern '("siteName":\s*)"[^"]*"' -Replacement ('${1}"' + (Esc $derivedSite) + '"') -Label 'PowerPages powerpages.config siteName'
 }

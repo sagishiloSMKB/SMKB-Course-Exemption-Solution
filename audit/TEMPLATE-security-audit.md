@@ -33,6 +33,19 @@ plainly if there are no Critical issues.]`
 - **Risk:** `[FILL IN]`.
 - **Fix applied:** `[FILL IN — or "Recommendation:" / "Rationale:" for not-changed items]`.
 
+## Deployment-readiness one-glance checks
+
+`[FILL IN: confirm each. These are cheap to check and each one prevents a silent outage or a
+half-delivered promotion.]`
+
+| Check | Why it matters | Status |
+|---|---|---|
+| Power Pages site type is **Production**, not Trial (`pac pages list -v`) | Every site is created as a trial; unconverted, it is suspended at day 90 and its **host deleted** 7 days later | `[FILL IN]` |
+| Site + all its components are in the solution (`npm run solution:check`) | A Pipeline promotes only what the solution holds, so a gap makes the promotion *succeed* with a misconfigured target | `[FILL IN]` |
+| Env var definitions all have a `type="380"` RootComponent | Without it a definition imports but never travels to Stage/Prod | `[FILL IN]` |
+| Secret env vars hold a Key Vault reference, not a literal | `[FILL IN]` | `[FILL IN]` |
+| Flows are **On** in the target (imports land them Draft/Inactive) | `[FILL IN]` | `[FILL IN]` |
+
 ## Verified-safe (checked, no issue)
 
 `[FILL IN: controls you checked and confirmed correct — e.g. secrets are Secret-typed and read via the Key
