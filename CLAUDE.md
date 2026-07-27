@@ -435,6 +435,19 @@ These cost a debugging cycle each, and several fail *silently*.
   bare string when there is one match, so `$ids[0]` indexes a *character* — the script then runs
   happily on garbage and fails later with an error naming something unrelated. **Wrap every
   collection-returning call site in `@( )`.**
+- **The same rule has a second face: a nested single-element array FLATTENS.** `@( @('a','b') )`
+  becomes `@('a','b')`, so a `file -> list of [find, replace] pairs` table silently degrades for any
+  file with exactly **one** pair: `foreach ($pair in $edits[$f])` then iterates the two *strings*, and
+  `$pair[0]`/`$pair[1]` become the first two **characters** of the find string. A real run turned that
+  into `.Replace('1', ' ')` across a whole document — **every digit 1 replaced with a space**, which
+  corrupted two script filenames while the intended edit silently did not happen. Files with two or
+  more pairs were untouched, so it looked like a one-file fluke. Force the shape with `,@('a','b')` or
+  `[object[]]`, or use `[pscustomobject]@{ Find=..; Replace=.. }`, which cannot flatten.
+- **Prefer a targeted edit over bulk `.Replace()` across a document.** A whole-file replace has no way
+  to report "0 matches", so a malformed argument corrupts instead of failing. An edit that errors when
+  its anchor is missing is strictly safer.
+- **Always `git diff` after any scripted multi-file edit, before committing.** Both this and the
+  Windows-1255 em-dash mangling were caught that way and would otherwise have shipped.
 - **A scriptblock passed as a parameter resolves its variables in the *invoking* scope**, not where it
   was written — silently producing empty values. Pass a template string with a token instead.
 - **Multi-line git commit messages must go through `git commit -F <file>`**, never `-m` with a

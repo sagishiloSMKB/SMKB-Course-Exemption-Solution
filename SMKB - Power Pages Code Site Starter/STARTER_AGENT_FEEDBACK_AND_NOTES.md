@@ -1,19 +1,15 @@
-# Starter Feedback & Notes
+# Starter Feedback & Notes — log in the REPO ROOT instead
 
-Append-only log for anything discovered while standing up a project from this
-starter: friction, workarounds, unexpected Power Pages / PAC CLI behavior, and
-concrete ideas to fold back into the starter template.
+**Do not log here.** Use the repo-root
+[`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](../STARTER_AGENT_FEEDBACK_AND_NOTES.md) for everything,
+including findings that are specific to this starter.
 
-**Agents:** whenever you hit a surprise during provisioning, first deploy, or a
-skill run — a command that didn't work as documented, a manual step the docs
-missed, a value that had to change — add a dated entry below. These notes are how
-the starter improves over time; the fixes already baked in (favicon in
-`bundleFilePatterns`, the cache-buster plugin, the `--deploymentProfile` /
-`--forceUploadAll` correction) all began as notes like these.
+Why: this used to be a second, parallel log. In the kit's first real end-to-end run the Code Site
+generated most of the findings and **every one of them was written to the root log** — this file
+stayed empty. Two locations with one in use is worse than one: a reader cannot tell which is
+authoritative, and an auditor has to check both to know whether the mandatory logging happened.
 
-Format: `## YYYY-MM-DD — short title` then what happened, the workaround, and a
-suggested starter change.
+The root log is what the Init Project flow references (the Step 10b.F prompts), what the "Log
+Everything" standing instruction points at, and what gets reviewed when the starter kit is improved.
 
----
-
-<!-- Add entries below this line, newest first. -->
+This file is kept only as a signpost, so the split is not re-created.

@@ -181,6 +181,15 @@ For detailed recovery procedures, see [provision-reference.md](provision-referen
     **PAUSE** and have the developer convert it now:
     > [Power Platform Admin Center](https://admin.powerplatform.microsoft.com) →
     > **Manage → Power Pages** → select the site → **Convert to production**. Wait 2-5 minutes.
+    > **Leave the CDN checkbox UNTICKED.**
+
+    > **Do not enable the CDN in that dialog.** The two settings are independent — the Production
+    > conversion is what stops the deletion clock; the CDN is a separate, riskier change. Enabling it
+    > took a real site **completely offline**: the hostname served the CDN's default certificate
+    > (`CN=*.azureedge.net`, which does not cover `*.powerappsportals.com`), and because
+    > `powerappsportals.com` is on the **HSTS preload list** nobody can click through —
+    > `ERR_CERT_COMMON_NAME_INVALID`. The site record stayed healthy throughout, and no deploy can
+    > cause or fix it. If it happens, see `/ppcs-troubleshoot`.
 
     Prerequisites: a Power Pages / Power Platform admin role, and available Power Pages capacity
     in the tenant. A site in a **developer or trial environment cannot be converted at all** —

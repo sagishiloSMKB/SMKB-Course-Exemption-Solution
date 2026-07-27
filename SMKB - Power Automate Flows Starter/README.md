@@ -511,6 +511,14 @@ Each action using a connector then references the **local key** in its `host.con
 
 `Other/Customizations.xml` has a `<connectionreferences>` section that lists the connection-reference metadata deployed to Dataverse alongside the flows. This is the **only** place the solution stores connection references — there is no `connectionreferences/` folder, and they are **not** `RootComponent`s in `Solution.xml` (verified against the live solution). The starter ships **all four** bank connectors here so every flow can reference any of them without re-adding metadata:
 
+> **Trim this list BEFORE the first deploy — a connection reference cannot be removed by re-importing.**
+> An unmanaged solution import is an **upsert**, so deleting an entry from this file does *not* delete
+> it from the environment, and `pac solution` has `add-solution-component` but **no remove
+> counterpart** — so the cleanup cannot be scripted. A real solution shipped with two unused bank
+> connectors (Approvals and SharePoint) permanently in its deployed solution, removable only by hand
+> in the Maker portal. Delete the connectors your flows will not use *before* you deploy, and they
+> never arrive in the first place.
+
 ```xml
 <connectionreferences>
   <connectionreference connectionreferencelogicalname="new_sharedoffice365_c3167">

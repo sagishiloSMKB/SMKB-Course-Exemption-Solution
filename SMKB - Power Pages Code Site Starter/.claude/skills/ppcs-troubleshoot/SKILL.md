@@ -1,14 +1,16 @@
 ---
 name: Power Pages Code Site — Troubleshoot
 description: >-
-  Diagnoses the 9 most common Power Pages Code Site failures: 500 on promotion,
+  Diagnoses the 10 most common Power Pages Code Site failures: 500 on promotion,
   portal template visible, /Profile redirect, route 404, Web API 403, flow 403,
-  CSP blocks, duplicate sites, stale-chunk import errors after deploy.
+  CSP blocks, duplicate sites, stale-chunk import errors after deploy, and a site
+  made unreachable by a CDN certificate mismatch.
 when_to_use: >-
   User reports: site showing error, "something went wrong", portal header visible,
   redirected to /Profile, 404 on a route, 403 from API or flow, CSP error in
   console, duplicate sites in pac pages list, "does not provide an export named"
-  error after a deploy.
+  error after a deploy, or ERR_CERT_COMMON_NAME_INVALID / "site unreachable" /
+  HSTS after enabling the CDN.
 argument-hint: "[symptom description]"
 arguments: [symptom]
 context: fork
@@ -21,7 +23,7 @@ allowed-tools: Read Grep Bash(pac pages list *) Bash(pac auth list)
 This skill is read-only. It diagnoses by reading files and running safe CLI
 queries, then reports findings without modifying anything.
 
-The 9 known failure modes have distinct diagnostic signatures. Match the
+The 10 known failure modes have distinct diagnostic signatures. Match the
 symptom to the correct case before proposing a fix.
 
 For YAML file paths and `pac pages list -v` output examples, see
@@ -31,7 +33,7 @@ For YAML file paths and `pac pages list -v` output examples, see
 
 ### Intake
 
-1. If `$symptom` is provided, classify it against the 9 cases below.
+1. If `$symptom` is provided, classify it against the 10 cases below.
    If no symptom was provided, ask the user to describe what they're seeing
    (error message, HTTP status code, which page, what was last deployed).
 
@@ -263,9 +265,49 @@ chunk (`vue.js` / `smkb.js`) that no longer has the expected export. The
 - Plugin present → restart the site from the Power Pages admin center
   (PPAC → Manage → Power Pages → site → **Restart site**) to purge the CDN cache
 
+### Case 10 — Site Unreachable With a Certificate Error (CDN)
+
+**Trigger phrases:** "ERR_CERT_COMMON_NAME_INVALID", "certificate error", "the
+website uses HSTS", "can't visit the site", "site went down after converting to
+production", unexplained **404 at the site root**
+
+**Diagnosis:**
+Enabling the **Azure CDN** — commonly ticked by accident in the same dialog as
+*Convert to production* — can leave the hostname serving the CDN's own default
+certificate instead of a Power Pages one. Because `powerappsportals.com` is on
+the **HSTS preload list**, the browser refuses to let anyone click through, so
+the site is unreachable rather than merely warned about.
+
+Check which certificate the hostname actually serves — do not guess:
+```powershell
+$h = '<slug>.powerappsportals.com'
+$c = [Net.Sockets.TcpClient]::new($h, 443)
+$s = [Net.Security.SslStream]::new($c.GetStream(), $false, { $true })
+$s.AuthenticateAsClient($h); $s.RemoteCertificate.Subject; $s.Dispose(); $c.Dispose()
+```
+Then **compare against a sibling site in the same environment** — that single
+comparison turns an ambiguous symptom into a certainty.
+
+**Conclusion:**
+- Subject is `CN=*.azureedge.net` (or any cert not covering
+  `*.powerappsportals.com`) → the **CDN binding is incomplete**. A 404 from an
+  HTTPS GET of `/` with validation disabled confirms the origin route is unbound
+  too. Sibling non-CDN sites in the same environment will serve a valid cert.
+- Subject covers the hostname → the problem is **not** TLS; rule this case out.
+
+**Fix:**
+- Disable the CDN for the site (PPAC → Manage → Power Pages → site), or wait for
+  the CDN binding to finish provisioning.
+- **A code-site deploy cannot cause or fix this.** DNS, TLS and edge routing sit
+  outside everything this kit touches, so redeploying only wastes time — and the
+  Dataverse site record stays `Active` / `Code Site` throughout, which makes the
+  record look healthy while the site is dark.
+- Converting to Production and enabling the CDN are **independent** settings:
+  keep the conversion (it stops the 90-day deletion clock), drop the CDN.
+
 ## Error Handling
 
-If the symptom doesn't match any of the 9 cases, report which cases were ruled
+If the symptom doesn't match any of the 10 cases, report which cases were ruled
 out and what diagnostic evidence was found. Ask the user for more context:
 browser console errors, HTTP response body, last action taken before the issue.
 

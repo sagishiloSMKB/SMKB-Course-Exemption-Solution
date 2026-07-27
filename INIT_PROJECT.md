@@ -501,6 +501,20 @@ tokens and how to resolve them are documented in each starter's own README.
 
 Deploy **one starter at a time**, in Critical Rule 4 order (Tables → Env Vars → Flows → Power Apps → Power Pages Code Site). Do not proceed to the next until the current is confirmed working. After each deploy, the agent must log the outcome (mandatory).
 
+> **What "log the outcome" means — read this, because it is easy to satisfy by accident and hard to
+> satisfy properly.** Logging every *problem* you hit feels like compliance, but the `10b.F` prompts
+> ask for something different: **a per-starter statement of outcome**, written even when the deploy
+> was completely clean. In the kit's first real run, problem entries existed but per-starter outcomes
+> did not, and the Power Pages Code Site had none at all — an absence that is invisible without an
+> audit. So:
+> - **One entry per activated starter, always** — including "clean, no issues", with what you verified
+>   (components visible in the Maker portal, a round-trip export, flows turned on).
+> - **Re-deploys need outcomes too.** Later deploys are exactly where the interesting failures live
+>   (a false-success import, a "deactivated and replaced" message). A single "deployed" entry per
+>   starter understates the history.
+> - **Log to the repo-root [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](STARTER_AGENT_FEEDBACK_AND_NOTES.md)**,
+>   never to a starter's own copy — the root file is the only one that is read.
+
 > **`/deploy-solution`** orchestrates this entire ordered sequence (each starter via its own deploy skill,
 > the manual portal handoffs, and the mandatory `10b.F` logging). The per-starter skills it calls —
 > **`/dvt-deploy`** (runs `guid-freshen` once), **`/flow-deploy`** (draft-vs-published check),
@@ -569,6 +583,31 @@ The Code Site provisions and deploys through its own skills — the agent drives
    `pac pages list -v` that it no longer reports `Trial`. Requires an admin role and available
    Power Pages capacity; a site in a **developer/trial environment cannot be converted** (migrate
    it first). `/ppcs-provision-site` Phase 5 walks through and verifies this.
+
+   > **Do NOT tick the CDN box in that dialog.** The conversion dialog offers to enable the Azure
+   > CDN alongside it. **The two settings are independent** — take the Production conversion (that is
+   > what stops the 90-day deletion clock) and leave the CDN **off** unless you specifically need
+   > edge caching and are prepared to verify it.
+   >
+   > Enabling it took a real site **completely offline**: the hostname began serving the CDN's own
+   > default certificate (`CN=*.azureedge.net`, which does not cover `*.powerappsportals.com`), and
+   > because `powerappsportals.com` is on the **HSTS preload list** the browser refuses to let anyone
+   > click through — `net::ERR_CERT_COMMON_NAME_INVALID`, site unreachable, not merely warned about.
+   > An HTTPS GET of `/` with validation disabled returned 404, so the origin route was unbound too,
+   > while the Dataverse site record stayed perfectly healthy the whole time.
+   >
+   > **A code-site deploy cannot cause or fix this** — DNS, TLS and edge routing are outside
+   > everything this kit touches, so redeploying wastes time. To confirm the diagnosis in one
+   > command, check which certificate the hostname actually serves:
+   > ```powershell
+   > $h = '<your-slug>.powerappsportals.com'
+   > $c = [Net.Sockets.TcpClient]::new($h, 443)
+   > $s = [Net.Security.SslStream]::new($c.GetStream(), $false, { $true })
+   > $s.AuthenticateAsClient($h); $s.RemoteCertificate.Subject; $s.Dispose(); $c.Dispose()
+   > ```
+   > A subject of `CN=*.azureedge.net` means the CDN binding is incomplete: wait for it to finish
+   > provisioning, or disable the CDN. Comparing against a sibling site in the same environment turns
+   > an ambiguous symptom into a certainty — every non-CDN site serves a valid certificate.
 7. **Reconcile the site into the solution — MANDATORY.**
    `pac pages upload-code-site` creates the site and its components as **loose Dataverse records**;
    solution membership is a separate act that nothing else performs. A Power Platform Pipeline
