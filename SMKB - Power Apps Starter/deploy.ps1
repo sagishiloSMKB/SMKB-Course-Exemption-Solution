@@ -93,13 +93,34 @@ Write-Host "Building..." -ForegroundColor Cyan
 pnpm run build
 if ($LASTEXITCODE -ne 0) { throw "Build failed (exit $LASTEXITCODE)" }
 
+# The push wraps the Power Apps CLI, which wraps pac - and pac returns exit code 0 even when the
+# operation failed (confirmed for a failed solution import and a rejected --componentType). The exit
+# code alone is therefore not a reliable success signal: parse stdout as well, or a failed push
+# reports "Deploy complete."
+$pushArgs = if ($solName) { @('pa', 'push', '--solution-id', $solName) } else { @('pa', 'push') }
 if ($solName) {
     Write-Host "Pushing to $envUrl (solution: $solName)..." -ForegroundColor Cyan
-    pnpm pa push --solution-id $solName
 } else {
     Write-Host "Pushing to $envUrl (standalone -- no solution assigned)..." -ForegroundColor Cyan
-    pnpm pa push
 }
-if ($LASTEXITCODE -ne 0) { throw "pnpm pa push failed (exit $LASTEXITCODE)" }
+$lines = & pnpm @pushArgs 2>&1
+$code  = $LASTEXITCODE
+$out   = ($lines | Out-String)
+$lines | ForEach-Object { Write-Host $_ }
+
+# Specific patterns on purpose: a bare match on "failed" would fire on benign output such as a
+# "0 failed" summary, and a guard that cries wolf gets bypassed.
+$pushFailed = ($code -ne 0) -or
+              ($out -match '(?im)^\s*Error:') -or
+              ($out -match '(?i)\bpush failed\b') -or
+              ($out -match '(?i)\b(unauthorized|forbidden)\b') -or
+              ($out -match '(?i)\bno\s+active\s+auth')
+if ($pushFailed) {
+    Write-Host ""
+    Write-Host "DEPLOY FAILED -- pnpm pa push did not succeed (exit $code)." -ForegroundColor Red
+    Write-Host "Do not treat the deploy as complete. If the app record does not exist yet, run" -ForegroundColor Yellow
+    Write-Host "'pac code init' first (see /pa-init); confirm the target with 'pac auth list'." -ForegroundColor Yellow
+    exit 1
+}
 
 Write-Host "Deploy complete." -ForegroundColor Green

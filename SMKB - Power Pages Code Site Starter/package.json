@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "deploy": "npm run lint && npm run test && npm run build && pac pages upload-code-site --rootPath . && npm run solution:sync",
+    "deploy": "npm run lint && npm run test && npm run build && npm run upload && npm run solution:sync",
+    "upload": "powershell -ExecutionPolicy Bypass -File scripts/upload-code-site.ps1",
     "solution:sync": "powershell -ExecutionPolicy Bypass -File scripts/add-site-to-solution.ps1",
     "solution:check": "powershell -ExecutionPolicy Bypass -File scripts/add-site-to-solution.ps1 -Check"
   },

@@ -9,7 +9,7 @@ when_to_use: >-
   User says "deploy", "push to Power Pages", "upload", "publish", "redeploy".
   Not for first-ever deploy — use /ppcs-provision-site instead.
 disable-model-invocation: true
-allowed-tools: Bash(pac auth list) Bash(npm run lint) Bash(npm run test) Bash(npm run build) Bash(pac pages upload-code-site *) Bash(npm run solution:sync) Bash(npm run solution:check) Read Grep
+allowed-tools: Bash(pac auth list) Bash(npm run lint) Bash(npm run test) Bash(npm run build) Bash(npm run upload) Bash(npm run solution:sync) Bash(npm run solution:check) Read Grep
 ---
 
 ## Context
@@ -92,10 +92,18 @@ Current config state (injected at invocation):
 
 ### Deploy
 
-6. Upload to Power Pages:
+6. Upload to Power Pages — go through the wrapper, **not** a raw `pac` call:
    ```
-   pac pages upload-code-site --rootPath .
+   npm run upload
    ```
+   (`npm run deploy` already chains this.) The wrapper is
+   `scripts/upload-code-site.ps1`, and it exists because **pac returns exit code 0 even when the
+   operation failed** — a raw `pac pages upload-code-site` in an npm `&&` chain would fall straight
+   through to the reconcile and report a successful deploy having shipped nothing. The wrapper parses
+   stdout and exits 1 on any error signal.
+
+   A clean run means "pac reported no error" — it is not proof the assets landed. Step 9's browser
+   check is what proves that.
 
 7. **Reconcile the site into the solution — part of the deploy, not an afterthought.**
    ```
