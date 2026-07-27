@@ -157,7 +157,7 @@ Collect the following from the developer. These are exactly the values you will 
 | **Solution display name** | With org prefix and ASCII hyphen | `SMKB - Events Tickets` |
 | **Short name (prefix)** | 2–5 lowercase letters only, no numbers | `evt` |
 | **Target environment URL** | Dataverse URL, must end in `/` | `https://org229c958d.crm4.dynamics.com/` |
-| **Environment ID** | GUID - obtain with `pac env list --filter "SMKB-Apps-Dev"` (the `--name` flag is rejected; `--filter`/`-f` is the only supported one) | `63329b6f-...` |
+| **Environment ID** | GUID - obtain with `pac env list --filter "SMKB-Apps-Dev"` (the `--name` flag is rejected; `--filter`/`-f` is the only supported one) | `00000000-1111-2222-3333-444444444444` |
 
 Derived values (confirm with the developer):
 - Local folder / repo name: `SMKB - [Solution Name] - Solution` — e.g. `SMKB - Events Tickets - Solution`
