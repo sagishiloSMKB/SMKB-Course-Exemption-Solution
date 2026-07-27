@@ -37,9 +37,23 @@ filename (get it via `pnpm pa add-flow --flow-id <portalId>` → `power.config.j
 
 ## Steps
 
-1. Create the flow stub in the Power Automate UI with the **correct trigger** (`PowerPages` for portal,
-   `PowerAppV2` "When Power Apps calls a flow (V2)" for the Code App) — trigger type can't be changed later.
-   Add it to the solution, then get its **`workflowEntityId`**:
+1. **Get a `workflowEntityId`. A freshly generated GUID is acceptable** — you do *not* need a portal
+   stub first, so the whole authoring phase is unblocked:
+   ```powershell
+   [guid]::NewGuid().ToString().ToLower()
+   ```
+   Measured, not assumed: two flows authored with generated GUIDs and no portal stub imported cleanly
+   and came back from `pac solution export` + `unpack` carrying **the same GUIDs**, correctly
+   registered as `type="29"` RootComponents — a solution import creates the workflow record for a GUID
+   Dataverse has not seen. (The shipped skeletons' placeholder GUIDs imply exactly this
+   substitute-your-own model.)
+
+   **Create a stub in the Power Automate UI only if** you need the trigger registered in Studio
+   *before* deploy, or your process requires it. Then read its `workflowEntityId` back rather than
+   inventing one — and note the **trigger type cannot be changed later**, so pick it correctly at
+   creation (`PowerPages` for portal, `PowerAppV2` "When Power Apps calls a flow (V2)" for the Code
+   App). Swapping the GUID afterwards is a mechanical rename across the filename,
+   `Customizations.xml` and `Solution.xml`.
    ```powershell
    pnpm pa add-flow --flow-id <portalFlowId> --non-interactive   # read workflowEntityId from power.config.json
    # or: pac solution export --name <SolutionUniqueName> --path .\out.zip --overwrite; pac solution unpack --zipFile .\out.zip --folder .\out_unpacked

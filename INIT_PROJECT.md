@@ -60,10 +60,9 @@ Init Project is a collaboration between the agent and the developer. The agent h
 
 | Task | Agent | Developer |
 |------|-------|-----------|
-| Rename starter folders | ✓ | |
-| Fill `solution.config.json` + run `apply-config.ps1` (identity) | ✓ | |
+| Fill `solution.config.json` + run `apply-config.ps1` (identity **+ folder renames + doc pointers**) | ✓ | |
 | Author schema/flow/content details in each starter | ✓ | |
-| `pac --version` / `pac auth list` (verify setup) | Tries first | Run manually + paste output if agent's shell can't find `pac` |
+| `pac auth list` (verify setup; NOT `pac --version` - it exits non-zero in PAC 2.8.1) | Tries first | Run manually + paste output if agent's shell can't find `pac` |
 | `pac pages list` (get site GUID) | Tries first | Run manually + paste output if agent's shell can't find `pac` |
 | `pac auth select` / `pac auth create` (change active profile) | — | Must run locally — blocked in agent settings |
 | `pnpm install` / `npm install` in starter folders (Step 5b) | — | Must run locally — required before first commit touching .vue/.ts |
@@ -83,8 +82,29 @@ Verify all tools are installed before beginning:
 ```powershell
 node --version    # Must be 20+
 pnpm --version    # Must be 8+  (npm i -g pnpm if missing)
-pac --version     # PAC CLI     (download from Microsoft if missing)
+pac auth list     # PAC CLI     (download from Microsoft if missing)
 ```
+
+> **Do not use `pac --version` as the install check.** In PAC CLI 2.8.1 it prints the version banner
+> and *then* fails with `Error: Not a valid command`, exiting **non-zero** — an agent treating that
+> exit code as "PAC CLI missing" will wrongly block the whole flow. `pac auth list` is the command
+> that actually matters anyway; use `pac help` if you only want to prove the binary is on PATH.
+
+**`NPM_TOKEN` — required if you activate the Power Apps or Power Pages starter.** Both resolve the
+private `@smkbacil/design-ui` package through `.npmrc` (`_authToken=${NPM_TOKEN}`), so `npm install`
+cannot succeed without a valid token with read access to the `@smkbacil` scope. Verify the
+**credential**, not the variable:
+
+```powershell
+npm whoami        # 401 => the token is expired or revoked, whether or not NPM_TOKEN is set
+```
+
+> **A successful `npm install` proves nothing about the credential.** The npm cache serves a warm
+> install indefinitely after the token dies, which is exactly how one initialization concluded twice
+> that the token was fine while CI — which has no cache — failed on every `@smkbacil` consumer.
+> `npm whoami` is the check. If it returns 401, mint a new token and update it everywhere (it is an
+> org-wide credential, not per-repo); see Step 4 for the CI secret.
+> Skip this entirely if the solution activates neither of those two starters.
 
 **PAC CLI authentication:**
 
@@ -100,7 +120,7 @@ pac auth create --url https://org229c958d.crm4.dynamics.com/
 
 > **Warning:** The PAC profile named "SMKB-Apps-Dev" incorrectly targets `org1dce1895` (Seminar Hakibutzim College), NOT SMKB-Apps-Dev. Always verify the active profile URL before proceeding. If the wrong profile is active: `pac auth select --index <N>` where N is the index from `pac auth list`.
 
-> **Note for the agent:** Run `pac --version` and `pac auth list` now using the **PowerShell tool** (not the Bash tool) — PAC CLI is a Windows executable and is only available in the Windows PowerShell PATH, not in the bash shell. Both commands are permitted in agent settings. If they still fail (PAC CLI not installed), do not skip this step — tell the developer, ask them to run the commands in their own PowerShell terminal, and paste the output back so you can read it and continue.
+> **Note for the agent:** Run `pac auth list` now using the **PowerShell tool** (not the Bash tool) — PAC CLI is a Windows executable and is only available in the Windows PowerShell PATH, not in the bash shell. Both commands are permitted in agent settings. If they still fail (PAC CLI not installed), do not skip this step — tell the developer, ask them to run the commands in their own PowerShell terminal, and paste the output back so you can read it and continue.
 >
 > `pac auth select` is blocked in agent settings. If the wrong profile is active, you cannot fix it yourself — stop and ask the developer to run `pac auth select --index <N>` before you proceed.
 
@@ -136,7 +156,8 @@ Collect the following from the developer. These are exactly the values you will 
 | **Solution unique name** | PascalCase, no spaces, no underscores | `SMKBEventsTickets` |
 | **Solution display name** | With org prefix and ASCII hyphen | `SMKB - Events Tickets` |
 | **Short name (prefix)** | 2–5 lowercase letters only, no numbers | `evt` |
-| **Target environment** | Dataverse URL + environment ID | `https://org229c958d.crm4.dynamics.com/` |
+| **Target environment URL** | Dataverse URL, must end in `/` | `https://org229c958d.crm4.dynamics.com/` |
+| **Environment ID** | GUID - obtain with `pac env list --filter "SMKB-Apps-Dev"` (the `--name` flag is rejected; `--filter`/`-f` is the only supported one) | `63329b6f-...` |
 
 Derived values (confirm with the developer):
 - Local folder / repo name: `SMKB - [Solution Name] - Solution` — e.g. `SMKB - Events Tickets - Solution`
@@ -196,6 +217,21 @@ Create a **private** repository in the SMKB-AC-IL GitHub organization:
 4. Visibility: **Private**
 5. **Do NOT** add a README, .gitignore, or license — the repo must be empty
 6. Click **Create repository** and copy the HTTPS clone URL
+7. **Add the `NPM_TOKEN` repo secret now, before the first push** — skip only if the solution
+   activates neither the Power Apps nor the Power Pages starter.
+   **Settings → Secrets and variables → Actions → New repository secret**, name `NPM_TOKEN`, value
+   a token with read access to the `@smkbacil` scope.
+   Without it, CI goes red on the very first push: every SPA job dies at `npm install` because
+   `@smkbacil/design-ui` is genuinely private, and the error (`npm error 404 @smkbacil/design-ui`)
+   names the *package*, not the credential — it looks identical whether the secret is absent or
+   merely expired. The CI workflow now diagnoses which case it is, but the token still has to exist.
+   It is an **org-wide** credential: if it has expired, every consuming repo is failing, not just
+   this one. Check with `npm whoami` (a successful local `npm install` proves nothing — the cache
+   masks a dead token).
+
+> **GitHub repo names cannot contain spaces.** Type the name already-hyphenated. Pasting a
+> folder-style name like `SMKB - Events Tickets - Solution` yields
+> `SMKB---Events-Tickets-Solution` (triple hyphens), because GitHub silently converts each space.
 
 Tell the developer exactly which name to use, then wait for them to confirm the repo is created before moving to Step 5.
 
@@ -388,6 +424,27 @@ For each activated starter, collect enough detail to drive implementation. Ask t
 **For each Cloud Flow:** schema name `smkb_<prefix>_<PascalName>` (e.g. `smkb_evt_SendConfirmation`), display `EVT - Send Confirmation`, trigger type (Power Pages request, scheduled, Dataverse row), what it does (logic, recipients, subject/body), input parameters. Power Pages-triggered flows follow the HTTP 200 + `errorCode` contract — see the Power Pages starter's [flow-error contract](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/FLOW-ERROR-CONTRACT.md).
 
 **For each Power App:** Functional Component Name (Step 7), app display name `SMKB - [Name] - Dev`, which Dataverse tables it reads/writes, key screens.
+
+> **Does this site use the SMKB design system, or its own visual identity?** Ask now, not after CI
+> goes red. The Code Site ships `@smkbacil/design-ui` (a **private** package) wired into `App.vue`,
+> `main.ts` and `composables/useFlowErrorToast.ts`. A solution that builds its own UI — a
+> like-for-like rebuild of an existing bespoke site, say — ships zero bytes of it, yet still forces a
+> working `@smkbacil` token on every `npm install`, every CI run and every new developer machine.
+> If the answer is "its own identity", run **`/ppcs-remove-design-ui`** during authoring; it is an
+> eight-step removal where two steps are easy to miss and the verification is the part everyone gets
+> wrong. Answering early turns that cleanup into a two-minute decision.
+
+> **Rebuilding an existing solution? The deployed artifact is the specification — the repo is only
+> evidence for it.** Do not assume the default branch is what is live. On one rebuild `origin/main`
+> was 7 commits and 11 days behind production, and the deployed commit existed only as a **deploy
+> tag** — porting from `main` would have silently produced a faithful copy of the wrong version
+> (a migrated video player, relinked logos, 11 renamed assets), and nothing would have failed a
+> build. Enumerate every ref (`git fetch --all --tags`, then
+> `git for-each-ref --sort=-committerdate`), identify the deployed commit by correlating with the
+> live artifact (a deploy tag, the solution version in Dataverse, the build timestamp of the
+> deployed bundle), diff your candidate against the default branch before porting, and verify
+> afterwards by hashing the ported files against that commit. Treat any disagreement between repo
+> and deployment as a finding, not a rounding error.
 
 **For each Power Pages Code Site:** Functional Component Name (Step 7), the **bare** site name (goes into `src/config/solution.ts` `siteName`; apply-config derives `[PREFIX] - [Name]`), app title(s) and languages, which tables/flows it uses, and auth requirements. See the [Power Pages Getting Started guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/GETTING-STARTED.md).
 

@@ -47,17 +47,25 @@ For Studio registration walkthrough and parameter constraints, see
    > 3. Assign web roles:
    >    - **Authenticated Users** for flows that require sign-in
    >    - Add **Anonymous Users** only for flows callable without authentication
-   > 4. After saving, click the flow to view the **trigger URL** — it looks like:
-   >    `/_api/cloudflow/v1.0/trigger/4d22a1a2-8a67-e681-9985-3f36acfb8ed4`
-   > 5. Copy that URL and pass it as the argument to this skill
+   > 4. Save. You do **not** need to copy the trigger URL — see below.
 
-### Extract the GUID
+### Get the GUID — derive it, don't ask for it
 
-2. Parse the flow GUID from `$flow-guid-or-trigger-url`:
-   - If a full trigger URL is provided: extract the UUID at the end
-     (everything after the last `/`)
-   - If a bare UUID is provided: use it directly
-   - Validate the UUID format: 8-4-4-4-12 hex characters
+2. **The Power Pages trigger GUID *is* the flow's `workflowid`**, which the repo already authored.
+   It is the trailing GUID of the flow's own filename under the Cloud Flows starter's `Workflows/`,
+   and the same value appears in that starter's `Customizations.xml` (`WorkflowId`) and
+   `Solution.xml` (`RootComponent id`). Verified on real flows: the Studio registration record's
+   `content` payload carries `"flowapiurl": "/_api/cloudflow/v1.0/trigger/<guid>"` and
+   `"processid": "<guid>"` — both the same `workflowid`. So read it from the repo:
+   ```powershell
+   Get-ChildItem "..\SMKB - <Name> - Cloud Flows\Workflows" -Filter *.json | Select-Object Name
+   ```
+   Take the trailing GUID of the flow's file name, lowercase it, and validate the 8-4-4-4-12 shape.
+   Ask the developer only if the flow is not in this repo.
+
+   *(If the user does paste a trigger URL or a bare UUID, accept it: take everything after the last
+   `/`, and cross-check it against the filename GUID — a mismatch means they registered a different
+   flow than the one they think.)*
 
 ### Update flows.ts
 
@@ -131,6 +139,19 @@ For Studio registration walkthrough and parameter constraints, see
    > 2. Copy the new GUID from the target Studio
    > 3. Store the target-env GUID (either replace this one or add an
    >    env-switching mechanism in `flows.ts`)
+
+### Verify the web role, don't trust it
+
+A wrong web role is **invisible until a user hits a 403 at runtime**, so assert it rather than
+assuming. The Studio registration record's `content` payload includes the assigned role and its
+flags — for a public page you want `"anonymoususersrole": true, "authenticatedusersrole": false`;
+for a signed-in-only flow, the reverse. Check this after registering, and re-check after each ALM
+promotion (the registration is per-environment).
+
+> **Registration creates new solution components.** Registering two flows added two `Cloud Flow`
+> components to the site, neither of them in the solution — a live demonstration that the
+> site-to-solution reconcile has to run on *every* deploy, not once. `npm run deploy` chains it; see
+> `/ppcs-deploy` step 7.
 
 ## Error Handling
 

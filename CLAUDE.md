@@ -297,8 +297,36 @@ The short name is the **middle segment** of every component's schema name and th
 | Power Platform display name | `SMKB - [Name] - Dev` | `SMKB - Events Backoffice - Dev` |
 | Power Pages `solution.ts` `siteName` (the **bare** name) | `[Name]` | `Lecturer Portal` |
 | Resulting Power Pages site name (**derived**, `[PREFIX] - [Name]`) | `[PREFIX] - [Name]` | `EVT - Lecturer Portal` |
+| Power Pages **web URL** (typed by hand at reactivation) | `[prefix]-[kebab-name]` + `-dev` / `-stage` / bare for prod | `evt-lecturer-portal-dev` |
 
 If in doubt about what to name one of these, ask the user what the app or site is *for* — that answer becomes the Component Name. Enter the Power Pages **bare** site name in the Code Site starter's `src/config/solution.ts` `siteName` field (or `powerPages.siteName` in `solution.config.json`); `apply-config.ps1` derives the prefixed `[PREFIX] - [Name]` form — do NOT type the prefix yourself or it doubles (`EVT - EVT - …`). See the [Power Pages starter docs](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/CLAUDE.md).
+
+---
+
+### Power Pages web URL — prefix it, and record it in the config
+
+The site **name** is derived; the **web address** is typed by hand in the maker at reactivation, and
+it is the one that is hard to change afterwards. Convention, so it is collision-proof and derivable
+with no judgement call:
+
+| Environment | URL | Display name |
+|---|---|---|
+| Dev | `[prefix]-[kebab-site-name]-dev` | `[PREFIX] - [Name]` |
+| Stage | `[prefix]-[kebab-site-name]-stage` | `[PREFIX] - [Name]` |
+| Prod | `[prefix]-[kebab-site-name]` | `[PREFIX] - [Name]` |
+
+The **display name takes no environment suffix** — each environment has its own Dataverse, so
+`[PREFIX] - [Name]` is already unambiguous. The environment belongs in the URL.
+
+**Why the prefix matters:** `*.powerappsportals.com` is a **global namespace shared with every
+Microsoft tenant**, not a per-tenant one, and there is no reservation mechanism. An unprefixed,
+generic slug is liable to be taken by a stranger. This is not hypothetical — across SMKB-Apps-Dev one
+site carries a `-new` in its URL only because the natural slug was already gone, and a rebuild found
+its obvious slug held by the very site it was replacing.
+
+Record the intended slug in `powerPages.webUrlSlug` in [`solution.config.json`](solution.config.json)
+so it lives in version control rather than only in the maker portal; `/ppcs-provision-site` prints
+the recommended value right before the reactivation pause so it is copied, not invented.
 
 ---
 
@@ -388,6 +416,33 @@ Always use the explicit `--environment` flag:
 ```
 
 Or rely on the default URL already configured in each `deploy.ps1` (which hardcodes the correct URL).
+
+---
+
+## Agent Guidance — Windows PowerShell 5.1 and git
+
+These cost a debugging cycle each, and several fail *silently*.
+
+- **Helper `.ps1` files must be ASCII-only** (or saved with a BOM). Windows PowerShell 5.1 reads a
+  UTF-8-without-BOM script as ANSI, so any non-ASCII literal becomes mojibake at parse time. A
+  validation script whose character class got corrupted this way matched *every* file and reported
+  nine false positives. `scripts/check-template-guards.mjs` enforces this.
+- **Express non-ASCII as `[char]0xNNNN` or a regex unicode escape — never the backtick-u brace form.**
+  That form is PowerShell 6+ only and fails **silently** in 5.1: the pattern simply never matches, so
+  a `-replace` cleanup appears to succeed while changing nothing.
+- **A `-replace` that fails to match is indistinguishable from success.** Assert the result.
+- **PowerShell unwraps a single-element array on return.** A helper ending in `@(...)` hands back a
+  bare string when there is one match, so `$ids[0]` indexes a *character* — the script then runs
+  happily on garbage and fails later with an error naming something unrelated. **Wrap every
+  collection-returning call site in `@( )`.**
+- **A scriptblock passed as a parameter resolves its variables in the *invoking* scope**, not where it
+  was written — silently producing empty values. Pass a template string with a token instead.
+- **Multi-line git commit messages must go through `git commit -F <file>`**, never `-m` with a
+  single-quoted here-string. PowerShell re-parses the string when handing it to a native executable,
+  so the argument splits at the first double quote and git reports
+  `error: pathspec '...' did not match any file(s) known to git`.
+- **Never trust a `pac` exit code.** It returns 0 on a failed import, a rejected component type, and
+  more. Parse stdout.
 
 ---
 

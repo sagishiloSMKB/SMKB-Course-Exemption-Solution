@@ -187,6 +187,12 @@ SMKB - Environmental Variables Starter/
 | `100000004` | Data Source |
 | `100000005` | Secret |
 
+> **A Secret env var can NEVER be read via `parameters()`.** Putting one in a flow's
+> `definition.parameters` **imports cleanly and then the flow refuses to turn on** — a symptom that
+> looks nothing like its cause. Read it at run time through the Dataverse unbound action
+> `RetrieveEnvironmentVariableSecretValue` instead. Its value is an Azure Key Vault **resource-ID
+> reference**, set per environment, never a literal and never committed.
+
 ### Updating an existing variable
 
 1. Edit the relevant XML file.

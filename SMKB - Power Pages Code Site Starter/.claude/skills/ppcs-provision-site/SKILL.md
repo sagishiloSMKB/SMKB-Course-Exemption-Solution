@@ -86,15 +86,36 @@ For detailed recovery procedures, see [provision-reference.md](provision-referen
 
 ### Phase 2 — Reactivation (Manual Step)
 
-8. **PAUSE.** Tell the user:
+8. **Compute the recommended web URL first, so the developer copies it instead of inventing one.**
+   Reactivation is where the site's **web address** gets typed by hand, and it is the value that is
+   hard to change afterwards. Read `powerPages.webUrlSlug` from the repo-root `solution.config.json`;
+   if it is unset or still a placeholder, derive it as `<prefix>-<kebab siteName>` from
+   `src/config/solution.ts` and append the environment suffix:
+
+   | Environment | URL |
+   |---|---|
+   | Dev | `<slug>-dev` |
+   | Stage | `<slug>-stage` |
+   | Prod | `<slug>` (no suffix) |
+
+   Print the exact string for the target environment. **Prefix it** — `*.powerappsportals.com` is a
+   global namespace shared with every Microsoft tenant, with no reservation mechanism, so a generic
+   slug is liable to be taken by a stranger (one SMKB site carries a `-new` only because its natural
+   slug was gone). The **display name takes no environment suffix**. See root CLAUDE.md → Critical
+   Rule 3.
+
+9. **PAUSE.** Tell the user:
    > The site has been uploaded to Power Pages as an inactive site.
    > 1. Go to [make.powerpages.microsoft.com](https://make.powerpages.microsoft.com)
    > 2. Click **Inactive Sites** in the left sidebar
    > 3. Find your site and click **Reactivate**
-   > 4. Wait 2–3 minutes — do NOT delete the site, only reactivate it
-   > 5. Reply "done" when the site is active
+   > 4. **Web address:** use exactly the URL printed above
+   > 5. Wait 2–3 minutes — do NOT delete the site, only reactivate it
+   > 6. Reply "done" when the site is active
 
    Wait for confirmation before continuing.
+
+   > Steps below keep their original numbers; this inserted step shifts them by one.
 
 ### Phase 3 — Download + Post-Config
 
