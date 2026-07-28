@@ -65,7 +65,7 @@ Init Project is a collaboration between the agent and the developer. The agent h
 | `pac auth list` (verify setup; NOT `pac --version` - it exits non-zero in PAC 2.8.1) | Tries first | Run manually + paste output if agent's shell can't find `pac` |
 | `pac pages list` (get site GUID) | Tries first | Run manually + paste output if agent's shell can't find `pac` |
 | `pac auth select` / `pac auth create` (change active profile) | — | Must run locally — blocked in agent settings |
-| `pnpm install` / `npm install` in starter folders (Step 5b) | — | Must run locally — required before first commit touching .vue/.ts |
+| `pnpm install` / `npm install` in starter folders (Step 8) | — | Must run locally — required before any commit touching .vue/.ts |
 | Run `deploy.ps1` / a starter's deploy flow | When you say "deploy" | Confirm auth is correct first |
 | Provision + deploy the Power Pages Code Site (`/ppcs-provision-site`, `/ppcs-deploy`) | Drives the skills | Runs local PowerShell/`pac`, visits portal in browser |
 | Set env var values in Maker portal | — | Power Apps Maker → Solutions → your solution → Env Vars |
@@ -104,7 +104,9 @@ npm whoami        # 401 => the token is expired or revoked, whether or not NPM_T
 > that the token was fine while CI — which has no cache — failed on every `@smkbacil` consumer.
 > `npm whoami` is the check. If it returns 401, mint a new token and update it everywhere (it is an
 > org-wide credential, not per-repo); see Step 4 for the CI secret.
-> Skip this entirely if the solution activates neither of those two starters.
+>
+> You will not know for certain which starters this solution activates until Step 7 (it is derived
+> from the specs), so sort the credential out now rather than discovering it at Step 8's install.
 
 **PAC CLI authentication:**
 
@@ -168,7 +170,10 @@ Derived values (confirm with the developer):
 - Short name: 2–5 lowercase letters only — no numbers, underscores, or hyphens; must be unique across all solutions in SMKB-Apps-Dev (see CLAUDE.md → Critical Rule 5)
 - **Display names use ASCII hyphens only** (` - `), never a Unicode en/em dash — see CLAUDE.md → Critical Rule 3
 
-> **Component-level names (Power Pages and Power Apps)** are collected in Step 8. Each Power Pages Code Site and each Power App gets its own **Functional Component Name** — a short phrase describing what that specific site or app does. A single solution can have multiple sites and multiple apps, each with a different name.
+> **Component-level names (Power Pages and Power Apps)** are not gathered here — they come out of the
+> specifications in **Step 6** and are settled in **Step 7**, because each is a **Functional Component
+> Name**: a short phrase describing what that specific site or app *does*, which only the specs can
+> supply. A single solution can have multiple sites and multiple apps, each with a different name.
 
 ---
 
@@ -217,8 +222,10 @@ Create a **private** repository in the SMKB-AC-IL GitHub organization:
 4. Visibility: **Private**
 5. **Do NOT** add a README, .gitignore, or license — the repo must be empty
 6. Click **Create repository** and copy the HTTPS clone URL
-7. **Add the `NPM_TOKEN` repo secret now, before the first push** — skip only if the solution
-   activates neither the Power Apps nor the Power Pages starter.
+7. **Add the `NPM_TOKEN` repo secret now, before the first push.** You do not yet know which starters
+   this solution will activate — that is decided in Step 7, from the specs — so add it unconditionally:
+   it is harmless if no starter ends up needing it, and CI's credential pre-flight skips itself when no
+   app declares an `@smkbacil` dependency. Adding it later means a red first push.
    **Settings → Secrets and variables → Actions → New repository secret**, name `NPM_TOKEN`, value
    a token with read access to the `@smkbacil` scope.
    Without it, CI goes red on the very first push: every SPA job dies at `npm install` because
@@ -261,9 +268,11 @@ git remote -v
 
 ---
 
-### Step 5b — Enable git hooks and install dependencies
+### Step 5b — Enable the git hooks
 
-Run once to activate the repo-wide pre-commit gate for this working copy:
+Run once to activate the repo-wide pre-commit gate for this working copy. (Installing the starters'
+dependencies is **Step 8** - it has to wait until the folders have their final names and you know
+which starters are activated.)
 
 ```powershell
 git config core.hooksPath .githooks
@@ -273,29 +282,58 @@ This tells Git to use the root `.githooks/` folder instead of `.git/hooks/`. The
 
 > **Note:** This is a local git config setting. Every developer who clones this repo runs it once.
 
-**Install dependencies for the activated code starters (required for the lint gate):**
+---
 
-The lint gate calls each starter's local ESLint, which needs `node_modules`. Install in every activated starter that has a `package.json`:
+### Step 6 — Gather solution specifications
 
-```powershell
-# Power Apps — pnpm, at the starter root
-cd "SMKB - [Your App Name] - Power App"
-pnpm install
+Specifications come FIRST: which starters you activate, and what each component is called, are both
+derived from them. Choosing starters from a generic checklist before understanding the solution leads
+to wrong activations (activating Flows before confirming any flow is needed, say), and the component
+names in Step 7 are functional names that only the specs can supply.
 
-# Power Pages Code Site — npm, at the starter root (it is a flat project, no client/ subfolder)
-cd "SMKB - [Your Site Name] - Power Pages Code Site"
-npm install
-```
 
-Skip this for starters without a `package.json` (Tables, Env Vars, Flows).
+For each activated starter, collect enough detail to drive implementation. Ask the developer:
+
+**For each Table:** schema name `smkb_<prefix>_<PascalName>` (e.g. `smkb_evt_Session`) and display name `EVT - Session`, key fields (name, type, required/optional), relationships to other tables. (See CLAUDE.md → Critical Rule 3 for the naming rule + the Dataverse lowercase-logical-name nuance.)
+
+**For each Environment Variable:** schema name `smkb_<prefix>_<PascalName>` (e.g. `smkb_evt_PortalBaseUrl`), display `EVT - Portal Base URL`, type (String / Number / Boolean — **use String + semicolons for lists, never JSON**; see CLAUDE.md → Critical Rule 5), default value (or none if environment-specific), purpose.
+
+**For each Cloud Flow:** schema name `smkb_<prefix>_<PascalName>` (e.g. `smkb_evt_SendConfirmation`), display `EVT - Send Confirmation`, trigger type (Power Pages request, scheduled, Dataverse row), what it does (logic, recipients, subject/body), input parameters. Power Pages-triggered flows follow the HTTP 200 + `errorCode` contract — see the Power Pages starter's [flow-error contract](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/FLOW-ERROR-CONTRACT.md).
+
+**For each Power App:** a Functional Component Name (what the app *does* - it becomes the folder name in Step 7), app display name `SMKB - [Name] - Dev`, which Dataverse tables it reads/writes, key screens.
+
+> **Does this site use the SMKB design system, or its own visual identity?** Ask now, not after CI
+> goes red. The Code Site ships `@smkbacil/design-ui` (a **private** package) wired into `App.vue`,
+> `main.ts` and `composables/useFlowErrorToast.ts`. A solution that builds its own UI — a
+> like-for-like rebuild of an existing bespoke site, say — ships zero bytes of it, yet still forces a
+> working `@smkbacil` token on every `npm install`, every CI run and every new developer machine.
+> If the answer is "its own identity", run **`/ppcs-remove-design-ui`** during authoring; it is an
+> eight-step removal where two steps are easy to miss and the verification is the part everyone gets
+> wrong. Answering early turns that cleanup into a two-minute decision.
+
+> **Rebuilding an existing solution? The deployed artifact is the specification — the repo is only
+> evidence for it.** Do not assume the default branch is what is live. On one rebuild `origin/main`
+> was 7 commits and 11 days behind production, and the deployed commit existed only as a **deploy
+> tag** — porting from `main` would have silently produced a faithful copy of the wrong version
+> (a migrated video player, relinked logos, 11 renamed assets), and nothing would have failed a
+> build. Enumerate every ref (`git fetch --all --tags`, then
+> `git for-each-ref --sort=-committerdate`), identify the deployed commit by correlating with the
+> live artifact (a deploy tag, the solution version in Dataverse, the build timestamp of the
+> deployed bundle), diff your candidate against the default branch before porting, and verify
+> afterwards by hashing the ported files against that commit. Treat any disagreement between repo
+> and deployment as a finding, not a rounding error.
+
+**For each Power Pages Code Site:** a Functional Component Name (what the site *does* - it becomes the folder name in Step 7), the **bare** site name (goes into `src/config/solution.ts` `siteName`; apply-config derives `[PREFIX] - [Name]`), app title(s) and languages, which tables/flows it uses, and auth requirements. See the [Power Pages Getting Started guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/GETTING-STARTED.md).
 
 ---
 
-### Step 6 — Starters are determined by specifications
+---
 
-Do NOT select starters before gathering specifications — choosing starters from a generic checklist before understanding the solution leads to wrong activations (e.g. activating Flows before confirming any flows are actually needed).
+### Step 7 — Activate the starters and choose their names
 
-**Starters are activated in Step 9, after specifications are gathered in Step 8.** The agent derives which starters to activate from the spec content:
+Now that the specs are known, decide **which** starters this solution activates, then name them.
+
+**Derive the activation from the spec content:**
 
 | If the solution needs... | Activate... |
 |--------------------------|------------|
@@ -307,9 +345,6 @@ Do NOT select starters before gathering specifications — choosing starters fro
 
 Starters that are NOT activated must remain completely untouched — do not rename them, modify files, or deploy them.
 
----
-
-### Step 7 — Choose the activated starters' names
 
 Each activated starter's folder becomes `SMKB - [Component Name] - [Type Label]`:
 
@@ -365,6 +400,8 @@ The Component Name must be consistent across:
 
 ---
 
+---
+
 ### Step 7b — Fill the solution config and apply it (this performs the Step 7 renames)
 
 > **Skills ship with the kit.** The starter provides `/slash` skills for the build/deploy/quality steps
@@ -373,7 +410,7 @@ The Component Name must be consistent across:
 > **`/solution-config`** (interviews for identity, validates the rules, and runs apply-config for you).
 
 Solution identity lives in one file: [`solution.config.json`](solution.config.json). Fill it with the
-values from Step 2 (and the app/site names from Steps 7–8), set the `activate` flags for the starters
+values from Step 2 (and the activation + component names decided in Steps 6-7), set the `activate` flags for the starters
 you renamed, then push everything into the starters at once (or just run **`/solution-config`**):
 
 ```powershell
@@ -413,40 +450,25 @@ safe and idempotent.
 
 ---
 
-### Step 8 — Gather solution specifications
+### Step 8 — Install dependencies for the activated starters
 
-For each activated starter, collect enough detail to drive implementation. Ask the developer:
+Now that the folders carry their final names (Step 7b renamed them) and you know which starters are
+activated, install the toolchains the lint gate needs.
 
-**For each Table:** schema name `smkb_<prefix>_<PascalName>` (e.g. `smkb_evt_Session`) and display name `EVT - Session`, key fields (name, type, required/optional), relationships to other tables. (See CLAUDE.md → Critical Rule 3 for the naming rule + the Dataverse lowercase-logical-name nuance.)
 
-**For each Environment Variable:** schema name `smkb_<prefix>_<PascalName>` (e.g. `smkb_evt_PortalBaseUrl`), display `EVT - Portal Base URL`, type (String / Number / Boolean — **use String + semicolons for lists, never JSON**; see CLAUDE.md → Critical Rule 5), default value (or none if environment-specific), purpose.
+The lint gate calls each starter's local ESLint, which needs `node_modules`. Install in every activated starter that has a `package.json`:
 
-**For each Cloud Flow:** schema name `smkb_<prefix>_<PascalName>` (e.g. `smkb_evt_SendConfirmation`), display `EVT - Send Confirmation`, trigger type (Power Pages request, scheduled, Dataverse row), what it does (logic, recipients, subject/body), input parameters. Power Pages-triggered flows follow the HTTP 200 + `errorCode` contract — see the Power Pages starter's [flow-error contract](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/FLOW-ERROR-CONTRACT.md).
+```powershell
+# Power Apps — pnpm, at the starter root
+cd "SMKB - [Your App Name] - Power App"
+pnpm install
 
-**For each Power App:** Functional Component Name (Step 7), app display name `SMKB - [Name] - Dev`, which Dataverse tables it reads/writes, key screens.
+# Power Pages Code Site — npm, at the starter root (it is a flat project, no client/ subfolder)
+cd "SMKB - [Your Site Name] - Power Pages Code Site"
+npm install
+```
 
-> **Does this site use the SMKB design system, or its own visual identity?** Ask now, not after CI
-> goes red. The Code Site ships `@smkbacil/design-ui` (a **private** package) wired into `App.vue`,
-> `main.ts` and `composables/useFlowErrorToast.ts`. A solution that builds its own UI — a
-> like-for-like rebuild of an existing bespoke site, say — ships zero bytes of it, yet still forces a
-> working `@smkbacil` token on every `npm install`, every CI run and every new developer machine.
-> If the answer is "its own identity", run **`/ppcs-remove-design-ui`** during authoring; it is an
-> eight-step removal where two steps are easy to miss and the verification is the part everyone gets
-> wrong. Answering early turns that cleanup into a two-minute decision.
-
-> **Rebuilding an existing solution? The deployed artifact is the specification — the repo is only
-> evidence for it.** Do not assume the default branch is what is live. On one rebuild `origin/main`
-> was 7 commits and 11 days behind production, and the deployed commit existed only as a **deploy
-> tag** — porting from `main` would have silently produced a faithful copy of the wrong version
-> (a migrated video player, relinked logos, 11 renamed assets), and nothing would have failed a
-> build. Enumerate every ref (`git fetch --all --tags`, then
-> `git for-each-ref --sort=-committerdate`), identify the deployed commit by correlating with the
-> live artifact (a deploy tag, the solution version in Dataverse, the build timestamp of the
-> deployed bundle), diff your candidate against the default branch before porting, and verify
-> afterwards by hashing the ported files against that commit. Treat any disagreement between repo
-> and deployment as a finding, not a rounding error.
-
-**For each Power Pages Code Site:** Functional Component Name (Step 7), the **bare** site name (goes into `src/config/solution.ts` `siteName`; apply-config derives `[PREFIX] - [Name]`), app title(s) and languages, which tables/flows it uses, and auth requirements. See the [Power Pages Getting Started guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/GETTING-STARTED.md).
+Skip this for starters without a `package.json` (Tables, Env Vars, Flows).
 
 ---
 

@@ -210,7 +210,7 @@ references — so each starter's own `deploy.ps1` placeholder guard stays armed 
 
 ## CRITICAL RULE 1 — Always Ask Which Starters to Activate
 
-At the beginning of any new solution engagement, BEFORE touching any files, you MUST ask the user (note: during Init Project, follow the Step 8→9 sequence in INIT_PROJECT.md instead — spec gathering happens before starter selection):
+At the beginning of any new solution engagement, BEFORE touching any files, you MUST ask the user (note: during Init Project, follow the Step 6→7 sequence in INIT_PROJECT.md instead — spec gathering happens before starter selection):
 
 > "Which starters do you want to activate for this solution?
 > - Dataverse Tables (custom data tables)
