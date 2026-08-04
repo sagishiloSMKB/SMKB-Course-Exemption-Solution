@@ -1,0 +1,6 @@
+description: >-
+  Disables built-in username/password sign-in. Unused by the custom OTP model,
+  and Microsoft recommends deprecating the local identity provider.
+id: aaaaaaaa-0012-4000-8000-000000000012
+name: Authentication/Registration/LocalLoginEnabled
+value: "false"

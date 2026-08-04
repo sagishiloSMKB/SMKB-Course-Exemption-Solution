@@ -1,0 +1,7 @@
+description: >-
+  Denies the browser features this site does not use. An empty allowlist ()
+  blocks the feature for the document and every embedded frame. Add a feature
+  back only when a page genuinely needs it.
+id: aaaaaaaa-0010-4000-8000-000000000010
+name: HTTP/Permissions-Policy
+value: "geolocation=(), camera=(), microphone=()"

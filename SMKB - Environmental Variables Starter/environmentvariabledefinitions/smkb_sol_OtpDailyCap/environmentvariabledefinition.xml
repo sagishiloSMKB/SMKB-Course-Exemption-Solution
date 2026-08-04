@@ -1,0 +1,11 @@
+<environmentvariabledefinition schemaname="smkb_sol_OtpDailyCap">
+  <defaultvalue>300</defaultvalue>
+  <displayname default="SOL - OTP Daily Cap">
+    <label description="SOL - OTP Daily Cap" languagecode="1033" />
+  </displayname>
+  <introducedversion>1.0.0.1</introducedversion>
+  <iscustomizable>1</iscustomizable>
+  <isrequired>0</isrequired>
+  <secretstore>0</secretstore>
+  <type>100000001</type>
+</environmentvariabledefinition>

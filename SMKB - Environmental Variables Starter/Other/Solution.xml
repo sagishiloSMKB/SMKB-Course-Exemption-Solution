@@ -99,6 +99,8 @@
       -->
       <RootComponent type="380" schemaName="smkb_sol_EnvironmentName" behavior="0" />
       <RootComponent type="380" schemaName="smkb_sol_FlowErrorEmails" behavior="0" />
+      <RootComponent type="380" schemaName="smkb_sol_OtpDailyCap" behavior="0" />
+      <RootComponent type="380" schemaName="smkb_sol_SecurityAlertEmails" behavior="0" />
       <RootComponent type="380" schemaName="smkb_sol_ExampleVar" behavior="0" />
     </RootComponents>
     <MissingDependencies />

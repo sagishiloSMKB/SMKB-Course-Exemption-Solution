@@ -78,7 +78,7 @@ Fill this file **first** on any new project — it is the single source for per-
 
 Every site created from this starter is namespaced to its solution by the publisher prefix. The exported `POWER_PAGES_SITE_NAME` derives the canonical site name as `` `${SOLUTION.prefix.toUpperCase()} - ${SOLUTION.siteName}` `` → e.g. **`PVCH - Lecturer Portal`**. That exact string must be the `siteName` in `powerpages.config.json` (PAC CLI reads that file directly to create/find the `adx_website` record): `/ppcs-provision-site` step 3 derives and writes it, and `/ppcs-deploy` verifies `siteName` still starts with `<PREFIX> - `. Do not hand-set the site name in `powerpages.config.json` — set `prefix` + `siteName` in `solution.ts` and let the skill sync it. (Power Pages may append a URL slug during provisioning, e.g. `PVCH - Lecturer Portal - pvch-lecturer-portal`; the base name still leads with the prefix.)
 
-Custom Dataverse components a solution adds later (tables, columns, flows) follow the kit-wide convention `smkb_<prefix>_<PascalName>` — the publisher prefix `smkb_` plus this solution's short prefix, e.g. `smkb_pvch_Registration` (see the root `CLAUDE.md` → Critical Rule 3; `SOLUTION.prefix` here is that short-prefix segment). **Exception:** the 8 shipped security site settings keep their platform-reserved names (`HTTP/Content-Security-Policy`, etc.) — recognized by Power Pages by exact name; never prefix them.
+Custom Dataverse components a solution adds later (tables, columns, flows) follow the kit-wide convention `smkb_<prefix>_<PascalName>` — the publisher prefix `smkb_` plus this solution's short prefix, e.g. `smkb_evt_Registration` (see the root `CLAUDE.md` → Critical Rule 3; `SOLUTION.prefix` here is that short-prefix segment). **Exception:** the 16 shipped security site settings keep their platform-reserved names (`HTTP/Content-Security-Policy`, etc.) — recognized by Power Pages by exact name; never prefix them.
 
 ---
 
@@ -91,7 +91,7 @@ Custom Dataverse components a solution adds later (tables, columns, flows) follo
 ## Power Pages Integration Rules
 
 ### No hand-authored GUIDs
-Never invent GUIDs by hand. The `.powerpages-site/site-settings/` folder ships 8 settings with **placeholder** GUIDs (`aaaaaaaa-000N-…`) that `scripts/freshen-site-settings.ps1` replaces with fresh ones during provisioning; the other `.powerpages-site/` folders (web-roles, table-permissions) are populated per-environment by `pac pages download`. Do not add or edit GUIDs manually.
+Never invent GUIDs by hand. The `.powerpages-site/site-settings/` folder ships 16 settings with **placeholder** GUIDs (`aaaaaaaa-00NN-…`) that `scripts/freshen-site-settings.ps1` replaces with fresh ones during provisioning; the other `.powerpages-site/` folders (web-roles, table-permissions) are populated per-environment by `pac pages download`. Do not add or edit GUIDs manually.
 
 ### Stable Vite output filenames (critical)
 `vite.config.ts` uses `[name]` (no hash) for all output files. Hashed filenames create a new Dataverse Web File record on every build, accumulating stale records. Do not add `[hash]` to output patterns. `base: "/"` is also required.
@@ -182,31 +182,73 @@ After deleting a record in the source environment, re-run `pac pages download` b
 
 ## Security Configuration
 
-The starter ships 8 custom security site settings in `.powerpages-site/site-settings/` that deploy automatically with `npm run deploy`. No manual portal setup required.
+The starter ships 16 custom security site settings in `.powerpages-site/site-settings/` that deploy automatically with `npm run deploy`. No manual portal setup required. They are the shipped half of the solution-wide security baseline (root **SECURITY-BASELINE.md**).
 
 ### What's pre-configured
+
+**Response headers and CSP**
 
 | File | `name` | Value | Effect |
 |---|---|---|---|
 | `security-x-content-type-options.sitesetting.yml` | `HTTP/X-Content-Type-Options` | `nosniff` | Prevents MIME-type sniffing attacks |
 | `security-x-xss-protection.sitesetting.yml` | `HTTP/X-XSS-Protection` | `0` | Disables the legacy browser XSS filter — leaving it on can introduce bypass vectors; CSP replaces it |
 | `security-csp-report-only.sitesetting.yml` | `HTTP/Content-Security-Policy-Report-Only` | Baseline CSP | Logs CSP violations to the browser console without blocking anything — safe to ship in a starter |
+| `security-csp.sitesetting.yml` | `HTTP/Content-Security-Policy` | Enforced CSP | Blocks disallowed sources; ships alongside report-only |
+| `security-csp-inject-unsafe-eval.sitesetting.yml` | `HTTP/Content-Security-Policy/Inject-unsafe-eval` | `false` | Prevents Power Pages from auto-injecting `unsafe-eval` |
+| `security-referrer-policy.sitesetting.yml` | `HTTP/Referrer-Policy` | `strict-origin-when-cross-origin` | Full path same-origin, origin only cross-origin, nothing on an HTTPS→HTTP downgrade |
+| `security-permissions-policy.sitesetting.yml` | `HTTP/Permissions-Policy` | `geolocation=(), camera=(), microphone=()` | Denies browser features this SPA does not use, for the document and every embedded frame |
+
+**Authentication cookie and password policy**
+
+| File | `name` | Value | Effect |
+|---|---|---|---|
 | `auth-cookie-httponly.sitesetting.yml` | `Authentication/ApplicationCookie/CookieHttpOnly` | `true` | Prevents JavaScript from reading the auth cookie |
 | `auth-cookie-secure.sitesetting.yml` | `Authentication/ApplicationCookie/CookieSecure` | `Always` | Auth cookie sent over HTTPS only |
 | `auth-password-policy.sitesetting.yml` | `Authentication/UserManager/PasswordValidator/EnforcePasswordPolicy` | `true` | Requires passwords to satisfy 3 of 4 character categories |
-| `security-csp.sitesetting.yml` | `HTTP/Content-Security-Policy` | Enforced CSP | Blocks disallowed sources; ships alongside report-only |
-| `security-csp-inject-unsafe-eval.sitesetting.yml` | `HTTP/Content-Security-Policy/Inject-unsafe-eval` | `false` | Prevents Power Pages from auto-injecting `unsafe-eval` |
+
+**Built-in login and registration surface — shipped disabled**
+
+Every one of these defaults to **`true`** on the platform, so leaving them out means shipping a sign-in and sign-up surface this starter never uses. That is a real audit finding, not a theoretical one.
+
+| File | `name` | Value | Effect |
+|---|---|---|---|
+| `auth-registration-disabled.sitesetting.yml` | `Authentication/Registration/Enabled` | `false` | Master switch for every built-in sign-up path |
+| `auth-local-login-disabled.sitesetting.yml` | `Authentication/Registration/LocalLoginEnabled` | `false` | No built-in username/password sign-in |
+| `auth-external-login-disabled.sitesetting.yml` | `Authentication/Registration/ExternalLoginEnabled` | `false` | No built-in external/social sign-in or registration |
+| `auth-open-registration-disabled.sitesetting.yml` | `Authentication/Registration/OpenRegistrationEnabled` | `false` | No open sign-up form for anonymous visitors |
+| `auth-invitation-disabled.sitesetting.yml` | `Authentication/Registration/InvitationEnabled` | `false` | No invitation-code redemption — a second sign-up path that survives disabling the first |
+| `auth-reset-password-disabled.sitesetting.yml` | `Authentication/Registration/ResetPasswordEnabled` | `false` | No password-reset page; it applies only to local accounts and its "check your email" response is an account-enumeration oracle |
+
+> **If this solution adopts a Power Pages identity provider** (Entra External ID, Azure AD B2C, any OIDC/SAML provider) instead of the SMKB custom OTP model, re-enable **only** the path it needs — normally `Authentication/Registration/ExternalLoginEnabled` — and leave the rest disabled. Do not delete the files; set the value to `true`, so the intent stays recorded in version control.
+
+### Headers the platform owns — verify, don't fake
 
 `HTTP/X-Frame-Options` and `Authentication/Registration/ProfileRedirectEnabled` are **not** shipped — Power Pages provisions them automatically. After `pac pages download`, set `ProfileRedirectEnabled` to `false` in the downloaded file (step 9 in first-deploy above) — its default of `true` redirects users to `/Profile` after sign-in instead of keeping them on the SPA.
+
+`Strict-Transport-Security` (HSTS) is also **platform-provided** — `powerappsportals.com` is on the browser HSTS preload list, and the platform emits the header itself. **Confirm it rather than assuming it:**
+
+```bash
+curl -I https://<your-site>.powerappsportals.com | grep -i strict-transport-security
+```
+
+Do **not** create a site setting for HSTS. A hand-written `HTTP/Strict-Transport-Security` competes with the platform's own header and gives a false sense of ownership; if the header is genuinely missing, that is a platform issue to raise, not a YAML file to add.
+
+The CSP value is tailored for this SPA — all Vite bundles are served from `'self'`, Power Pages platform scripts come from `content.powerapps.com` (and the other Microsoft CDN domains included), styles require `'unsafe-inline'` for `@smkbacil/design-ui`'s Vue style injection. The `'nonce'` token is a Power Pages placeholder replaced with a cryptographically unique nonce on every request. `object-src 'none'` and `base-uri 'self'` close plugin embedding and `<base>` hijacking; `upgrade-insecure-requests` rewrites any stray `http://` subresource to HTTPS.
 
 The CSP report-only value is tailored for this SPA — all Vite bundles are served from `'self'`, Power Pages platform scripts come from `content.powerapps.com` (and the other Microsoft CDN domains included), styles require `'unsafe-inline'` for `@smkbacil/design-ui`'s Vue style injection. The `'nonce'` token is a Power Pages placeholder replaced with a cryptographically unique nonce on every request.
 
 ### Placeholder GUIDs and the freshen script
 
-The 8 custom security settings files ship with placeholder GUIDs (`aaaaaaaa-000N-*`).
-Run `scripts/freshen-site-settings.ps1` once before first deploy — it replaces each
+The 16 custom security settings files ship with placeholder GUIDs (`aaaaaaaa-00NN-*`).
+Run `scripts/freshen-site-settings.ps1` before first deploy — it replaces each
 placeholder with a fresh random GUID unique to this site, preventing collisions if
 multiple sites are created from this starter in the same Dataverse org.
+
+The script is **safe to run again**. It only ever touches a file that still holds a
+placeholder, so if the starter later ships another setting (a new header, a new auth
+lockdown), a re-run gives that one a real GUID and leaves every assigned GUID alone.
+Without that, a late-added setting would deploy carrying the literal template placeholder.
+Placeholders must be **lowercase** — the replacement scan is case-sensitive.
 
 After `pac pages download`, PAC CLI overwrites these files with the system-assigned
 Dataverse GUIDs. Subsequent deploys are fully idempotent.
@@ -235,9 +277,14 @@ After first deploy, two Power Pages site checker findings remain and cannot be r
 
 ### What's intentionally absent
 
-- **Table permissions** — Power Pages denies all Dataverse access by default. No permissions are needed until you enable the Web API for a table. When you do add them, generate a fresh UUID per permission (see the Web API section below) — never copy GUIDs from another site.
-- **Web roles** — Anonymous Users and Authenticated Users roles are auto-created by Power Pages during site provisioning. No YAML required.
+Each of these is a deliberate decision, not an oversight. A security review that flags one should be answered with the reasoning here, and the answer recorded under "Verified-safe" in the audit report rather than re-litigated.
+
+- **Table permissions** — Power Pages denies all Dataverse access by default, and this starter enables the Web API for **no** table, so there is no browser-facing data surface for a table permission to protect. `table-permissions/` is intentionally empty. Permissions become necessary only when you enable the Web API for a table; when you do add them, generate a fresh UUID per permission (see the Web API section below) — never copy GUIDs from another site.
+- **Web roles** — Anonymous Users and Authenticated Users roles are auto-created by Power Pages during site provisioning, so `web-roles/` is intentionally empty. The **Anonymous** role is the correct role for this starter's flow endpoints and does not mean "unauthenticated": every authenticated flow re-validates the session token server-side and scopes data by ownership. That is Microsoft's documented model for Power-Pages-invoked cloud flows, and table permissions are **not** enforced inside a flow.
 - **CORS headers** (`HTTP/Access-Control-Allow-Origin` etc.) — site-specific; only add if your SPA calls cross-origin APIs.
+- **HSTS** — platform-provided and preloaded; verify with `curl -I` as above rather than shipping a competing site setting.
+- **`X-Frame-Options`** — platform-provided, and `frame-ancestors 'self'` in the CSP already covers framing for modern browsers.
+- **A `frame-src` directive** — absent on purpose. With `default-src 'self'` as the fallback, no third-party frame can load until you add one deliberately (for example `/ppcs-add-turnstile`, which adds `challenges.cloudflare.com`).
 
 ---
 

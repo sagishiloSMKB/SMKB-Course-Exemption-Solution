@@ -136,12 +136,21 @@ function Invoke-Op {
 }
 
 # -- ALM env-var rename (exact-token; sentinel-based one-shot) -----------------
+# Every env-var definition this starter SHIPS. Each one's 'sol' segment is swapped to the
+# solution prefix here, so add a name to this list whenever the starter ships another
+# definition - the Env Vars deploy.ps1 guard refuses to deploy while any 'sol' segment
+# remains, so a definition missing from this list silently blocks the whole starter.
+$script:shippedEnvVars = @('EnvironmentName', 'FlowErrorEmails', 'OtpDailyCap', 'SecurityAlertEmails')
+
 function Invoke-AlmToken {
   param([string]$Path, [string]$Label)
   if (-not (Test-Path -LiteralPath $Path)) { return }
   $orig = Read-Text $Path
-  $new  = $orig.Replace('smkb_sol_EnvironmentName', "smkb_${prefix}_EnvironmentName").Replace('smkb_sol_FlowErrorEmails', "smkb_${prefix}_FlowErrorEmails")
-  # Display-name convention prefix inside the two ALM env-var definition files only.
+  $new  = $orig
+  foreach ($v in $script:shippedEnvVars) {
+    $new = $new.Replace("smkb_sol_$v", "smkb_${prefix}_$v")
+  }
+  # Display-name convention prefix inside the shipped env-var definition files only.
   if ($Path -match 'environmentvariabledefinition\.xml$') { $new = $new.Replace('SOL - ', "$prefixUpper - ") }
   $changed = ($new -ne $orig)
   if ($Check)  { if ($changed) { $script:drift += "$Label  ($Path)" }; return }
@@ -370,10 +379,11 @@ if ($cfg.activate.powerPages) {
   Invoke-Op -Path $ppc -Pattern '("siteName":\s*)"[^"]*"' -Replacement ('${1}"' + (Esc $derivedSite) + '"') -Label 'PowerPages powerpages.config siteName'
 }
 
-# ALM env vars - swap the 'sol' segment of smkb_sol_EnvironmentName / smkb_sol_FlowErrorEmails to the solution prefix.
+# Shipped env vars - swap the 'sol' segment of every definition this starter ships
+# (see $script:shippedEnvVars) to the solution prefix, and rename its folder to match.
 if ($cfg.activate.environmentVariables) {
   $evBase = Join-Path $evRoot 'environmentvariabledefinitions'
-  foreach ($v in @('EnvironmentName','FlowErrorEmails')) {
+  foreach ($v in $script:shippedEnvVars) {
     $oldFolder = "smkb_sol_$v"; $newFolder = "smkb_${prefix}_$v"
     $xmlOld = Join-Path (Join-Path $evBase $oldFolder) 'environmentvariabledefinition.xml'
     $xmlNew = Join-Path (Join-Path $evBase $newFolder) 'environmentvariabledefinition.xml'
@@ -381,10 +391,10 @@ if ($cfg.activate.environmentVariables) {
     elseif (Test-Path -LiteralPath $xmlNew) { Invoke-AlmToken -Path $xmlNew -Label "EnvVars $newFolder schema/display" }
     Rename-AlmFolder -Base $evBase -OldName $oldFolder -NewName $newFolder -Label "EnvVars folder $oldFolder"
   }
-  # The two ALM vars are also declared as RootComponents in Solution.xml - keep those
+  # The shipped vars are also declared as RootComponents in Solution.xml - keep those
   # schemaNames in lockstep with the folder/schemaname rename above, or the definitions
   # import unlinked from the solution and never reach Stage/Prod.
-  Invoke-AlmToken -Path (Join-Path $evRoot 'Other\Solution.xml') -Label 'EnvVars Solution.xml ALM RootComponents'
+  Invoke-AlmToken -Path (Join-Path $evRoot 'Other\Solution.xml') -Label 'EnvVars Solution.xml RootComponents'
 }
 if ($cfg.activate.powerAutomateFlows) {
   $wf = Join-Path $flRoot 'Workflows'

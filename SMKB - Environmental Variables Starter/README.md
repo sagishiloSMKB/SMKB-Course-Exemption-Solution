@@ -73,7 +73,7 @@ For **each variable** your solution needs:
 | `your-default-value-here` | Your actual default value, or remove the `<defaultvalue>` element if there is no universal default |
 
 4. After creating all your real variable folders, **delete** the `smkb_sol_ExampleVar` template folder (it should not be deployed).
-5. If your solution uses Cloud Flows, the two ALM variables `smkb_sol_EnvironmentName` and `smkb_sol_FlowErrorEmails` have their `sol` segment **renamed to your prefix automatically** by the root `apply-config.ps1` (do not delete them). See the "ALM-Required Variables" section below.
+5. The **four shipped variables** — `smkb_sol_EnvironmentName`, `smkb_sol_FlowErrorEmails` (ALM) and `smkb_sol_OtpDailyCap`, `smkb_sol_SecurityAlertEmails` (security baseline) — have their `sol` segment and `SOL - ` display prefix **renamed to your prefix automatically** by the root `apply-config.ps1`, folder and `<RootComponent>` included (do not delete them). See "ALM-Required Variables" and "Security Baseline Variables" below.
 6. **For every variable folder you created**, add a `<RootComponent>` entry to `Other/Solution.xml`:
 
 ```xml
@@ -283,6 +283,44 @@ When your solution uses the **Flows Starter**, always activate these two variabl
 | Dev test emails go to production ops team | Each environment targets the correct audience |
 
 This is the ALM pipeline model: flows are promoted unchanged through Dev → Stage → Prod. Env vars are the mechanism for everything that legitimately differs between environments.
+
+---
+
+## Security Baseline Variables — Abuse Thresholds and Alerting
+
+Two more variables ship for the same reason as the ALM pair: an abuse threshold and an alert recipient list are *exactly* the kind of value that must differ per environment and must be changeable without a redeploy. They back the global-cap and abuse-alert controls described in the root **SECURITY-BASELINE.md** and the Flows starter's [FLOW_SNIPPETS.md](../SMKB%20-%20Power%20Automate%20Flows%20Starter/FLOW_SNIPPETS.md).
+
+Both are renamed to your prefix by `apply-config.ps1` — do not rename them by hand.
+
+### `smkb_sol_OtpDailyCap` — Global send cap
+
+| Setting | Value |
+|---------|-------|
+| Schema name | `smkb_sol_OtpDailyCap` (apply-config renames the `sol` segment → e.g. `smkb_evt_OtpDailyCap`) |
+| Type | **Number** (`100000001`) |
+| Default value | `300` |
+
+**Purpose:** A ceiling on how many one-time codes (or any other rate-sensitive send) the solution will issue across **all** identifiers in a rolling window. A per-identifier rate limit alone does not stop a spray across many identifiers; this is the second, global bound. A flow reads it, counts recent rows, and refuses past the threshold.
+
+**Why an env var, not a constant:** Dev wants a low cap to make the control easy to exercise; production wants a realistic one. Tuning must not require a redeploy.
+
+> This is a **Number**, so a flow consumes it directly with no parsing. Set it low in Dev to test that the rejection path actually works — a cap nobody has ever seen trigger is not a verified control.
+
+### `smkb_sol_SecurityAlertEmails` — Security alert recipients
+
+| Setting | Value |
+|---------|-------|
+| Schema name | `smkb_sol_SecurityAlertEmails` (apply-config renames the `sol` segment → e.g. `smkb_evt_SecurityAlertEmails`) |
+| Type | String |
+| Default value | *(none — must be set per environment)* |
+
+**Purpose:** Semicolon-separated recipients for **suspicious-activity** alerts — the global cap tripping, or an account locking out. Deliberately separate from `smkb_sol_FlowErrorEmails`: a technical failure and a possible attack are different signals with different audiences and different urgency, and mixing them trains people to ignore both.
+
+**Format (String, semicolon-separated — NOT JSON):** the same rule and the same reasoning as `FlowErrorEmails` above.
+
+**Leave it empty to disable alerting.** A flow should treat an empty value as "no alerting configured" and skip the send rather than fail — the cap still rejects; only the notification is off.
+
+> **Debounce the alert.** An alert that fires per rejected attempt turns an abuse attempt into an outbound mail flood from your own tenant. Alert on the *transition* into a capped/locked state, not on every attempt.
 
 ---
 

@@ -1,0 +1,6 @@
+description: >-
+  Disables the invitation-code redemption form - a second sign-up path that stays
+  reachable even when the open sign-up form is off.
+id: aaaaaaaa-0015-4000-8000-000000000015
+name: Authentication/Registration/InvitationEnabled
+value: "false"

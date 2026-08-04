@@ -1,0 +1,7 @@
+description: >-
+  Master switch for every built-in sign-up path. This starter authenticates with
+  its own OTP flow, so portal registration is unused surface. Platform default is
+  true, which is why this must ship explicitly.
+id: aaaaaaaa-0011-4000-8000-000000000011
+name: Authentication/Registration/Enabled
+value: "false"

@@ -1,0 +1,6 @@
+description: >-
+  Disables the open sign-up form, which would otherwise let any anonymous visitor
+  create a portal user account.
+id: aaaaaaaa-0014-4000-8000-000000000014
+name: Authentication/Registration/OpenRegistrationEnabled
+value: "false"

@@ -1,0 +1,6 @@
+description: >-
+  Disables built-in external (social / OIDC) sign-in and registration. Re-enable
+  only if this solution actually adopts a Power Pages identity provider.
+id: aaaaaaaa-0013-4000-8000-000000000013
+name: Authentication/Registration/ExternalLoginEnabled
+value: "false"
