@@ -92,7 +92,10 @@ export async function checkOtp(phone: string, otp: string): Promise<CheckOtpResu
         errorCode: null, attemptsRemaining: null,
       }
     }
-    return { ...EMPTY, errorCode: 'WRONG_OTP', attemptsRemaining: 2 }
+    // INVALID_CODE, not WRONG_OTP: the hardened flow returns one generic code for
+    // wrong / expired / no-pending-code so the response cannot be used to test whether
+    // a number is registered. The mock mirrors the real contract.
+    return { ...EMPTY, errorCode: 'INVALID_CODE', attemptsRemaining: 2 }
   }
 
   try {
@@ -111,7 +114,7 @@ export async function checkOtp(phone: string, otp: string): Promise<CheckOtpResu
       errorCode: null, attemptsRemaining: null,
     }
   } catch (err) {
-    // Business error (WRONG_OTP/EXPIRED/LOCKED/…) → FlowError; WRONG_OTP carries attemptsRemaining in data.
+    // Business error (INVALID_CODE/LOCKED/…) → FlowError; INVALID_CODE carries attemptsRemaining in data.
     if (err instanceof FlowError) {
       const d = err.data as Record<string, unknown> | undefined
       return {

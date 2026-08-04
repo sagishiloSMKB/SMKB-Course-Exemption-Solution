@@ -45,14 +45,14 @@ Every flow JSON must have a `properties.connectionReferences` block that maps **
 
 ```json
 "connectionReferences": {
-  "shared_sharepointonline_pvch": {
+  "shared_sharepointonline_sol": {
     "runtimeSource": "embedded",
     "connection": {
       "connectionReferenceLogicalName": "smkb_SMKBSharePointConnectionUser1"
     },
     "api": { "name": "shared_sharepointonline" }
   },
-  "shared_office365_pvch": {
+  "shared_office365_sol": {
     "runtimeSource": "embedded",
     "connection": {
       "connectionReferenceLogicalName": "new_sharedoffice365_c3167"
@@ -66,7 +66,7 @@ Every flow JSON must have a `properties.connectionReferences` block that maps **
 
 | Name | Example | Where it appears | What it is |
 |------|---------|-----------------|------------|
-| **Local key** | `shared_office365_pvch` | This JSON file only — in every action's `connectionName` field | Arbitrary string; scope is this one JSON file |
+| **Local key** | `shared_office365_sol` | This JSON file only — in every action's `connectionName` field | Arbitrary string; scope is this one JSON file |
 | **Logical name** | `new_sharedoffice365_c3167` | `connectionReferenceLogicalName` in this block | Environment-level reference; must match what's deployed in Dataverse |
 
 - `runtimeSource: "embedded"` is required — tells the runtime the reference is embedded in the solution
@@ -307,7 +307,7 @@ The `operationMetadataId` is any UUID — use a fresh one per flow. Its presence
 2. Search for the flow by display name → select it
 3. Under Roles, click **+ Add roles** → select **Anonymous Users** → Save
 4. Copy the GUID from the URL shown: `/_api/cloudflow/v1.0/trigger/<guid>`
-5. Paste the GUID into `SMKB - Lecturer Portal - Power Page/src/config/flows.ts`
+5. Paste the GUID into the Code Site starter's `src/config/flows.ts`
 
 > **Anonymous Users web role is correct here.** The portal uses OTP session auth (not Power Pages native auth). All access control is enforced inside each flow via session token lookup. All 13 portal flows use Anonymous Users.
 
@@ -410,7 +410,7 @@ Standard two-scope structure used in all flows in this project. All business log
                 "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
               },
               "parameters": {
-                "emailMessage/From": "noreply@smkb.ac.il",
+                "emailMessage/From": "[REPLACE-NOREPLY-SENDER]",
                 "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)')",
                 "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [ERROR] sol_flow_name failed')",
                 "emailMessage/Body": "@concat('<p><strong>sol_flow_name</strong> failed in <strong>', parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), '</strong>.</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",
@@ -441,7 +441,7 @@ Standard two-scope structure used in all flows in this project. All business log
 - Every Response — success, business error, and this technical `Respond_with_error` — uses `statusCode: 200` (see the Response contract above). A non-2xx status would be swallowed by Power Pages into a generic `00000006` envelope, so the caller could never read `errorCode`.
 - `ERROR_EMAILS` is a `String` env var (semicolon-separated addresses) — pass directly to `emailMessage/To`. Do not use `json()` or `join()`.
 - Replace `shared_office365_[yourlocalkey]` with the local key from the flow's `connectionReferences` block (Snippet 2).
-- Replace `sol_flow_name` with the actual flow schema name (e.g. `smkb_pvch_SendLecturerInvite`).
+- Replace `sol_flow_name` with the actual flow schema name (e.g. `smkb_sol_SendInvite`).
 
 ---
 
@@ -524,7 +524,7 @@ The `shared_powerautomate` connector (`runtimeSource: "invoker"`) is used to cal
 Symptoms:
 - The connection reference block uses `"runtimeSource": "invoker"` instead of `"embedded"`
 - On import, the connection ID is invalid: `subscriptions/.../apis/powerautomate/connections/`
-- Error: `'The 'id' property '...' under 'properties.connectionReferences.shared_powerautomate_pvch.connection' is not valid.'`
+- Error: `'The 'id' property '...' under 'properties.connectionReferences.shared_powerautomate_sol.connection' is not valid.'`
 
 **Rule:** Do not add `shared_powerautomate` to any flow's `connectionReferences`. If you need to call another flow as a child, either:
 1. Merge the child flow's logic directly into the parent flow
@@ -540,10 +540,10 @@ If child flow `Run_Child_Flow_*` actions have placeholder GUIDs (e.g. `[IMPLEMEN
 The Power Automate Approvals connector (`shared_approvals`) requires an embedded connection reference with a valid logical name — just like SharePoint or Office 365. Using `runtimeSource: "invoker"` (which Power Automate sometimes suggests in the designer) is invalid for solution flows.
 
 Symptoms:
-- Error: `'The 'id' property '...' under 'properties.connectionReferences.shared_approvals_pvch.connection' is not valid.'`
+- Error: `'The 'id' property '...' under 'properties.connectionReferences.shared_approvals_sol.connection' is not valid.'`
 - The connection reference block has `"runtimeSource": "invoker"` and `"connection": {}`
 
-**Rule:** If the Approvals connector is not yet provisioned with a real embedded connection reference logical name, remove the `shared_approvals_pvch` connection reference block and all `StartAndWaitForAnApproval` actions. The approval feature can be added back later once the Approvals connection reference is set up in the environment.
+**Rule:** If the Approvals connector is not yet provisioned with a real embedded connection reference logical name, remove the `shared_approvals_sol` connection reference block and all `StartAndWaitForAnApproval` actions. The approval feature can be added back later once the Approvals connection reference is set up in the environment.
 
 ---
 
@@ -622,7 +622,7 @@ Correct — PA designer format:
 
 **No logic change from the switch:** `runtimeSource` only chooses which connection (identity) the action runs under. It does NOT change who an Approvals action is assigned to (that's the action's "Assigned to" input). For an anonymous portal call the service-account connection is the only identity that can run anyway, so `embedded` is both correct and the only workable value.
 
-Confirmed 2026-06-25 on `smkb_pvch_UpdateBankAccount` — its Approvals connection was `invoker`; flipping it to `embedded` ended the per-deploy 403 (a deploy no longer breaks the binding).
+Confirmed on a live deployed flow (2026-06-25): its Approvals connection was `invoker`; flipping it to `embedded` ended the per-deploy 403, and a deploy no longer breaks the binding.
 
 ---
 
@@ -691,7 +691,7 @@ Secret env vars also don't appear in the dynamic-content picker. They must be fe
 Then reference the value with `@body('GetMySecret')?['EnvironmentVariableSecretValue']` (or `outputs('GetMySecret')?['body/EnvironmentVariableSecretValue']`).
 
 **Rules:**
-- `item/EnvironmentVariableName` is the env var **schema name** (e.g. `smkb_pvch_SopranoSMSAPIPassword`), as a plain string — NOT a `parameters()` reference. This is what avoids the `100000005` error.
+- `item/EnvironmentVariableName` is the env var **schema name** (e.g. `smkb_sol_SmsApiPassword`), as a plain string — NOT a `parameters()` reference. This is what avoids the `100000005` error.
 - Needs a **Dataverse connection reference** in the flow. Reuse the solution's existing one — key `shared_commondataserviceforapps` → logical name `msdyn_Dataverse` (the same one the manager flows use). The designer may wire a *new* Dataverse connection reference (e.g. `new_sharedcommondataserviceforapps_xxxx`) that isn't declared in the solution's `Customizations.xml`; if so, import fails — switch it to the declared `msdyn_Dataverse`.
 - Enable **Secure Outputs** on the fetch action (shown above) and **Secure Inputs** on whatever consumes it (the HTTP call), so the secret never lands in run history.
 - **Never** add the Secret env var to `definition.parameters` / reference it via `parameters()` — that is exactly what triggers the turn-on error.
@@ -699,7 +699,7 @@ Then reference the value with `@body('GetMySecret')?['EnvironmentVariableSecretV
 
 **Azure prerequisite (one-time per environment/vault):** the **Dataverse service principal** (app id `00000007-0000-0000-c000-000000000000`) needs the **Key Vault Secrets User** role on the vault; register the `Microsoft.PowerPlatform` resource provider; and if the Key Vault firewall is on, allow the Power Platform IP ranges. Without these the fetch action fails at runtime (the definition still imports fine). Docs: [Use environment variables for Azure Key Vault secrets](https://learn.microsoft.com/en-us/power-apps/maker/data-platform/environmentvariables-azure-key-vault-secrets).
 
-> Live example in this solution: `smkb_pvch_CreateOtp` fetches both the Turnstile secret (`smkb_pvch_TurnstileSecretAPIKey`) and the Soprano SMS password (`smkb_pvch_SopranoSMSAPIPassword`) with `RetrieveEnvironmentVariableSecretValue`, and gates Turnstile on the public site key `smkb_TurnstileSiteKey`.
+> Worked example — see the `CreateOtp` reference flow in [`examples/`](./examples/README.md): it fetches both the Turnstile secret (`smkb_sol_TurnstileSecretAPIKey`) and the SMS API password (`smkb_sol_SmsApiPassword`) with `RetrieveEnvironmentVariableSecretValue`, secures the **outputs** of each fetch and the **inputs** of each call that consumes them, and gates the whole Turnstile branch on a non-empty public site key (`smkb_sol_TurnstileSiteKey`) so a solution without Cloudflare still works. Section 19 covers the DO/DON'T; `keyvault-secret-read-is-secured` enforces the fetch half.
 
 ---
 
@@ -718,9 +718,9 @@ Snippet 3 covers `CreateRecord`. The other Dataverse operations use the same `ms
       "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
     },
     "parameters": {
-      "entityName": "sol_example_items",
-      "$filter": "sol_lecturerid eq '@{string(first(body('Get_Auth_Session')?['value'])?['ID'])}'",
-      "$select": "sol_example_itemid,sol_name",
+      "entityName": "smkb_sol_exampleitems",
+      "$filter": "smkb_sol_ownerref eq '@{string(first(body('Get_Auth_Session')?['value'])?['smkb_sol_contactid'])}'",
+      "$select": "smkb_sol_exampleitemid,smkb_name",
       "$top": 50
     },
     "authentication": "@parameters('$authentication')"
@@ -729,7 +729,7 @@ Snippet 3 covers `CreateRecord`. The other Dataverse operations use the same `ms
 }
 ```
 
-> **Security:** when a `$filter` interpolates client input, scope it to the caller's own records (ownership) **and** escape quotes, or you have an IDOR / OData-injection hole. Prefer a `recordId` (GUID) lookup where possible. This is what the `authenticated-flow-validates-token` flow-lint rule and the audit's F2/F3/F5 findings are about.
+> **Security:** when a `$filter` interpolates client input, scope it to the caller's own records (ownership) **and** escape quotes, or you have an IDOR / OData-injection hole. See **Section 15** for the full ownership scaffold, which is the control that actually closes this.
 
 **UpdateRecord** — patch a row by GUID (`item/` prefix on every field, same as CreateRecord):
 ```json
@@ -742,15 +742,22 @@ Snippet 3 covers `CreateRecord`. The other Dataverse operations use the same `ms
       "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
     },
     "parameters": {
-      "entityName": "sol_example_items",
-      "recordId": "@triggerBody()?['id']",
-      "item/sol_name": "@triggerBody()?['name']"
+      "entityName": "smkb_sol_exampleitems",
+      "recordId": "@{first(body('Get_Owned_Record')?['value'])?['smkb_sol_exampleitemid']}",
+      "item/smkb_name": "@triggerBody()?['name']"
     },
     "authentication": "@parameters('$authentication')"
   },
   "runAfter": {}
 }
 ```
+
+> **`recordId` must never come straight from `triggerBody()`.** A client-supplied GUID passed to
+> `UpdateRecord` *is* the IDOR: the connector patches whatever row that GUID names, and being a
+> GUID confers no authorization. Resolve the row first with a `ListRecords` that filters on **both**
+> the requested id **and** the session-resolved owner (Section 15), then pass that lookup's own
+> id — as above. If the lookup returns nothing, answer `NOT_FOUND`; never fall back to the
+> client's value.
 To clear a column during an update, use `"@null"` — never bare JSON `null` (Snippet 10).
 
 **DeleteRecord** — delete by GUID:
@@ -827,3 +834,352 @@ There is **no local Power Automate engine** — a flow's *behavior* can only be 
 | End-to-end journeys | **Cloud Dev** | Drive the calling site/app against the deployed flow |
 
 Keep flow bodies thin: push pure logic (validation, formatting, error-code mapping) into the calling SPA where it can be unit-tested locally, and let the flow orchestrate connectors. When a flow **must** hold logic, cover its invariants with a flow-lint rule so they can never silently regress.
+
+---
+
+## 15. Auth-Token Validation + Row-Level Ownership
+
+The scaffold **every authenticated flow** follows. It closes three audit findings at once: "sensitive
+processes are anonymous" (the Anonymous web role is not the authorization boundary — this is),
+"ownership checks incomplete", and the IDOR half of the file/record findings.
+
+The token-validation half already exists as a ready-made snippet — do not retype it:
+[`VALIDATE_AUTH_TOKEN_SNIPPET.json`](../SMKB%20-%20Component%20Library/OTP%20Auth%20Screen/flow-templates/VALIDATE_AUTH_TOKEN_SNIPPET.json)
+in the Component Library. Paste that in, then add the ownership scoping below, which the snippet
+deliberately leaves to the caller because only you know your ownership column.
+
+### The five steps, in order
+
+1. **Look up the session row** by the client's `authToken` (the snippet). No row → `UNAUTHORIZED`.
+2. **Reject an expired session** — compare the row's expiry to `utcNow()`. Past it → `UNAUTHORIZED`.
+   Check this server-side even though the client also tracks expiry; the client's copy is a UX hint.
+3. **Resolve the acting user FROM THE SESSION ROW.** This is the load-bearing step.
+4. **Scope every read and write** by that resolved owner.
+5. **Answer `NOT_FOUND`** when a requested record exists but is not the caller's — never `FORBIDDEN`,
+   which confirms the record exists (Section 17).
+
+### Step 3 — resolve the actor from the session, never from the request
+
+```jsonc
+// The session row is the ONLY trustworthy statement of who is calling.
+// Everything downstream keys off this, not off anything in triggerBody().
+"Resolve_Actor": {
+  "type": "Compose",
+  "inputs": "@{first(body('Get_Auth_Session')?['value'])?['smkb_sol_contactid']}",
+  "runAfter": { "Check_Session_Expiry": ["Succeeded"] }
+}
+```
+
+**The rule:** a client-supplied identifier may narrow *which* of the caller's own records is meant.
+It must never be what *selects* the record. Concretely — a request carrying `recordId` is answered by
+
+```
+$filter = <idColumn> eq '<escaped recordId>' and <ownerColumn> eq '<resolved actor>'
+```
+
+not by `recordId` alone, and not by passing `recordId` to `UpdateRecord` / `GetItem` directly
+(Section 12). Two conditions, both required, and the owner side comes from step 3.
+
+### Step 4 — the scoped query, with quote escaping
+
+```jsonc
+"Get_Owned_Record": {
+  "type": "OpenApiConnection",
+  "inputs": {
+    "host": {
+      "connectionName": "shared_commondataserviceforapps_sol",
+      "operationId": "ListRecords",
+      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+    },
+    "parameters": {
+      "entityName": "smkb_sol_exampleitems",
+      "$filter": "smkb_sol_exampleitemid eq '@{replace(triggerBody()?['recordId'], '''', '''''')}' and smkb_sol_ownerref eq '@{replace(outputs('Resolve_Actor'), '''', '''''')}'",
+      "$top": 1
+    },
+    "authentication": "@parameters('$authentication')"
+  },
+  "runAfter": { "Resolve_Actor": ["Succeeded"] }
+}
+```
+
+The four- and six-quote runs in that `replace()` are the WDL escaping idiom, not a typo: inside a WDL
+string literal a single quote is written **doubled**, so a run of four quotes denotes the
+one-character string `'` and a run of six denotes `''`. The call therefore doubles every quote in the
+value, and a value containing a quote can no longer terminate the OData string literal and inject a
+clause of its own.
+
+Then branch on `empty(body('Get_Owned_Record')?['value'])` → respond `NOT_FOUND` and `Terminate`.
+
+> **Escaping is not optional even for a GUID-shaped input.** Nothing guarantees the client sent a
+> GUID; the column type is checked by Dataverse *after* the filter string has already been built.
+> If the value really must be a GUID, validate its shape first and reject `INVALID_INPUT` — that is
+> strictly better than escaping, and cheaper.
+
+### Declare no trigger input you do not use
+
+Every field in the trigger schema is part of the flow's public contract: the SPA can send it, and a
+reviewer cannot tell a dead field from a live record selector. The `no-unused-trigger-inputs`
+flow-lint rule flags them — it found three in the reference flows, one of which was a `voucherId`
+that no action ever read. Delete the field, or consume it.
+
+---
+
+## 16. Server-Side File Validation
+
+Client-side validation is a UX affordance; the flow is where it counts. Reject the upload unless
+**all three** hold, then store it under a name **you** generated.
+
+### Extension against an allow-list
+
+```
+@and(
+  contains(createArray('pdf','jpg','jpeg','png'), toLower(last(split(triggerBody()?['fileName'], '.')))),
+  greater(length(split(triggerBody()?['fileName'], '.')), 1)
+)
+```
+
+The second clause matters: a name with no dot makes `last(split(...))` return the whole name, which
+could coincidentally match an allowed value.
+
+### Magic bytes — no decode, no connector needed
+
+Base64 encodes 3 bytes into 4 characters, so a file's leading signature bytes map to a **fixed
+base64 prefix**. A `startsWith` on the raw base64 the client sent is therefore a real content check:
+
+| Type | Signature bytes | Base64 prefix |
+|---|---|---|
+| PDF | `25 50 44 46` (`%PDF`) | `JVBER` |
+| PNG | `89 50 4E 47 0D 0A 1A 0A` | `iVBORw0KGgo` |
+| JPEG | `FF D8 FF` | `/9j/` |
+
+```
+@or(
+  startsWith(triggerBody()?['fileBase64'], 'JVBER'),
+  startsWith(triggerBody()?['fileBase64'], 'iVBORw0KGgo'),
+  startsWith(triggerBody()?['fileBase64'], '/9j/')
+)
+```
+
+**To add a type:** take its documented signature, base64-encode the first 3, 6 or 9 bytes, and keep
+only the leading characters that those whole 3-byte groups produce — a prefix that stops mid-group
+varies with the following byte. (PNG's 8-byte signature safely yields 11 characters.)
+
+Check the extension **and** the bytes. Either alone is bypassable: the extension is client-controlled
+text, and matching bytes say nothing about the name you are about to store.
+
+### Size cap
+
+Base64 length is `ceil(bytes / 3) * 4`, so convert the cap once and compare lengths — do not decode
+just to measure:
+
+```
+@less(length(triggerBody()?['fileBase64']), 6990508)     // 5 MB
+```
+
+`2 MB -> 2796204` · `5 MB -> 6990508` · `10 MB -> 13981016`.
+
+### Store under a server-generated filename
+
+```
+@concat('upload-', guid(), '.', toLower(last(split(triggerBody()?['fileName'], '.'))))
+```
+
+Never persist the client's filename as the stored name. It is the vector for path traversal
+(`../../x`), for a double extension (`invoice.pdf.htm`), and for RTL-override tricks that make a
+dangerous name render harmlessly. Keep the original in a **data column** if users need to see it —
+displaying it as text is safe; letting it name a file is not.
+
+### One generic rejection code
+
+All three checks fail as `INVALID_FILE`. Telling a caller *which* check failed just enumerates the
+allow-list and the cap for them; the specific reason belongs in run history.
+
+> **Scope, honestly.** This is defense-in-depth, not anti-malware. SharePoint Online and Dataverse
+> already virus-scan stored files, and the portal never serves an upload as active content, so a
+> separate scanning tier is not required here — but nothing above inspects a file *beyond* its first
+> few bytes, and it should not be described as though it does.
+
+---
+
+## 17. Uniform Anti-Enumeration Responses
+
+An unauthenticated endpoint that answers differently for "no such account" and "account exists" is an
+account-existence oracle, whatever the status code. Collapse those to **one** response and keep the
+real distinction in run history, which is visible only to flow owners and environment admins.
+
+### What merges, and what may still be returned
+
+| Situation | Return | Why |
+|---|---|---|
+| Identifier not found (send) | the **same** response as success | The caller must not learn that an identifier is unregistered |
+| Identifier not found (verify) | `INVALID_CODE` | Merged with a wrong code — indistinguishable |
+| Wrong code | `INVALID_CODE` | Merged with not-found |
+| Account archived / disabled | the generic response | State is as sensitive as existence |
+| Locked out | `LOCKED` — *see below* | Needed for UX, but must not confirm the account |
+| Rate limited | `RATE_LIMITED` | Safe **only if** the limit applies whether or not the identifier exists |
+| Malformed input | `INVALID_INPUT` | Reveals nothing — it is about the request's shape |
+
+`RATE_LIMITED` and `LOCKED` are the two that quietly leak if you are careless. A limit counted only
+for *real* accounts turns `RATE_LIMITED` into the oracle you just closed elsewhere — count attempts
+per submitted identifier, existent or not. `LOCKED` is a genuine trade-off: it is worth returning so
+a user understands why they are stuck, but the message must describe the *attempt state*, not the
+account ("too many attempts, try again later" — not "this account is locked").
+
+The branch still runs, so nothing is lost operationally:
+
+```jsonc
+// Both paths answer identically. Which one ran is in the run history.
+"Respond_generic": {
+  "type": "Response", "kind": "PowerPages",
+  "inputs": {
+    "statusCode": 200,
+    "headers": { "Content-Type": "application/json" },
+    "body": { "ok": true }
+  }
+}
+```
+
+> **Response timing.** A not-found short-circuit returns measurably faster than a full verification,
+> so a determined attacker can still distinguish the two by latency. Equalising that in a cloud flow
+> is not practical — connector latency varies far more than the branch does, and a fixed `Delay`
+> costs every real user. Treat the timing channel as **accepted and documented**, and rely on the
+> rate limit and global cap (Section 18) to make bulk probing expensive. Claiming the channel is
+> closed would be worse than admitting it is narrow.
+
+---
+
+## 18. Rate Limit, Global Cap, and Abuse Alert
+
+Four bounds, each catching what the others cannot:
+
+| Bound | Stops | Shipped as |
+|---|---|---|
+| Bot check | Automated traffic, before anything else runs | Fail-closed Turnstile (OTP recipe) |
+| Per-identifier limit | Hammering one account | The OTP recipe's 10-minute window |
+| Attempt lockout | Guessing a code for one account | The recipe's 5-attempt lockout |
+| **Global cap** | A spray across *many* identifiers | `smkb_sol_OtpDailyCap` (below) |
+
+A per-identifier limit is blind to breadth: 10 000 identifiers touched three times each never trips
+it. The global cap is that bound.
+
+### Counting recent events — Dataverse
+
+Dataverse returns a page of at most 5 000 rows plus an `@odata.nextLink` for the rest, so **count
+with `$count`, never by measuring an array you fetched**:
+
+```jsonc
+"Count_Recent_Sends": {
+  "type": "OpenApiConnection",
+  "inputs": {
+    "host": {
+      "connectionName": "shared_commondataserviceforapps_sol",
+      "operationId": "ListRecords",
+      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+    },
+    "parameters": {
+      "entityName": "smkb_sol_otprequests",
+      "$filter": "createdon ge @{addHours(utcNow(), -24)}",
+      "$count": true,
+      "$top": 1
+    },
+    "authentication": "@parameters('$authentication')"
+  },
+  "runAfter": { "Verify_Bot_Token": ["Succeeded"] }
+}
+```
+
+Read the total from `@body('Count_Recent_Sends')?['@odata.count']` and compare:
+
+```
+@greaterOrEquals(
+  int(body('Count_Recent_Sends')?['@odata.count']),
+  int(parameters('SOL - OTP Daily Cap (smkb_sol_OtpDailyCap)'))
+)
+```
+
+Over the cap → respond with the same generic body as any other rejection (Section 17) and
+`Terminate` succeeded.
+
+> **Index the timestamp column** if the table will hold more than a few thousand rows. An unindexed
+> `createdon ge …` scan degrades as the table grows, and this query runs on every request.
+
+> **SharePoint variant.** If the backing store is a SharePoint list instead, the shape differs: there
+> is no `$count`, the list-view threshold is 5 000 items *scanned* (not returned), and an unindexed
+> filter column fails outright past it rather than merely slowing down. Use `GetItems` with `$top`
+> and paginate, and index the timestamp column before the list grows.
+
+### Abuse alert
+
+Reuse the existing `Handle_Flow_Error` → `SendEmailV2` shape (Section 8), but send to
+`smkb_sol_SecurityAlertEmails` — **not** `smkb_sol_FlowErrorEmails`. A technical failure and a
+possible attack have different audiences and different urgency; mixing them trains people to ignore
+both.
+
+Alert when the global cap trips, or when an account transitions into lockout.
+
+> **Debounce it, or you have built an amplifier.** An alert per rejected attempt turns an abuse
+> attempt into an outbound mail flood from your own tenant, throttles the connection, and buries the
+> first alert. Fire on the **transition into** the capped/locked state, not on every attempt. If the
+> recipient list is empty, skip the send and continue — the cap must still reject; only the
+> notification is optional.
+
+> **Per-IP and distributed abuse is an edge concern, not a flow concern.** A cloud flow has no
+> trustworthy client IP: the Power Pages trigger does not supply one, and any value the SPA passes is
+> attacker-controlled. Rate limiting by IP belongs at the WAF / front door and is an IT/platform
+> task. Do not simulate it in a flow — a limiter keyed on a spoofable value is worse than none,
+> because it reads as a control that is not there.
+
+---
+
+## 19. Secure Inputs / Outputs — DO and DON'T
+
+`secureData` keeps a value out of run history. Run history is visible only to the flow's
+owners/co-owners and environment admins — never to end users or the portal's Anonymous role — so it
+is a *containment* control, not a boundary.
+
+### DO — internal connector actions
+
+Enable it on `OpenApiConnection` and `Http` **actions** that read a secret, or that read, write or
+transmit a token, one-time code, bank detail, or national id:
+
+```jsonc
+// Secret FETCH: secure the OUTPUTS - the secret is what comes back.
+"runtimeConfiguration": { "secureData": { "properties": ["outputs"] } }
+```
+```jsonc
+// The call that CONSUMES it: secure the INPUTS - the secret is in the request.
+"runtimeConfiguration": { "secureData": { "properties": ["inputs"] } }
+```
+
+Section 11 shows the full Key Vault fetch. Secure **both halves** — a secured fetch feeding an
+unsecured HTTP call just moves the plaintext one action to the right.
+`keyvault-secret-read-is-secured` (error) enforces the fetch half.
+
+### DON'T — the two that break the flow
+
+**Not on the trigger.** Microsoft does not support Secure Inputs on the trigger of a flow invoked
+from Power Pages ("passing a parameter to a flow configured with secure inputs isn't available").
+Secure the internal actions that handle the value instead.
+
+**Not on a `Compose`** — nor a `ParseJson`, `Select`, `InitializeVariable`, or any other
+non-connector action. This is the expensive one, because it does not fail where you are looking: the
+solution **imports successfully**, and the flow then fails *activation* with
+`InvalidSecureDataConfiguration` and stays in **Draft**. Nothing in the import output mentions it.
+Every portal call to that flow then fails, and there is no `pac` verb to turn a flow on —
+reactivation is a manual portal step.
+
+`securedata-only-on-connector-actions` (error) catches both before deploy.
+
+### The residual — and what to do about it
+
+A generated code or token that several actions share usually lives in a `Compose` output, and that
+value **cannot be secured**. Two honest options, in order:
+
+1. **Refactor it away.** Inline the expression into the secured connector action that needs it. One
+   consumer is the common case, and this removes the exposure rather than accepting it.
+2. **Accept it and restrict the audience.** If several actions genuinely need it, the value stays in
+   admin-only run history. Review who holds owner/co-owner on the flow and admin on the environment,
+   and treat that list as the control — because it is.
+
+Do not "fix" this by adding `secureData` to the `Compose`. That does not hide the value; it stops the
+flow from running at all.

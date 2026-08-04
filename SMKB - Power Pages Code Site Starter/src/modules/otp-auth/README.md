@@ -35,10 +35,11 @@ Response action returns **statusCode 200**; errors are `{ "errorCode": "<CODE>" 
 
 ### 1. create_otp
 - **Inputs:** `phone` (text), `origin` (text), `turnstileToken` (text — trigger field title must match exactly)
-- Verify the Turnstile token (Cloudflare siteverify) when a site key is configured → on failure return `{ "errorCode": "CAPTCHA_FAILED" }`
+- Verify the Turnstile token (Cloudflare siteverify) **server-side, before any lookup or send**, when a site key is configured → on failure return `{ "errorCode": "CAPTCHA_FAILED" }`. Must **fail closed**: a `Failed`/`Skipped` secret-fetch or parse error rejects rather than falling through.
 - Look up the user by phone; generate + store an OTP; send via SMS/email
 - **Success:** `{ "channels": [ { "type": "sms" | "email_college" | "email_personal", "maskedValue": "050****567" } ] }`
-- **Error codes:** `NOT_FOUND` (keep the response generic client-side — anti-enumeration), `ACCOUNT_ARCHIVED`, `RATE_LIMITED` (same number within the resend window), `LOCKED`, `OTP_SEND_FAILED`, `CAPTCHA_FAILED`, `INVALID_INPUT`
+- **Error codes:** `RATE_LIMITED` (count per *submitted* number, existent or not), `LOCKED`, `OTP_SEND_FAILED`, `CAPTCHA_FAILED`, `INVALID_INPUT`
+- **An unknown or archived number must return the SUCCESS response**, not a distinct code. Returning `NOT_FOUND` or `ACCOUNT_ARCHIVED` here makes the endpoint an account-existence oracle: the generic message this module shows in the UI is cosmetic, and anyone reading the network tab sees the real code. Build the delivery-channel list from the submitted address so the shapes match.
 
 ### 2. check_otp
 - **Inputs:** `phone` (text), `otp` (text)
@@ -47,7 +48,17 @@ Response action returns **statusCode 200**; errors are `{ "errorCode": "<CODE>" 
   — `authToken` is a server-generated session token the flow layer re-validates on every
   authenticated call; `authTokenExpiresAt` is ISO 8601; `status` is your solution's
   user status (e.g. `Active` / `Pending` / `Archived`)
-- **Error codes:** `WRONG_OTP` (+ `attemptsRemaining` number), `EXPIRED`, `LOCKED`, `NOT_FOUND`, `ERROR`
+- **Error codes:** `INVALID_CODE` (+ `attemptsRemaining` number), `LOCKED`, `ERROR`
+- **`INVALID_CODE` is deliberately one code for three situations** — no pending code, expired code, and
+  wrong code. Splitting it back into `NOT_FOUND` / `EXPIRED` / `WRONG_OTP` re-opens the enumeration
+  oracle, because each variant states something about whether the number is registered. Which case
+  actually occurred is in the flow's run history, readable only by flow owners and environment admins.
+  `LOCKED` may be returned, but word it about the attempt state ("too many attempts"), never the
+  account.
+
+> The hardened flow templates and the full reasoning are the single source:
+> `SMKB - Component Library/OTP Auth Screen/RECIPE.md` → "Security baseline for this module". Build the
+> three flows from those templates rather than from these bullets, which are the client-side contract.
 
 ### 3. get_portal_config
 - **Inputs:** none

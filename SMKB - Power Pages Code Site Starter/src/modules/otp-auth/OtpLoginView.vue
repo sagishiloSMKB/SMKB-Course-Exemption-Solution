@@ -120,20 +120,29 @@ const errorMessage = computed(() => {
   if (!errorCode.value) return ''
   switch (errorCode.value) {
     case 'INVALID_PHONE':    return 'נא להזין מספר טלפון תקין'
-    // Generic on purpose — don't reveal whether a number is registered (anti-enumeration).
-    // NOT_FOUND and the phone-step LOCKED share the same generic message. ACCOUNT_ARCHIVED
-    // intentionally keeps a specific message so a deactivated user is told to contact support.
-    case 'NOT_FOUND':        return 'פרטי הכניסה שגויים'
-    case 'ACCOUNT_ARCHIVED': return 'חשבונך אינו פעיל. אנא פנה/י לתמיכה'
+    // Anti-enumeration: the FLOW is what must not distinguish these cases — a generic
+    // message here is cosmetic if the response body still carries a specific code, since
+    // anyone can read it in the network tab. The hardened templates therefore return a
+    // single INVALID_CODE for no-pending-code, expired and wrong-code, and answer an
+    // unknown number on the phone step exactly as they answer a successful send.
+    // See SMKB - Component Library/OTP Auth Screen/RECIPE.md -> "Security baseline".
+    case 'INVALID_CODE':     return attemptsLeft.value !== null
+                               ? `הקוד שגוי. נותרו ${attemptsLeft.value} ניסיונות`
+                               : 'הקוד שגוי או שתוקפו פג. בקש/י קוד חדש'
+    // LOCKED is the one specific code we still return, because a stuck user needs to know
+    // why. It describes the ATTEMPT STATE, never the account.
     case 'LOCKED':           return step.value === 'otp'
                                ? 'יותר מדי ניסיונות שגויים. בקש/י קוד חדש'
-                               : 'פרטי הכניסה שגויים'
-    case 'WRONG_OTP':        return attemptsLeft.value !== null
-                               ? `הקוד שגוי. נותרו ${attemptsLeft.value} ניסיונות`
-                               : 'אירעה שגיאה. אנא נסה שוב'
+                               : 'יותר מדי נסיונות. נסה/י שוב מאוחר יותר'
+    // Legacy codes from a flow built before the recipe was hardened. Kept so an older
+    // deployment degrades gracefully, and mapped to the SAME generic text as INVALID_CODE
+    // so the client never widens what the flow reveals.
+    case 'NOT_FOUND':
+    case 'WRONG_OTP':
+    case 'EXPIRED':
+    case 'ACCOUNT_ARCHIVED': return 'הקוד שגוי או שתוקפו פג. בקש/י קוד חדש'
     case 'OTP_SEND_FAILED':  return 'לא ניתן לשלוח את קוד האימות. אנא נסה שוב'
     case 'RATE_LIMITED':     return 'כבר נשלח קוד. ניתן לבקש קוד חדש בעוד כדקה'
-    case 'EXPIRED':          return 'תוקף הקוד פג. בקש/י קוד חדש'
     case 'INVALID_INPUT':    return 'נא להזין מספר טלפון תקין'
     case 'CAPTCHA_FAILED':   return 'אימות האבטחה נכשל, נסה/י שוב'
     default:                 return 'אירעה שגיאה. אנא נסה שוב'

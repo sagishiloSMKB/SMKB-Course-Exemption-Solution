@@ -80,30 +80,30 @@
       "actions": {
         "Main_Flow": {
           "type": "Scope",
-          "description": "All main flow logic. Business errors (NOT_FOUND, WRONG_OTP, LOCKED — expected conditions) use Response + Terminate(Succeeded) inside this scope and do NOT reach Handle_Flow_Error. Only unexpected technical failures bubble up.",
+          "description": "All main flow logic. Business errors (INVALID_CODE, LOCKED — expected conditions) use Response + Terminate(Succeeded) inside this scope and do NOT reach Handle_Flow_Error. Only unexpected technical failures bubble up. RESPONSE CONTRACT: every Response here returns HTTP 200 - success and error alike. Power Pages DISCARDS the body of any non-2xx flow response and substitutes a generic IncorrectPayload envelope, so a 400/401/429/500 cannot carry an errorCode to the portal and the client would only ever see a generic platform failure. The error signal is the errorCode field inside a 200 body.",
           "actions": {
             "Validate_Input": {
               "type": "If",
-              "description": "Guard: reject missing/malformed input before touching any data. Returns 400 + Terminate(Succeeded) so Handle_Flow_Error does NOT run — invalid input is not a bug.",
+              "description": "Guard: reject missing/malformed input before touching any data. Returns 200 + an errorCode, then Terminate(Succeeded) so Handle_Flow_Error does NOT run — invalid input is not a bug.",
               "expression": "@or(empty(coalesce(triggerBody()?['email'], '')), not(contains(coalesce(triggerBody()?['email'], ''), '@')), not(equals(length(coalesce(triggerBody()?['otp'], '')), 6)))",
               "actions": {
                 "Respond_invalid_input": {
                   "type": "Response",
-                  "description": "Return 400 for missing/malformed email or OTP that is not exactly 6 characters.",
+                  "description": "Return INVALID_INPUT for a missing/malformed email or an OTP that is not exactly 6 characters. HTTP 200 - see below.",
                   "inputs": {
-                    "statusCode": 400,
+                    "statusCode": 200,
                     "headers": {
                       "Content-Type": "application/json"
                     },
                     "body": {
-                      "code": "INVALID_INPUT"
+                      "errorCode": "INVALID_INPUT"
                     }
                   },
                   "runAfter": {}
                 },
                 "Terminate_after_invalid_input": {
                   "type": "Terminate",
-                  "description": "Stop the flow cleanly — no error email, no 500.",
+                  "description": "Stop the flow cleanly — no error email.",
                   "inputs": {
                     "runStatus": "Succeeded"
                   },
@@ -139,19 +139,19 @@
             },
             "If_OTP_Not_Found": {
               "type": "If",
-              "description": "No OTP record found for this email — user never sent a code, or it was already consumed. Return NOT_FOUND + Terminate(Succeeded).",
+              "description": "No OTP record found for this email — the user never sent a code, or it was already consumed. Returns the SAME generic INVALID_CODE as a wrong code, deliberately: an unauthenticated caller must not be able to tell 'this email has no pending code' from 'this code is wrong', because the first answer confirms whether an email is registered. Which branch ran is recorded in run history, which only flow owners and environment admins can read. Do NOT split this back into a distinct NOT_FOUND.",
               "expression": "@equals(length(body('IMPLEMENT_Get_OTP_Record')?['value']), 0)",
               "actions": {
                 "Respond_not_found": {
                   "type": "Response",
-                  "description": "Return 400 Not Found.",
+                  "description": "Return the generic invalid-code response (same shape and code as a wrong OTP).",
                   "inputs": {
-                    "statusCode": 400,
+                    "statusCode": 200,
                     "headers": {
                       "Content-Type": "application/json"
                     },
                     "body": {
-                      "code": "NOT_FOUND"
+                      "errorCode": "INVALID_CODE"
                     }
                   },
                   "runAfter": {}
@@ -181,14 +181,14 @@
               "actions": {
                 "Respond_locked": {
                   "type": "Response",
-                  "description": "Return 400 Locked.",
+                  "description": "Return LOCKED. Word the client-facing message about the ATTEMPT STATE (\"too many attempts, try again later\"), never about the account - \"this account is locked\" confirms the account exists.",
                   "inputs": {
-                    "statusCode": 400,
+                    "statusCode": 200,
                     "headers": {
                       "Content-Type": "application/json"
                     },
                     "body": {
-                      "code": "LOCKED"
+                      "errorCode": "LOCKED"
                     }
                   },
                   "runAfter": {}
@@ -213,7 +213,7 @@
             },
             "IMPLEMENT_PLACEHOLDER": {
               "type": "Compose",
-              "description": "[IMPLEMENT — BUSINESS LOGIC]: Replace this Compose action with your actual OTP validation actions.\n\nWhat to build (run in this order inside Main_Flow after If_Account_Locked):\n  1. Check expiry: compare stored expires_at to utcNow(). If expired → Respond_expired({ code: 'LOCKED' }) + Terminate(Succeeded).\n  2. Compare OTPs: if stored otp_code != triggerBody()?['otp']:\n       a. Increment attempts counter on the OTP record (UpdateRecord).\n       b. Compute attemptsRemaining = 5 - new_attempts_value.\n       c. Respond_wrong_otp({ code: 'WRONG_OTP', attemptsRemaining: N }) + Terminate(Succeeded).\n  3. On match:\n       a. Delete the OTP record (DeleteRecord) — one-time use; leaving it enables replay attacks.\n       b. Retrieve the user record from your main user table.\n       c. Expose the user record ID for IMPLEMENT_Create_Auth_Session below (e.g. via a Compose or variable).\n\nSecurity notes:\n  - Always delete the OTP row on success — replay attacks are trivially prevented this way.\n  - Expiry check MUST run before the comparison; expired codes should NOT increment the attempts counter.\n  - Comparing plaintext 6-digit codes is safe here because the 5-attempt lockout prevents enumeration.\n\nSession cleanup (optional but recommended):\n  - Before creating the new auth session, delete any previous session rows for this email:\n    ListRecords(smkb_sol_sessions, $filter: smkb_sol_email eq '...') → Apply_to_each → DeleteRecord.\n    This prevents accumulation of valid tokens for the same user.\n  - A scheduled cleanup flow running daily to delete expired rows is also recommended.\n\nCRITICAL — two error categories:\n\n(A) BUSINESS ERRORS (WRONG_OTP, LOCKED, NOT_FOUND, EXPIRED — expected, do NOT send error email):\n    Pattern: Response(4xx) → Terminate(runStatus: Succeeded)\n    Terminate(Succeeded) ends the run cleanly. Handle_Flow_Error does NOT run.\n\n(B) TECHNICAL ERRORS (Dataverse failure, null reference — unexpected bugs):\n    Let them throw unhandled. The scope fails → Handle_Flow_Error runs → error email sent → 500 returned.",
+              "description": "[IMPLEMENT — BUSINESS LOGIC]: Replace this Compose action with your actual OTP validation actions.\n\nWhat to build (run in this order inside Main_Flow after If_Account_Locked):\n  1. Check expiry: compare stored expires_at to utcNow(). If expired → Respond({ code: 'INVALID_CODE' }) + Terminate(Succeeded). Use the SAME generic code as a wrong code — 'this code expired' confirms a code was issued for this email.\n  2. Compare OTPs: if stored otp_code != triggerBody()?['otp']:\n       a. Increment attempts counter on the OTP record (UpdateRecord).\n       b. Compute attemptsRemaining = 5 - new_attempts_value.\n       c. Respond_invalid_code({ code: 'INVALID_CODE', attemptsRemaining: N }) + Terminate(Succeeded).\n  3. On match:\n       a. Delete the OTP record (DeleteRecord) — one-time use; leaving it enables replay attacks.\n       b. Retrieve the user record from your main user table.\n       c. Expose the user record ID for IMPLEMENT_Create_Auth_Session below (e.g. via a Compose or variable).\n\nSecurity notes:\n  - Always delete the OTP row on success — replay attacks are trivially prevented this way.\n  - Expiry check MUST run before the comparison; expired codes should NOT increment the attempts counter.\n  - Comparing plaintext 6-digit codes is acceptable here, and hashing them would add little: a 6-digit code has only 10^6 possible values, so an unsalted fast hash is reversible by exhaustive search in negligible time. The controls that actually matter are the 5-attempt lockout, the short expiry, deleting the row on use, and restricting the OTP/session tables to the service account. Power Automate has no native hash expression in any case (see RECIPE.md, 'What at-rest protection actually means here'). The SESSION TOKEN is the value where hashing would genuinely help, and it has the same platform limitation.\n  - Every failure path above returns the SAME generic INVALID_CODE. Do not reintroduce distinct codes for not-found / expired / wrong: each one tells an unauthenticated caller something about whether the email is registered.\n\nSession cleanup (optional but recommended):\n  - Before creating the new auth session, delete any previous session rows for this email:\n    ListRecords(smkb_sol_sessions, $filter: smkb_sol_email eq '...') → Apply_to_each → DeleteRecord.\n    This prevents accumulation of valid tokens for the same user.\n  - A scheduled cleanup flow running daily to delete expired rows is also recommended.\n\nCRITICAL — two error categories:\n\n(A) BUSINESS ERRORS (INVALID_CODE, LOCKED — expected, do NOT send error email):\n    Pattern: Response(4xx) → Terminate(runStatus: Succeeded)\n    Terminate(Succeeded) ends the run cleanly. Handle_Flow_Error does NOT run.\n\n(B) TECHNICAL ERRORS (Dataverse failure, null reference — unexpected bugs):\n    Let them throw unhandled. The scope fails → Handle_Flow_Error runs → error email sent → 500 returned.",
               "inputs": "[IMPLEMENT]",
               "runAfter": {
                 "If_Account_Locked": ["Succeeded"]
@@ -275,7 +275,7 @@
         },
         "Handle_Flow_Error": {
           "type": "Scope",
-          "description": "Error handler — runs ONLY on unexpected technical failures (unhandled exception in Main_Flow). Business errors (WRONG_OTP, LOCKED, NOT_FOUND) use Terminate(Succeeded) inside Main_Flow and never reach here.",
+          "description": "Error handler — runs ONLY on unexpected technical failures (unhandled exception in Main_Flow). Business errors (INVALID_CODE, LOCKED) use Terminate(Succeeded) inside Main_Flow and never reach here.",
           "actions": {
             "Check_Error_Emails_Configured": {
               "type": "If",
@@ -312,12 +312,12 @@
               "type": "Response",
               "description": "Always return a response so the Power Pages caller does not hang.",
               "inputs": {
-                "statusCode": 500,
+                "statusCode": 200,
                 "headers": {
                   "Content-Type": "application/json"
                 },
                 "body": {
-                  "code": "ERROR"
+                  "errorCode": "ERROR"
                 }
               },
               "runAfter": {

@@ -32,19 +32,19 @@
       },
       "If_Token_Not_Found": {
         "type": "If",
-        "description": "No session record for this token — caller is unauthenticated or presented a forged/expired token. Return 401 + Terminate(Succeeded).",
+        "description": "No session record for this token — caller is unauthenticated or presented a forged/expired token. Return 200 + UNAUTHORIZED, then Terminate(Succeeded).",
         "expression": "@equals(length(body('IMPLEMENT_Get_Auth_Session')?['value']), 0)",
         "actions": {
           "Respond_unauthorized": {
             "type": "Response",
-            "description": "Return 401 Unauthorized.",
+            "description": "Return UNAUTHORIZED. HTTP 200 - see below.",
             "inputs": {
-              "statusCode": 401,
+              "statusCode": 200,
               "headers": {
                 "Content-Type": "application/json"
               },
               "body": {
-                "code": "UNAUTHORIZED"
+                "errorCode": "UNAUTHORIZED"
               }
             },
             "runAfter": {}
@@ -69,19 +69,19 @@
       },
       "If_Token_Expired": {
         "type": "If",
-        "description": "Token exists but its expiry timestamp is in the past. Return 401 + Terminate(Succeeded). [IMPLEMENT]: replace smkb_sol_expires_at with your expiry field schema name.\n\nNote: this action only runs when If_Token_Not_Found succeeded — meaning the token WAS found. If it was not found, If_Token_Not_Found terminates the run before reaching here.",
+        "description": "Token exists but its expiry timestamp is in the past. Return 200 + UNAUTHORIZED, then Terminate(Succeeded). [IMPLEMENT]: replace smkb_sol_expires_at with your expiry field schema name.\n\nNote: this action only runs when If_Token_Not_Found succeeded — meaning the token WAS found. If it was not found, If_Token_Not_Found terminates the run before reaching here.",
         "expression": "@lessOrEquals(ticks(first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['[IMPLEMENT]:smkb_sol_expires_at']), ticks(utcNow()))",
         "actions": {
           "Respond_token_expired": {
             "type": "Response",
-            "description": "Return 401 Unauthorized for an expired token.",
+            "description": "Return UNAUTHORIZED for an expired token.",
             "inputs": {
-              "statusCode": 401,
+              "statusCode": 200,
               "headers": {
                 "Content-Type": "application/json"
               },
               "body": {
-                "code": "UNAUTHORIZED"
+                "errorCode": "UNAUTHORIZED"
               }
             },
             "runAfter": {}

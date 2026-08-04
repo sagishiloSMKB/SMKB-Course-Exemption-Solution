@@ -79,30 +79,30 @@
       "actions": {
         "Main_Flow": {
           "type": "Scope",
-          "description": "All main flow logic. Wrap here so Handle_Flow_Error can target this scope on unexpected technical failures. Business errors (NOT_FOUND, RATE_LIMITED, OTP_SEND_FAILED) must use Response + Terminate(Succeeded) inside this scope — they do NOT bubble up to Handle_Flow_Error.",
+          "description": "All main flow logic. Wrap here so Handle_Flow_Error can target this scope on unexpected technical failures. Business errors (RATE_LIMITED, OTP_SEND_FAILED) must use Response + Terminate(Succeeded) inside this scope RESPONSE CONTRACT: every Response here returns HTTP 200 - success and error alike. Power Pages DISCARDS the body of any non-2xx flow response and substitutes a generic IncorrectPayload envelope, so a 400/401/429/500 cannot carry an errorCode to the portal and the client would only ever see a generic platform failure. The error signal is the errorCode field inside a 200 body. — they do NOT bubble up to Handle_Flow_Error.",
           "actions": {
             "Validate_Input": {
               "type": "If",
-              "description": "Guard: reject missing or obviously malformed email before touching any data. Returns 400 + Terminate(Succeeded) so Handle_Flow_Error does NOT run — invalid input is not a bug.",
+              "description": "Guard: reject missing or obviously malformed email before touching any data. Returns 200 + an errorCode, then Terminate(Succeeded) so Handle_Flow_Error does NOT run — invalid input is not a bug.",
               "expression": "@or(empty(coalesce(triggerBody()?['email'], '')), not(contains(coalesce(triggerBody()?['email'], ''), '@')))",
               "actions": {
                 "Respond_invalid_input": {
                   "type": "Response",
-                  "description": "Return 400 for missing or malformed email.",
+                  "description": "Return INVALID_INPUT for a missing or malformed email. HTTP 200 - see below.",
                   "inputs": {
-                    "statusCode": 400,
+                    "statusCode": 200,
                     "headers": {
                       "Content-Type": "application/json"
                     },
                     "body": {
-                      "code": "INVALID_INPUT"
+                      "errorCode": "INVALID_INPUT"
                     }
                   },
                   "runAfter": {}
                 },
                 "Terminate_after_invalid_input": {
                   "type": "Terminate",
-                  "description": "Stop the flow cleanly — no error email, no 500.",
+                  "description": "Stop the flow cleanly — no error email.",
                   "inputs": {
                     "runStatus": "Succeeded"
                   },
@@ -138,19 +138,19 @@
             },
             "If_Rate_Limited": {
               "type": "If",
-              "description": "Block if 3 or more OTPs have been sent for this email in the last 10 minutes. 429 + Terminate(Succeeded) — no error email.",
+              "description": "Block if 3 or more OTPs have been sent for this email in the last 10 minutes. 200 + RATE_LIMITED, then Terminate(Succeeded) — no error email. Count attempts per SUBMITTED identifier whether or not it exists, or RATE_LIMITED becomes an account-existence oracle.",
               "expression": "@greaterOrEquals(length(body('IMPLEMENT_List_Recent_OTP_Requests')?['value']), 3)",
               "actions": {
                 "Respond_rate_limited": {
                   "type": "Response",
-                  "description": "Return 429 Too Many Requests.",
+                  "description": "Return RATE_LIMITED. HTTP 200 - see below.",
                   "inputs": {
-                    "statusCode": 429,
+                    "statusCode": 200,
                     "headers": {
                       "Content-Type": "application/json"
                     },
                     "body": {
-                      "code": "RATE_LIMITED"
+                      "errorCode": "RATE_LIMITED"
                     }
                   },
                   "runAfter": {}
@@ -202,7 +202,7 @@
         },
         "Handle_Flow_Error": {
           "type": "Scope",
-          "description": "Error handler — runs ONLY on unexpected technical failures (unhandled exception in Main_Flow). Business errors (NOT_FOUND, RATE_LIMITED, OTP_SEND_FAILED) use Terminate(Succeeded) inside Main_Flow and never reach here.",
+          "description": "Error handler — runs ONLY on unexpected technical failures (unhandled exception in Main_Flow). Business errors (RATE_LIMITED, OTP_SEND_FAILED) use Terminate(Succeeded) inside Main_Flow and never reach here.",
           "actions": {
             "Check_Error_Emails_Configured": {
               "type": "If",
@@ -239,12 +239,12 @@
               "type": "Response",
               "description": "Always return a response so the Power Pages caller does not hang. code: OTP_SEND_FAILED is what authService.ts maps to the user-facing 'could not send code' message.",
               "inputs": {
-                "statusCode": 500,
+                "statusCode": 200,
                 "headers": {
                   "Content-Type": "application/json"
                 },
                 "body": {
-                  "code": "OTP_SEND_FAILED"
+                  "errorCode": "OTP_SEND_FAILED"
                 }
               },
               "runAfter": {

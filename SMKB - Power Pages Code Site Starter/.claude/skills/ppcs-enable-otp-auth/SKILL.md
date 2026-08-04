@@ -104,6 +104,27 @@ documented in [src/modules/otp-auth/README.md](../../../src/modules/otp-auth/REA
     `blockedStatuses`, and the optional `onLoginRedirect` / `onNavigate` hooks
     (e.g. route status `Pending` into an onboarding wizard).
 
+11b. **State the two server-side security requirements explicitly** — the client
+    half you just wired does not provide either, and both are audit findings when
+    missed. The hardened flow templates and the reasoning live in the Component
+    Library recipe (`SMKB - Component Library/OTP Auth Screen/RECIPE.md`, "Security
+    baseline for this module"); build the flows from those templates, not from
+    scratch.
+
+    - **Uniform responses (anti-enumeration).** `createOtp` must answer an unknown
+      address *exactly* as it answers a successful send, and `checkOtp` must return
+      one generic `INVALID_CODE` for not-found, expired **and** wrong code. The
+      client already shows a generic message (`OtpLoginView.vue`), but that is
+      cosmetic: if the flow returns distinguishable codes, the endpoint is still an
+      account-existence oracle for anyone reading the network tab. Also count the
+      rate limit per *submitted* address, or `RATE_LIMITED` leaks the same fact.
+    - **Turnstile must be verified server-side, and fail closed.** Step 9 wires only
+      the widget and the CSP. The control is the `siteverify` call inside
+      `createOtp`, before any lookup or send, gated on a non-empty public site key
+      and configured so a `Failed`/`Skipped` secret-fetch or parse error **rejects**
+      rather than falling through. A rendered widget with no server check stops
+      nobody.
+
 ### Verify
 
 12. `npm run lint` and `npm run build` must pass.

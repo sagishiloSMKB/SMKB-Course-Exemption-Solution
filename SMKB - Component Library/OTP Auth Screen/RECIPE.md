@@ -160,10 +160,10 @@ Add both files to `Other/Solution.xml` `<RootComponents>` and `Customizations.xm
 Both flow templates contain a `IMPLEMENT_PLACEHOLDER` Compose action that marks what needs to be built. **Replace it** with real actions before the flow goes to production.
 
 **smkb_sol_CreateOtp:**
-1. Look up the user by email in your Dataverse table (return `NOT_FOUND` if absent)
+1. Look up the user by email in your Dataverse table. **If absent, respond exactly as if the send succeeded** — do not return a distinct code; see **Anti-enumeration** below
 2. Check for rate limiting (e.g. max 3 OTPs per 10 minutes per email)
 3. Generate a 6-digit random OTP: `rand(100000, 999999)` expression in Power Automate
-4. Store an OTP record in Dataverse: `{ email, otp_hash, expires_at, attempts: 0 }`
+4. Store an OTP record in Dataverse: `{ email, otp_code, expires_at, attempts: 0 }` — stored as-is, deliberately; see **At-rest protection** below
 5. Send the code via SMS (Twilio/Azure Communication) or email
 6. Build the `channels` array with masked delivery addresses
 7. Pass to `Respond_to_PowerPages` as `@variables('channels_array')`
@@ -172,7 +172,7 @@ Both flow templates contain a `IMPLEMENT_PLACEHOLDER` Compose action that marks 
 1. Query the Dataverse OTP record for this email
 2. Return `NOT_FOUND` if no record exists; `LOCKED` if already locked
 3. Check expiry: return `LOCKED` (with appropriate message) if expired
-4. Compare OTP values; on mismatch: increment `attempts`, lock if ≥ 5, return `WRONG_OTP` with `attemptsRemaining`
+4. Compare OTP values; on mismatch: increment `attempts`, lock if ≥ 5, return `INVALID_CODE` with `attemptsRemaining` (the same code a not-found or expired record returns — see **Anti-enumeration** below)
 5. On success: delete the OTP record, retrieve the user record, return `{ inviteeId, firstName, lastName, email }`
 
 **Flow HTTP contract — do not change these shapes:**
@@ -194,7 +194,7 @@ CheckOTP response (200):
 
 CheckOTP error:
 ```json
-{ "code": "WRONG_OTP|LOCKED|NOT_FOUND", "attemptsRemaining": 3 }
+{ "errorCode": "INVALID_CODE|LOCKED", "attemptsRemaining": 3 }
 ```
 
 ---
@@ -321,4 +321,127 @@ This ensures the authenticated user can only read and modify their own record, e
 - [ ] **SESSION_KEY unique** — `useAuth.ts` `SESSION_KEY` does not clash with other portal apps on the same domain
 - [ ] **Site settings committed** with new GUIDs, empty `adx_value` — grep for `00000000-0000-0000-0000-000000000001` → zero matches in `sitesetting.yml`
 - [ ] **Trigger URLs set** in Power Pages design studio (not in git) after flow deploy
-- [ ] **Production smoke test** — real email → OTP received → login succeeds → session persists on page reload, expires after 30 min
+- [ ] **Production smoke test** — real email → OTP received → login succeeds → session persists on page reload, expires after the 1-hour TTL
+
+---
+
+## 8. Security baseline for this module
+
+An external security audit of a solution built on this recipe raised findings that trace straight back
+to the recipe itself. The controls below are the recipe's answers. They are part of the module, not
+optional extras — the root **SECURITY-BASELINE.md** records how each maps to a finding, and
+[FLOW_SNIPPETS.md](../../SMKB%20-%20Power%20Automate%20Flows%20Starter/FLOW_SNIPPETS.md) sections 17-19
+carry the generic patterns.
+
+### Anti-enumeration — one generic answer
+
+An unauthenticated endpoint that answers differently for "no such account" and "account exists" tells
+an attacker which email addresses are registered, whatever status code it uses.
+
+| Flow | Situation | Return |
+|---|---|---|
+| CreateOtp | email not found | **exactly the success response** — same shape, same `channels` array (built from the submitted address) |
+| CreateOtp | account archived / disabled | the success response |
+| CreateOtp | rate limit hit | `RATE_LIMITED` — counted per **submitted** address, existent or not |
+| CheckOtp | no pending code | `INVALID_CODE` |
+| CheckOtp | code expired | `INVALID_CODE` |
+| CheckOtp | wrong code | `INVALID_CODE` (+ `attemptsRemaining`) |
+| CheckOtp | locked out | `LOCKED`, worded about the **attempt state** |
+
+Both templates now do this. Two things not to undo:
+
+- **Do not split `INVALID_CODE` back into `NOT_FOUND` / `EXPIRED` / `WRONG_OTP`.** Each one is a
+  separate statement about whether an address is registered. The branch still runs, so the real reason
+  is in run history, which only flow owners and environment admins can read.
+- **Count the rate limit per submitted address, not per found account.** If the limiter only fires for
+  real accounts, `RATE_LIMITED` becomes the oracle you just closed.
+
+`LOCKED` is a deliberate exception: users need to know why they are stuck. Word it as
+*"too many attempts, try again later"* — never *"this account is locked"*, which confirms the account.
+
+> **Response timing is a residual, and we accept it.** A not-found short-circuit returns faster than a
+> full verification. Equalising that in a cloud flow is impractical (connector latency varies far more
+> than the branch, and a fixed `Delay` taxes every real user). The rate limit, the lockout and the
+> global cap are what make bulk probing expensive. Stating the channel is narrow is honest; claiming
+> it is closed would not be.
+
+### What at-rest protection actually means here
+
+The OTP is stored as written, and that is a considered decision rather than an omission:
+
+- **Power Automate has no hash expression.** There is no SHA/HMAC function in WDL, and OData `$filter`
+  cannot hash server-side. "Hash the OTP" is not a flow edit; it needs a Dataverse plug-in, an Azure
+  Function, or a custom connector.
+- **For a 6-digit code, hashing buys very little anyway.** The keyspace is 10^6. An unsalted fast hash
+  falls to exhaustive search instantly, so it would be reassurance rather than protection.
+- **The session token is the value where hashing would genuinely help** — it is high-entropy and
+  long-lived by comparison. The same platform limitation applies, so it is stored as-is too.
+
+The controls that carry the weight instead:
+
+| Control | Value |
+|---|---|
+| OTP expiry | 10 minutes |
+| Attempt lockout | 5 attempts |
+| Clear on use | Delete the OTP row on success — prevents replay |
+| Session TTL | 1 hour |
+| **Table access** | Restrict the OTP and session tables to the flow's service account |
+
+That last row is the one people skip. If any portal role or broad security role can read the session
+table, the token TTL is irrelevant — verify it explicitly. True at-rest hashing is a separate,
+compliance-driven change; treat it as a project, not a checkbox on this recipe.
+
+### Bot protection — fail closed, opt in
+
+Verify a bot token **server-side, before any lookup or send**. Client-side widget rendering is not the
+control; the `siteverify` call in the flow is.
+
+- Gate the whole branch on a **non-empty public site key**, so a solution with no Cloudflare account
+  works unchanged.
+- When the key *is* set, **fail closed**: reject unless `siteverify` returned success. Run the check
+  with `runAfter` covering `Succeeded`, `Failed` **and** `Skipped`, so a secret-fetch, HTTP or parse
+  error rejects rather than falling through — otherwise a transient failure becomes an open door.
+- Return `CAPTCHA_FAILED`. It reveals nothing about the account.
+
+The `/ppcs-add-turnstile` skill wires the client and CSP halves; the fail-closed server gate is
+demonstrated end to end by the `CreateOtp` reference flow in
+[`examples/`](../../SMKB%20-%20Power%20Automate%20Flows%20Starter/examples/README.md).
+
+### Rate limiting has three layers, and the recipe ships one
+
+| Layer | Stops | Where |
+|---|---|---|
+| Per-address limit (3 per 10 min) | Hammering one address | **Shipped** in `CreateOtp` |
+| Attempt lockout (5) | Guessing a code | **Shipped** in `CheckOtp` |
+| **Global cap** | A spray across many addresses | Add it — `smkb_sol_OtpDailyCap` |
+
+The per-address limit is blind to breadth: ten thousand addresses touched twice each never trips it.
+Add the global cap using `smkb_sol_OtpDailyCap` (Number) and alert to `smkb_sol_SecurityAlertEmails`
+(String, semicolon-separated) — both ship in the Environmental Variables starter. FLOW_SNIPPETS
+section 18 has the Dataverse `$count` query and the exact expressions.
+
+Two rules for the alert: send it on the **transition into** a capped or locked state, never per
+attempt (otherwise an abuse attempt becomes an outbound mail flood from your own tenant), and skip the
+send when the recipient list is empty rather than failing — the cap must still reject.
+
+Per-IP limiting belongs at the WAF, not here: a cloud flow has no trustworthy client IP, and a limiter
+keyed on a spoofable value reads as a control that is not there.
+
+### Secrets for the send
+
+The recipe leaves the actual send to you, and whatever SMS or email API you wire in will have a key.
+
+- Store it in a **Secret** environment variable (type `100000005`), never in
+  `definition.parameters` — a committed default is caught by `no-secret-param-default`.
+- Read it with the Dataverse unbound action `RetrieveEnvironmentVariableSecretValue`, passing
+  `item/EnvironmentVariableName` as a **plain string**, not a `parameters()` reference.
+- Set `runtimeConfiguration.secureData.properties` to `["outputs"]` on that fetch, and to `["inputs"]`
+  on the call that consumes it. Securing only one half moves the plaintext one action to the right.
+  `keyvault-secret-read-is-secured` enforces the fetch half.
+
+**Never put `secureData` on the `Compose` that holds the generated code.** It is rejected: the
+solution imports fine, then the flow fails activation with `InvalidSecureDataConfiguration` and stays
+in **Draft** — every portal call to it then fails, and there is no `pac` verb to turn a flow back on.
+`securedata-only-on-connector-actions` blocks it before deploy. The generated OTP therefore remains
+visible in **admin-only run history**; that is the accepted residual, and the mitigation is auditing
+who holds owner/co-owner on the flow and admin on the environment.
