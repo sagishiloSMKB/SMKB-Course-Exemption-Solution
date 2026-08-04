@@ -8,10 +8,16 @@ const globalById = Object.fromEntries(globalRules.map((r) => [r.id, r]))
 let pass = 0, fail = 0
 const results = []
 
+// Every rule id an assertion below actually exercised, and whether it was asserted to
+// FIRE (>0 findings) at least once. Checked at the end - see "Coverage".
+const exercised = new Map()
+const note = (id, expected) => exercised.set(id, (exercised.get(id) ?? false) || expected > 0)
+
 /** Assert `rule(flow, ctx)` returns exactly `expected` findings. */
 function expect(id, label, flow, ctx, expected) {
   const rule = byId[id]
   if (!rule) { results.push(`FAIL ${id} :: ${label} :: rule not found`); fail++; return }
+  note(id, expected)
   const n = (rule.check(flow, ctx) || []).length
   if (n === expected) { results.push(`ok   ${id} :: ${label} (${n})`); pass++ }
   else { results.push(`FAIL ${id} :: ${label} :: expected ${expected} findings, got ${n}`); fail++ }
@@ -21,6 +27,7 @@ function expect(id, label, flow, ctx, expected) {
 function expectGlobal(id, label, gctx, expected) {
   const rule = globalById[id]
   if (!rule) { results.push(`FAIL ${id} :: ${label} :: global rule not found`); fail++; return }
+  note(id, expected)
   const n = (rule.check(gctx) || []).length
   if (n === expected) { results.push(`ok   ${id} :: ${label} (${n})`); pass++ }
   else { results.push(`FAIL ${id} :: ${label} :: expected ${expected} findings, got ${n}`); fail++ }
@@ -95,6 +102,59 @@ expect('env-var-param-defined', 'bad: unknown schemaName',
 expect('env-var-param-defined', 'good: known schemaName',
   flow({ parameters: { P: { metadata: { schemaName: 'smkb_OK' } } } }), evCtx, 0)
 
+// securedata-only-on-connector-actions
+const SECURE_OUT = { secureData: { properties: ['outputs'] } }
+const SECURE_IN = { secureData: { properties: ['inputs'] } }
+expect('securedata-only-on-connector-actions', 'bad: secureData on a Compose',
+  flow({ actions: { C: { type: 'Compose', runtimeConfiguration: SECURE_OUT } } }), {}, 1)
+expect('securedata-only-on-connector-actions', 'bad: secureData on a ParseJson',
+  flow({ actions: { P: { type: 'ParseJson', runtimeConfiguration: SECURE_OUT } } }), {}, 1)
+expect('securedata-only-on-connector-actions', 'bad: nested inside a Scope',
+  flow({ actions: { S: { type: 'Scope', actions: { C: { type: 'Compose', runtimeConfiguration: SECURE_OUT } } } } }), {}, 1)
+expect('securedata-only-on-connector-actions', 'bad: secureData on a trigger',
+  flow({ triggers: { manual: { type: 'Request', kind: 'PowerPages', runtimeConfiguration: SECURE_IN } } }), {}, 1)
+expect('securedata-only-on-connector-actions', 'good: secureData outputs on OpenApiConnection',
+  flow({ actions: { K: { type: 'OpenApiConnection', runtimeConfiguration: SECURE_OUT } } }), {}, 0)
+expect('securedata-only-on-connector-actions', 'good: secureData inputs on Http',
+  flow({ actions: { H: { type: 'Http', runtimeConfiguration: SECURE_IN } } }), {}, 0)
+expect('securedata-only-on-connector-actions', 'good: Compose with no secureData',
+  flow({ actions: { C: { type: 'Compose', runtimeConfiguration: { concurrency: { repetitions: 1 } } } } }), {}, 0)
+
+// keyvault-secret-read-is-secured
+const secretRead = (runtimeConfiguration) => ({
+  actions: {
+    GetSecret: {
+      type: 'OpenApiConnection',
+      inputs: {
+        host: { connectionName: 'shared_commondataserviceforapps', operationId: 'PerformUnboundAction' },
+        parameters: { actionName: 'RetrieveEnvironmentVariableSecretValue', 'item/EnvironmentVariableName': 'smkb_ApiKey' },
+      },
+      ...(runtimeConfiguration ? { runtimeConfiguration } : {}),
+    },
+  },
+})
+expect('keyvault-secret-read-is-secured', 'bad: secret read with no secureData',
+  flow(secretRead(null)), {}, 1)
+expect('keyvault-secret-read-is-secured', 'bad: secret read securing inputs only',
+  flow(secretRead(SECURE_IN)), {}, 1)
+expect('keyvault-secret-read-is-secured', 'good: secret read securing outputs',
+  flow(secretRead(SECURE_OUT)), {}, 0)
+expect('keyvault-secret-read-is-secured', 'good: unrelated unbound action',
+  flow({ actions: { A: { type: 'OpenApiConnection', inputs: { host: { operationId: 'PerformUnboundAction' }, parameters: { actionName: 'WhoAmI' } } } } }), {}, 0)
+
+// no-unused-trigger-inputs
+const ppTrigger = (props) => ({
+  triggers: { manual: { kind: 'PowerPages', inputs: { schema: { properties: props, required: Object.keys(props) } } } },
+})
+expect('no-unused-trigger-inputs', 'bad: declared input never referenced',
+  flow({ ...ppTrigger({ text: { title: 'authToken' }, text_1: { title: 'lecturerId' } }),
+    actions: { A: { type: 'Compose', inputs: "@triggerBody()?['text']" } } }), {}, 1)
+expect('no-unused-trigger-inputs', 'good: every input consumed',
+  flow({ ...ppTrigger({ text: { title: 'authToken' }, text_1: { title: 'voucherId' } }),
+    actions: { A: { type: 'Compose', inputs: "@concat(triggerBody()?['text'], triggerBody()?['text_1'])" } } }), {}, 0)
+expect('no-unused-trigger-inputs', 'good: not a Power Pages trigger',
+  flow({ triggers: { manual: { kind: 'Button', inputs: { schema: { properties: { text_9: { title: 'x' } } } } } } }), {}, 0)
+
 // ── Global rules ──
 // workflow-json-matches-customizations
 expectGlobal('workflow-json-matches-customizations', 'bad: flow not referenced',
@@ -122,7 +182,33 @@ expectGlobal('xml-ascii-hyphen-only', 'bad: en-dash in xml',
 expectGlobal('xml-ascii-hyphen-only', 'good: ascii hyphen',
   { xmlFiles: [{ rel: 's.xml', raw: '<n>PVCH - Thing</n>' }] }, 0)
 
+// ── Coverage ──────────────────────────────────────────────────────────────────
+// The bad-input/good-input convention above is only worth anything if it is enforced:
+// before this gate existed, a rule could ship with NO tests and the suite stayed green,
+// so "the self-test covers every rule" was believed rather than true.
+//
+// 'flow-valid-json' is excluded deliberately: it is a synthetic id emitted from
+// lint.mjs's JSON.parse catch and has no rule object, so it cannot be unit-tested here.
+const SYNTHETIC_IDS = new Set(['flow-valid-json'])
+for (const r of [...rules, ...globalRules]) {
+  if (SYNTHETIC_IDS.has(r.id)) continue
+  if (!exercised.has(r.id)) {
+    results.push(`FAIL ${r.id} :: coverage :: rule has no test - add a bad-input and a good-input assertion`)
+    fail++
+  } else if (!exercised.get(r.id)) {
+    results.push(`FAIL ${r.id} :: coverage :: every assertion expects 0 findings - add a bad input that makes it FIRE`)
+    fail++
+  }
+}
+const known = new Set([...rules, ...globalRules].map((r) => r.id))
+for (const id of exercised.keys()) {
+  if (!known.has(id)) { results.push(`FAIL ${id} :: coverage :: tested id is not a registered rule`); fail++ }
+}
+
 // ── Report ──
 for (const line of results) console.log(line)
 console.log(`\nflow-lint self-test: ${pass} passed, ${fail} failed`)
+console.log(fail > 0
+  ? `coverage: ${known.size} registered rules - see the FAIL lines above`
+  : `coverage: ${known.size} rules, every one with a firing test and a silent test`)
 process.exit(fail > 0 ? 1 : 0)

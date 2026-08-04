@@ -137,7 +137,10 @@ const gctx = {
 for (const rule of globalRules) {
   let out = []
   try { out = rule.check(gctx) || [] } catch (e) { add('error', rule.id, '(global)', '(rule)', `rule threw: ${e.message}`) }
-  for (const f of out) add(rule.severity, rule.id, f.location, '', f.message)
+  // A global rule's `location` IS a file path (Workflows/x.json, Other/Solution.xml, an
+  // XML rel path), so it belongs in the file slot - that is what groups these findings
+  // per file in the report. There is no sub-location within it, hence '(file)'.
+  for (const f of out) add(rule.severity, rule.id, f.location, '(file)', f.message)
 }
 
 // ── Report ───────────────────────────────────────────────────────────────────

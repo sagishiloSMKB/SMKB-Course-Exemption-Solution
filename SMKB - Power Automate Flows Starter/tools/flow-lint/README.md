@@ -30,6 +30,8 @@ auto-discovered (`* Cloud Flows/Workflows`, `* Environmental Variables/environme
 
 ## Rules
 
+### Per-flow
+
 | id | sev | catches |
 |----|-----|---------|
 | `flow-valid-json` | error | JSON that won't parse (BOM-tolerant) |
@@ -37,12 +39,25 @@ auto-discovered (`* Cloud Flows/Workflows`, `* Environmental Variables/environme
 | `connection-runtime-embedded` | error | a connection with `runtimeSource` ≠ `embedded` (invoker → recurring 403) |
 | `no-placeholders` | error | unreplaced starter placeholders |
 | `no-secret-param-default` | error | a password/secret/token-named parameter with a committed default |
-| `http-uri-encodes-client-input` | error | `triggerBody()` interpolated into an HTTP URI without `encodeUriComponent` (F1/F4) |
+| `http-uri-encodes-client-input` | error | `triggerBody()` interpolated into an HTTP URI without `encodeUriComponent` |
 | `authenticated-flow-validates-token` | error | an `authToken` trigger input with no `sessionToken` validation |
+| `securedata-only-on-connector-actions` | error | `secureData` anywhere other than an `OpenApiConnection`/`Http` **action** — imports fine, then fails activation and stays in **Draft** |
+| `keyvault-secret-read-is-secured` | error | a Secret env-var read that doesn't mark its **outputs** secure (secret lands in run history) |
 | `connection-reference-complete` | warn | connection reference missing logical/api name |
 | `no-email-in-defaultvalue` | warn | an email committed in a parameter `defaultValue` (set per-environment instead) |
 | `powerpages-trigger-fields-have-title` | warn | Power Pages trigger field missing a `title` (eventData maps by title) |
 | `env-var-param-defined` | warn | a `metadata.schemaName` with no matching Environmental Variables definition |
+| `no-unused-trigger-inputs` | warn | a Power Pages trigger input the flow never reads — dead surface a reviewer can't distinguish from a record selector |
+
+### Whole-solution (global)
+
+These block a deploy just as hard as the per-flow errors — they were previously undocumented here.
+
+| id | sev | catches |
+|----|-----|---------|
+| `workflow-json-matches-customizations` | error | a `Workflows/*.json` not referenced in `Other/Customizations.xml` (or a stale reference to a file that no longer exists) |
+| `env-var-rootcomponents-complete` | error | an env-var definition with no `<RootComponent type="380">` entry — imports unlinked and never reaches Stage/Prod |
+| `xml-no-placeholders` | error | unreplaced placeholders in any shipped solution/env-var XML |
 | `xml-ascii-hyphen-only` | warn | Unicode en/em dash in solution/env-var display XML |
 
 ## Add a rule
@@ -53,12 +68,18 @@ Append to the array in [`rules.mjs`](./rules.mjs):
 { id: 'my-rule', severity: 'error', docs: 'why it matters',
   check(flow, ctx) {
     // flow = { name, path, raw, json }; ctx = { envVarSchemaNames: Set }
-    // return [{ location, message }, ...]
+    // return [{ location, message }, ...]   // no line numbers - there is no line machinery
   } }
 ```
 
-Then add a bad-input and good-input assertion in [`test.mjs`](./test.mjs) and run it — every rule
-must fire on bad input and stay silent on good input.
+Useful in-module helpers: `walk(node, cb, path)` (exported) and the private `nodesOfType`,
+`def`/`params`/`triggers`/`connRefs`. `nodesOfType` takes the **whole `flow.json`** — it descends into
+`properties.definition` itself.
+
+Then add a bad-input and good-input assertion in [`test.mjs`](./test.mjs) and run it. This is
+**enforced, not just asked for**: the self-test fails if a registered rule has no test, or if every
+assertion for it expects zero findings (a rule that never fires in its own tests is untested). Before
+that gate existed, a rule could ship with no tests at all and the suite stayed green.
 
 ## Wiring
 

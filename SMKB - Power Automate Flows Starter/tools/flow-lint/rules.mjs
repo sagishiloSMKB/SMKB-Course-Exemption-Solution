@@ -3,7 +3,8 @@
 //
 // Each rule: { id, severity: 'error'|'warn', docs, check(flow, ctx) -> Finding[] }
 //   flow = { name, path, raw, json }   (json is the parsed definition, BOM-stripped)
-//   ctx  = { envVarSchemaNames: Set<string>, publicFlows: Set<string> }
+//   ctx  = { envVarSchemaNames: Set<string> }   (that is the whole context - if a rule
+//          needs more, add the key in lint.mjs first; do not document it here only)
 //   Finding = { location, message }     (ruleId/severity/file are added by the runner)
 //
 // Severity policy:
@@ -211,6 +212,91 @@ export const rules = [
         const schema = p?.metadata?.schemaName
         if (typeof schema === 'string' && schema.startsWith('smkb_') && !known.has(schema)) {
           out.push({ location: `parameters['${key}'].metadata.schemaName`, message: `env-var "${schema}" has no definition in the Environmental Variables folder (typo or missing/shared var — verify it exists)` })
+        }
+      }
+      return out
+    },
+  },
+
+  {
+    id: 'securedata-only-on-connector-actions',
+    severity: 'error',
+    docs: 'runtimeConfiguration.secureData is accepted only on OpenApiConnection and Http ACTIONS. Anywhere else — a Compose, a ParseJson, or a trigger — the solution imports "successfully" and the flow then fails activation with InvalidSecureDataConfiguration and stays in Draft, so every portal call to it fails.',
+    check(flow) {
+      const out = []
+      // Allow-list, not a deny-list for Compose alone: ParseJson, Select,
+      // InitializeVariable and every other action type fail activation identically,
+      // so enumerating the two that work is both shorter and complete.
+      const SECUREABLE = new Set(['OpenApiConnection', 'Http'])
+      walk(def(flow.json), (n, p) => {
+        if (Array.isArray(n)) return
+        if (!n.runtimeConfiguration || typeof n.runtimeConfiguration !== 'object') return
+        if (!('secureData' in n.runtimeConfiguration)) return
+        if (typeof n.type !== 'string') return
+        const loc = `${p}.runtimeConfiguration.secureData`
+        if (p === 'triggers' || p.startsWith('triggers.')) {
+          // Distinct cause, same symptom: Microsoft does not support Secure Inputs on
+          // the trigger of a flow invoked from Power Pages ("passing a parameter to a
+          // flow configured with secure inputs isn't available").
+          out.push({ location: loc, message: `secureData on a trigger ("${n.type}") — not supported on a Power-Pages-invoked flow trigger. Secure the internal actions that handle the value instead.` })
+          return
+        }
+        if (SECUREABLE.has(n.type)) return
+        out.push({ location: loc, message: `secureData on a "${n.type}" action — valid only on OpenApiConnection/Http. The flow will import but fail activation (InvalidSecureDataConfiguration) and stay in Draft. Remove it: a sensitive value held here is covered by run history being admin-only, or inline it into a secured connector action.` })
+      })
+      return out
+    },
+  },
+
+  {
+    id: 'keyvault-secret-read-is-secured',
+    severity: 'error',
+    docs: 'An action reading a Secret environment variable (the Dataverse unbound action RetrieveEnvironmentVariableSecretValue) must mark its OUTPUTS secure, or the secret is written to run history in clear text.',
+    check(flow) {
+      const out = []
+      walk(def(flow.json), (n, p) => {
+        if (Array.isArray(n) || n.type !== 'OpenApiConnection') return
+        // Match on the operation + action name, case-insensitively and without
+        // depending on parameter order.
+        const opId = n.inputs?.host?.operationId
+        const actionName = n.inputs?.parameters?.actionName
+        if (typeof opId !== 'string' || opId.toLowerCase() !== 'performunboundaction') return
+        if (typeof actionName !== 'string' || actionName.toLowerCase() !== 'retrieveenvironmentvariablesecretvalue') return
+        const props = n.runtimeConfiguration?.secureData?.properties
+        const secured = Array.isArray(props) && props.some((x) => typeof x === 'string' && x.toLowerCase() === 'outputs')
+        if (!secured) {
+          out.push({ location: `${p}.runtimeConfiguration.secureData`, message: 'reads a Secret env var without securing its outputs — the secret value lands in run history in clear text. Set runtimeConfiguration.secureData.properties to ["outputs"], and secure the INPUTS of whatever consumes it.' })
+        }
+      })
+      return out
+    },
+  },
+
+  {
+    id: 'no-unused-trigger-inputs',
+    severity: 'warn',
+    docs: 'A Power Pages trigger input the flow never references is dead surface: the SPA can send it, nothing validates it, and a reviewer cannot tell whether it was meant to select a record. Remove it, or consume it. (The control that actually prevents IDOR is resolving the target record from the session row — see FLOW_SNIPPETS.md.)',
+    check(flow) {
+      const out = []
+      for (const [tname, t] of Object.entries(triggers(flow.json))) {
+        if (t?.kind !== 'PowerPages') continue
+        const props = t?.inputs?.schema?.properties ?? {}
+        const schemaPath = `triggers.${tname}.inputs.schema`
+        // Collect every string VALUE in the definition except inside this trigger's own
+        // input schema. A property KEY is not a value, so the declaration itself never
+        // counts as a use; excluding the schema subtree by path also drops the
+        // `required: [...]` array, which would otherwise mask every unused input.
+        const seen = []
+        walk(def(flow.json), (n, p) => {
+          if (p === schemaPath || p.startsWith(`${schemaPath}.`) || p.startsWith(`${schemaPath}[`)) return
+          const vals = Array.isArray(n) ? n : Object.values(n)
+          for (const v of vals) if (typeof v === 'string') seen.push(v)
+        })
+        const haystack = seen.join('\n')
+        for (const [pname, p] of Object.entries(props)) {
+          if (haystack.includes(pname)) continue
+          const title = typeof p?.title === 'string' && p.title.trim() ? p.title.trim() : pname
+          out.push({ location: `${schemaPath}.properties.${pname}`, message: `trigger input "${title}" (${pname}) is declared but never referenced anywhere in the flow — dead input surface` })
         }
       }
       return out
