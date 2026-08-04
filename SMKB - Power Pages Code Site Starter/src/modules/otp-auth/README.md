@@ -1,7 +1,7 @@
 # OTP Auth Module (opt-in)
 
 Phone-OTP authentication as an alternative to Power Pages OAuth (Entra sign-in).
-Proven in production (SMKB Payment Vouchers / Lecturer Portal).
+Proven in production on a live SMKB Power Pages site.
 
 **This module is dormant**: nothing outside `src/modules/otp-auth/` imports it, so it
 ships **zero bytes** in the bundle until wired up — but `vue-tsc` and ESLint still
@@ -88,7 +88,7 @@ wrapper logs out and fires `smkb:session-expired` (App.vue redirects to login).
 
 While a GUID in `otpFlows.ts` is empty and the app runs under `npm run dev`:
 - `createOtp` returns mock masked channels for any phone number
-- `checkOtp` accepts OTP **123456** (anything else → `WRONG_OTP` with 2 attempts left)
+- `checkOtp` accepts OTP **123456** (anything else → `INVALID_CODE` with 2 attempts left)
 - `getPortalConfig` returns an empty config (no Turnstile widget)
 
 So the full login UX is testable before any flow exists.

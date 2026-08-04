@@ -1,6 +1,6 @@
 # flow-lint
 
-Static checks for the Payment Vouchers **cloud flows** and **solution XML** — the layer that
+Static checks for this solution's **cloud flows** and **solution XML** — the layer that
 has no local runtime, so we assert over the JSON/XML instead of executing it. Zero-dependency
 Node ESM (built-ins only): it runs from a pre-commit hook, `deploy.ps1`, or CI **without an
 `npm install`**.

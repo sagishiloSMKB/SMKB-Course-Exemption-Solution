@@ -410,7 +410,7 @@ Standard two-scope structure used in all flows in this project. All business log
                 "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
               },
               "parameters": {
-                "emailMessage/From": "[REPLACE-NOREPLY-SENDER]",
+                "emailMessage/From": "noreply@smkb.ac.il",
                 "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)')",
                 "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [ERROR] sol_flow_name failed')",
                 "emailMessage/Body": "@concat('<p><strong>sol_flow_name</strong> failed in <strong>', parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), '</strong>.</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",

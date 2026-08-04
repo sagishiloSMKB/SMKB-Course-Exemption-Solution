@@ -46,11 +46,36 @@ half-delivered promotion.]`
 | Secret env vars hold a Key Vault reference, not a literal | `[FILL IN]` | `[FILL IN]` |
 | Flows are **On** in the target (imports land them Draft/Inactive) | `[FILL IN]` | `[FILL IN]` |
 
+## Security baseline intact
+
+The kit ships a hardened default posture — see [SECURITY-BASELINE.md](../SECURITY-BASELINE.md). Confirm
+each control is still in place; a **weakened** one is a finding, and the baseline is what a reviewer is
+entitled to assume was true before this solution was built on top of it.
+
+| Baseline control | How to confirm | Status |
+|---|---|---|
+| The 6 built-in login/registration paths are still `false` | grep `.powerpages-site/site-settings/auth-*-disabled.sitesetting.yml` | `[FILL IN]` |
+| CSP still carries `object-src 'none'`, `base-uri 'self'`, `upgrade-insecure-requests`, `frame-ancestors 'self'`, `form-action 'self'` | both CSP files, and they are still **byte-identical** to each other | `[FILL IN]` |
+| `Referrer-Policy` + `Permissions-Policy` settings present | site-settings folder | `[FILL IN]` |
+| HSTS is emitted by the platform | `curl -I https://<site>` — do **not** add a competing site setting | `[FILL IN]` |
+| Every site setting has a real GUID, not a placeholder | grep for `aaaaaaaa-` → zero matches | `[FILL IN]` |
+| flow-lint passes with no error, incl. the `secureData` rules | `node "<flows>/tools/flow-lint/lint.mjs"` | `[FILL IN]` |
+| `vue/no-v-html` and the no-direct-network rules are intact | each SPA's `eslint.config.js` | `[FILL IN]` |
+| Unauthenticated endpoints return one generic code (no not-found / expired / wrong split) | read the OTP flows' Response bodies | `[FILL IN]` |
+| Every record operation is scoped by a **session-resolved** owner | read each authenticated flow's `$filter` / `recordId` | `[FILL IN]` |
+| Uploads validated server-side (extension + magic bytes + size + generated filename) | read the upload flow | `[FILL IN]` |
+| Global cap + abuse alert env vars are set in this environment | `smkb_<prefix>_OtpDailyCap`, `smkb_<prefix>_SecurityAlertEmails` | `[FILL IN]` |
+| OTP/session tables are restricted to the service account | Dataverse security roles | `[FILL IN]` |
+| Run-history access is limited (the fallback for values that cannot be secured) | flow owners/co-owners + environment admins | `[FILL IN]` |
+
 ## Verified-safe (checked, no issue)
 
-`[FILL IN: controls you checked and confirmed correct — e.g. secrets are Secret-typed and read via the Key
-Vault unbound action; no invoker connections; authenticated flows validate the session token; ownership
-checks present. This section shows the review had coverage, not just findings.]`
+`[FILL IN: controls you checked and confirmed correct — including the baseline rows above that passed.
+Do NOT re-raise an accepted trade-off from SECURITY-BASELINE.md as a finding (style-src 'unsafe-inline',
+response timing, no hash for a 6-digit code or session token, a value in a Compose output, no per-IP
+limiting in a flow, first-bytes-only file checks) — each has documented reasoning. If you think one is
+wrong, raise it as a recommendation with new evidence. This section shows the review had coverage, not
+just findings.]`
 
 ## Verification
 

@@ -1,7 +1,7 @@
-﻿{
+{
   "properties": {
     "connectionReferences": {
-      "shared_office365_pvch": {
+      "shared_office365_sol": {
         "runtimeSource": "embedded",
         "connection": {
           "connectionReferenceLogicalName": "new_sharedoffice365_c3167"
@@ -23,19 +23,19 @@
           "defaultValue": {},
           "type": "Object"
         },
-        "ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)": {
+        "ENVIRONMENT_NAME (smkb_sol_EnvironmentName)": {
           "defaultValue": "dev",
           "type": "String",
           "metadata": {
-            "schemaName": "smkb_pvch_EnvironmentName",
+            "schemaName": "smkb_sol_EnvironmentName",
             "description": "Logical environment name (dev/stage/prod)."
           }
         },
-        "ERROR_EMAILS (smkb_pvch_FlowErrorEmails)": {
+        "ERROR_EMAILS (smkb_sol_FlowErrorEmails)": {
           "defaultValue": "",
           "type": "String",
           "metadata": {
-            "schemaName": "smkb_pvch_FlowErrorEmails",
+            "schemaName": "smkb_sol_FlowErrorEmails",
             "description": "Semicolon-separated email addresses for flow error notifications."
           }
         }
@@ -63,7 +63,7 @@
               "description": "Fetch bank list from Israeli government open data portal, sorted by Bank_Code ascending.",
               "inputs": {
                 "method": "GET",
-                "uri": "https://data.gov.il/api/3/action/datastore_search?resource_id=ebb61778-e34c-4e67-8fcf-0e643d9cf8c2&limit=200&sort=Bank_Code%20asc"
+                "uri": "https://data.gov.il/api/3/action/datastore_search?resource_id=e0000000-0042-4000-8000-000000000042&limit=200&sort=Bank_Code%20asc"
               },
               "runAfter": {}
             },
@@ -197,21 +197,21 @@
           "actions": {
             "Check_Error_Emails_Configured": {
               "type": "If",
-              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)'))))",
+              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)'))))",
               "actions": {
                 "Send_error_notification": {
                   "type": "OpenApiConnection",
                   "inputs": {
                     "host": {
-                      "connectionName": "shared_office365_pvch",
+                      "connectionName": "shared_office365_sol",
                       "operationId": "SendEmailV2",
                       "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
                     },
                     "parameters": {
                       "emailMessage/From": "noreply@smkb.ac.il",
-                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)')",
-                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)')), ') [ERROR] smkb_pvch_GetBankList failed')",
-                      "emailMessage/Body": "@concat('<p>The flow <strong>smkb_pvch_GetBankList</strong> failed in <strong>', parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)'), '</strong>.</p><p>Run ID: ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [ERROR] smkb_sol_GetBankList failed')",
+                      "emailMessage/Body": "@concat('<p>The flow <strong>smkb_sol_GetBankList</strong> failed in <strong>', parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), '</strong>.</p><p>Run ID: ', workflow()['run']['name'], '</p>')",
                       "emailMessage/Importance": "High"
                     },
                     "authentication": "@parameters('$authentication')"

@@ -778,7 +778,7 @@ After running `pnpm pa add-flow`, `power.config.json` stores both under `workflo
 "workflowDetails": {
   "workflowEntityId": "6c504095-...",   ← Dataverse GUID (filename / XML)
   "workflowName": "1a3594a6-...",        ← Power Automate flow ID (pnpm pa / portal URL)
-  "workflowDisplayName": "PVCH - Manager Get Lecturers"
+  "workflowDisplayName": "SOL - Manager Get Owners"
 }
 ```
 

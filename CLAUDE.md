@@ -25,6 +25,9 @@ doubt about where a fact belongs, use this.
 - Solution-level documentation & review templates — the root `docs/` set (a per-solution artifact, drafted
   at the end of Init Project), `TESTING-STRATEGY.md`, and the `audit/` templates. (Distinct from a starter's
   *own* `docs/`, which documents that starter's mechanics.)
+- The cross-starter **security baseline** — `SECURITY-BASELINE.md`. A house standard spanning every
+  starter, so it is root's: what ships hardened by default, what is statically enforced, and which
+  trade-offs are accepted. Each starter documents its own half of a control; root owns the map.
 
 **Each STARTER owns (and root must never re-document):**
 - Its build / dev / deploy commands and scripts.
@@ -60,6 +63,7 @@ that owns it:
 | Environment variables — definitions, ALM vars | [Env Vars README](SMKB%20-%20Environmental%20Variables%20Starter/README.md) |
 | Solution documentation (architecture, security, privacy, ALM …) — templates, filled per solution at init | [docs/](docs/README.md) |
 | Testing strategy — the layered testing method | [TESTING-STRATEGY.md](TESTING-STRATEGY.md) |
+| **Security baseline** — shipped defaults, enforced invariants, accepted trade-offs (read before any security review) | [SECURITY-BASELINE.md](SECURITY-BASELINE.md) |
 | Pre-go-live security / UX audit templates | [audit/](audit/README.md) |
 
 ## Skills

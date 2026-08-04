@@ -28,16 +28,35 @@ anything risky or behavior-changing, tagging runtime changes **[needs deploy]**.
 
 1. Copy the template to a dated, scoped report:
    `audit/<component>-audit-YYYY-MM-DD.md` (audit **one** component per report).
+1b. **Read [`SECURITY-BASELINE.md`](../../../SECURITY-BASELINE.md) first.** It is the **expected** state of
+   any solution from this kit: the shipped defaults, the statically-enforced invariants, and the accepted
+   trade-offs — each with its reasoning. Use it two ways:
+   - **Verify the baseline is intact**, and record what you confirmed under **Verified-safe** (step 3).
+     A control that has been weakened *is* a finding — e.g. a login site setting flipped back to `true`,
+     a CSP directive dropped, `secureData` removed from a secret read.
+   - **Do not re-raise an accepted trade-off as a finding.** The document lists them explicitly
+     (`style-src 'unsafe-inline'`, response timing, no hash for a code/token, a value in a `Compose`
+     output, no per-IP limiting in a flow, first-bytes-only file checks). If you believe one is wrong,
+     say so as a **recommendation with new evidence** — not as a rediscovered defect.
+
+   Your value is in what *this* solution added on top of the baseline. Spend the effort there.
+
 2. **Static pass** — read the actual source / flow JSON / XML. For each candidate finding, **prove it against
    the code before writing it down.** Check at least:
    - the UI-only boundary (no direct `fetch`/XHR/OData from the SPA; ESLint bans intact),
    - injection escaping in flows (OData `$filter` quote-escape; URL `encodeUriComponent`),
-   - authorization (per-user ownership checks; session-token validation before data access),
-   - secrets (Secret-typed env vars read via `RetrieveEnvironmentVariableSecretValue`; no committed defaults/emails),
-   - safe error handling (HTTP-200 `errorCode`; `Handle_Flow_Error` leaks nothing).
+   - authorization (session-token validation before data access, and the acting user resolved from the
+     **session row** — a client-supplied id must never select the target record),
+   - secrets (Secret-typed env vars read via `RetrieveEnvironmentVariableSecretValue`; no committed
+     defaults/emails; Secure I/O on the fetch **and** on whatever consumes it),
+   - safe error handling (HTTP-200 `errorCode`; `Handle_Flow_Error` leaks nothing),
+   - anti-enumeration on unauthenticated endpoints (one generic code — a distinct not-found/expired/wrong
+     response is an account-existence oracle),
+   - server-side validation of any upload (extension + magic bytes + size cap + server-generated filename).
 3. Record findings with `ID · Severity · Category · Status`. Categories: Security/Injection,
    Security/Authorization, Secrets hygiene, Clean-code, Docs. For **False positive**, show why the code is
-   already safe. Fill the **Verified-safe** section (coverage, not just findings).
+   already safe. Fill the **Verified-safe** section (coverage, not just findings) — including the baseline
+   controls you confirmed, so a reader can see what was checked and passed, not only what failed.
 4. **Apply only low-risk fixes** and verify locally:
    ```powershell
    pnpm run build   # or npx vue-tsc --noEmit — must exit 0 for any SPA touched

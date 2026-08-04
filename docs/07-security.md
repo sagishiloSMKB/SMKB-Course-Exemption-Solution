@@ -1,7 +1,11 @@
 # Security
 
-> **TEMPLATE** — this captures the standard SMKB security posture (keep the sections). Fill the `[FILL IN: …]`
-> prompts with this solution's specifics and cite the source files. Delete this callout once populated.
+> **TEMPLATE** — this captures the standard SMKB security posture (keep the sections). The posture that is
+> true for *every* solution from this kit is already written and cited in
+> [SECURITY-BASELINE.md](../SECURITY-BASELINE.md) — read that first, and do not restate it here. Fill the
+> `[FILL IN: …]` prompts with what is specific to **this** solution (which tables hold personal data, which
+> flows egress where, which extra origins the CSP had to allow) and cite the source files. Delete this
+> callout once populated.
 
 This document describes the security controls **as currently implemented**. Each control cites where it
 lives so IT can verify it in the repository.
@@ -65,14 +69,23 @@ Configured as Power Pages site settings (`.powerpages-site/site-settings/`):
 | Legacy XSS filter off (CSP supersedes) | `HTTP/X-XSS-Protection` | `0` |
 | Block `unsafe-eval` auto-injection | `HTTP/Content-Security-Policy/Inject-unsafe-eval` | `false` |
 
-**CSP:** `default-src 'self'`. Scripts, styles, images, fonts, and `connect-src` are restricted to `'self'`
-plus the required Microsoft Power Platform CDNs; `[FILL IN: any additional allowed origins — e.g. a bot-check
-domain in connect-src/frame-src, an open-data API in connect-src]`. `frame-ancestors 'self'` and
-`form-action 'self'` are set. HTTPS and `X-Frame-Options` are provisioned by the Power Pages platform.
-Use the Power Pages starter's `/ppcs-add-csp-domain` skill to add an origin to both CSP files.
+**CSP — the standard set, shipped by the kit:** `default-src 'self'`; scripts, styles, images, fonts and
+`connect-src` restricted to `'self'` plus the required Microsoft Power Platform CDNs; `object-src 'none'`;
+`base-uri 'self'`; `frame-ancestors 'self'`; `form-action 'self'`; `upgrade-insecure-requests`. The enforced
+and report-only files are kept **byte-identical** to each other.
 
-`[FILL IN: note any accepted CSP findings, e.g. style-src 'unsafe-inline' required by the design system's
-runtime style injection — tracked as a known, accepted finding in the portal CLAUDE.md.]`
+HTTPS, **HSTS** and `X-Frame-Options` are provisioned by the Power Pages platform — verify HSTS with
+`curl -I` rather than adding a competing site setting.
+
+**This solution's additions:** `[FILL IN: any additional allowed origins — e.g. a bot-check domain in
+connect-src/frame-src, an open-data API in connect-src. Use the Power Pages starter's
+/ppcs-add-csp-domain skill so both CSP files stay identical.]`
+
+**Accepted kit-wide** (do not re-raise — see [SECURITY-BASELINE.md](../SECURITY-BASELINE.md)):
+`style-src 'unsafe-inline'` is required by the design system's runtime style injection, and
+`script-src 'unsafe-hashes'` is injected by the Power Pages platform itself.
+
+`[FILL IN: any accepted CSP finding specific to this solution.]`
 
 ## 6. Injection prevention (flows)
 
@@ -110,6 +123,20 @@ Cloud-flow calls carry the Power Pages anti-forgery token. In the deployed runti
 
 ## 11. Static enforcement
 
-Security-relevant rules are enforced automatically before code ships — no `v-html`, no direct network calls
-from the SPA, cloud-flow schema/description constraints, no stray secrets. See
-[Testing & Quality Gates](08-testing-and-quality-gates.md).
+Security-relevant rules are enforced automatically before code ships. Each fails a build, a commit or a
+deploy rather than relying on review:
+
+| Gate | Enforces |
+|---|---|
+| `vue/no-v-html: 'error'` | no raw HTML injection in either SPA |
+| ESLint no-direct-network | the SPA cannot bypass the flow boundary (`fetch`/XHR/WebSocket banned) |
+| `authenticated-flow-validates-token` | a flow taking an `authToken` validates it server-side |
+| `http-uri-encodes-client-input` | client input reaching an HTTP URI is encoded |
+| `no-secret-param-default` | no secret committed as a parameter default |
+| `securedata-only-on-connector-actions` | `secureData` only on connector **actions** — never a trigger or a `Compose` |
+| `keyvault-secret-read-is-secured` | a Secret env-var read marks its **outputs** secure |
+| `no-unused-trigger-inputs` | no dead trigger input a reviewer can't distinguish from a record selector |
+| `check-template-guards.mjs` | no shipped file trips its own placeholder guard; `.ps1`/solution XML stay ASCII |
+
+See [Testing & Quality Gates](08-testing-and-quality-gates.md) and
+[SECURITY-BASELINE.md](../SECURITY-BASELINE.md).

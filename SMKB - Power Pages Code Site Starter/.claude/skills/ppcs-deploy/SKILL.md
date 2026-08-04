@@ -45,7 +45,7 @@ Current config state (injected at invocation):
 1b. **Site-name convention check.**
    Read `SOLUTION.prefix` from `src/config/solution.ts` and `siteName` from
    `powerpages.config.json`. The config `siteName` must begin with
-   `<PREFIX.toUpperCase()> - ` (e.g. prefix `pvch` → starts with `PVCH - `) — the
+   `<PREFIX.toUpperCase()> - ` (e.g. prefix `evt` → starts with `EVT - `) — the
    naming convention every site from this starter follows. If it does not (still
    `MY-SITE-NAME`, or the prefix drifted from `solution.ts`) → **STOP** and tell the
    user to re-run `/ppcs-provision-site` step 3, or fix `siteName` to

@@ -1,7 +1,7 @@
-﻿{
+{
   "properties": {
     "connectionReferences": {
-      "shared_sharepointonline_pvch": {
+      "shared_sharepointonline_sol": {
         "runtimeSource": "embedded",
         "connection": {
           "connectionReferenceLogicalName": "smkb_SMKBSharePointConnectionUser1"
@@ -10,7 +10,7 @@
           "name": "shared_sharepointonline"
         }
       },
-      "shared_office365_pvch": {
+      "shared_office365_sol": {
         "runtimeSource": "embedded",
         "connection": {
           "connectionReferenceLogicalName": "new_sharedoffice365_c3167"
@@ -32,19 +32,19 @@
           "defaultValue": {},
           "type": "Object"
         },
-        "ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)": {
+        "ENVIRONMENT_NAME (smkb_sol_EnvironmentName)": {
           "defaultValue": "dev",
           "type": "String",
           "metadata": {
-            "schemaName": "smkb_pvch_EnvironmentName",
+            "schemaName": "smkb_sol_EnvironmentName",
             "description": "Logical environment name (dev/stage/prod)."
           }
         },
-        "ERROR_EMAILS (smkb_pvch_FlowErrorEmails)": {
+        "ERROR_EMAILS (smkb_sol_FlowErrorEmails)": {
           "defaultValue": "",
           "type": "String",
           "metadata": {
-            "schemaName": "smkb_pvch_FlowErrorEmails",
+            "schemaName": "smkb_sol_FlowErrorEmails",
             "description": "Semicolon-separated email addresses for flow error notifications."
           }
         },
@@ -137,7 +137,7 @@
               "description": "Look up the lecturer row by cell phone number.",
               "inputs": {
                 "host": {
-                  "connectionName": "shared_sharepointonline_pvch",
+                  "connectionName": "shared_sharepointonline_sol",
                   "operationId": "GetItems",
                   "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
                 },
@@ -282,7 +282,7 @@
                   "description": "Increment OtpAttempts on the lecturer row.",
                   "inputs": {
                     "host": {
-                      "connectionName": "shared_sharepointonline_pvch",
+                      "connectionName": "shared_sharepointonline_sol",
                       "operationId": "PatchItem",
                       "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
                     },
@@ -351,7 +351,7 @@
               "description": "Clear OTP fields and write session token + expiry to the lecturer row.",
               "inputs": {
                 "host": {
-                  "connectionName": "shared_sharepointonline_pvch",
+                  "connectionName": "shared_sharepointonline_sol",
                   "operationId": "PatchItem",
                   "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
                 },
@@ -406,21 +406,21 @@
           "actions": {
             "Check_Error_Emails_Configured": {
               "type": "If",
-              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)'))))",
+              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)'))))",
               "actions": {
                 "Send_error_notification": {
                   "type": "OpenApiConnection",
                   "inputs": {
                     "host": {
-                      "connectionName": "shared_office365_pvch",
+                      "connectionName": "shared_office365_sol",
                       "operationId": "SendEmailV2",
                       "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
                     },
                     "parameters": {
                       "emailMessage/From": "noreply@smkb.ac.il",
-                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_pvch_FlowErrorEmails)')",
-                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)')), ') [ERROR] smkb_pvch_CheckOtp failed')",
-                      "emailMessage/Body": "@concat('<p>The flow <strong>smkb_pvch_CheckOtp</strong> failed unexpectedly in <strong>', parameters('ENVIRONMENT_NAME (smkb_pvch_EnvironmentName)'), '</strong>.</p><p><strong>Triggered by phone:</strong> ', coalesce(triggerBody()?['text'], '(unknown)'), '</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [ERROR] smkb_sol_CheckOtp failed')",
+                      "emailMessage/Body": "@concat('<p>The flow <strong>smkb_sol_CheckOtp</strong> failed unexpectedly in <strong>', parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), '</strong>.</p><p><strong>Triggered by phone:</strong> ', coalesce(triggerBody()?['text'], '(unknown)'), '</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",
                       "emailMessage/Importance": "High"
                     },
                     "authentication": "@parameters('$authentication')"

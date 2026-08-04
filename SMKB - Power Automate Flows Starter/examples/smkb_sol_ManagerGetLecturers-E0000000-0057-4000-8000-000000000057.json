@@ -1,4 +1,4 @@
-﻿{
+{
   "properties": {
     "connectionReferences": {
       "shared_sharepointonline": {
@@ -33,31 +33,31 @@
           "type": "SecureObject"
         },
         "SharePoint Site URL (smkb_SharePointSiteUrl)": {
-          "defaultValue": "https://smkb365.sharepoint.com/teams/SMKBAppsFiles",
+          "defaultValue": "",
           "type": "String",
           "metadata": {
             "schemaName": "smkb_SharePointSiteUrl"
           }
         },
-        "Environment Name (smkb_pvch_EnvironmentName)": {
+        "Environment Name (smkb_sol_EnvironmentName)": {
           "defaultValue": "dev",
           "type": "String",
           "metadata": {
-            "schemaName": "smkb_pvch_EnvironmentName"
+            "schemaName": "smkb_sol_EnvironmentName"
           }
         },
-        "Flow Error Emails (smkb_pvch_FlowErrorEmails)": {
+        "Flow Error Emails (smkb_sol_FlowErrorEmails)": {
           "defaultValue": "",
           "type": "String",
           "metadata": {
-            "schemaName": "smkb_pvch_FlowErrorEmails"
+            "schemaName": "smkb_sol_FlowErrorEmails"
           }
         }
       },
       "triggers": {
         "manual": {
           "metadata": {
-            "operationMetadataId": "82e2ea7d-e3ef-4084-8dce-9b74d76c9590"
+            "operationMetadataId": "e0000000-0045-4000-8000-000000000045"
           },
           "type": "Request",
           "kind": "PowerAppV2",
@@ -83,7 +83,7 @@
             "Build_Status_Filter": {
               "runAfter": {},
               "metadata": {
-                "operationMetadataId": "ad5cdce1-0dd6-4a60-91b0-4bc5c0845550"
+                "operationMetadataId": "e0000000-0046-4000-8000-000000000046"
               },
               "type": "Compose",
               "inputs": "@if(not(empty(coalesce(triggerBody()?['status'], ''))), concat('lecturerStatus eq ''', replace(triggerBody()?['status'], '''', ''''''), ''''), '')",
@@ -96,7 +96,7 @@
                 ]
               },
               "metadata": {
-                "operationMetadataId": "bde0f30d-868a-41aa-af9b-72bb7aabb5bf"
+                "operationMetadataId": "e0000000-0047-4000-8000-000000000047"
               },
               "type": "OpenApiConnection",
               "inputs": {
@@ -121,7 +121,7 @@
                 ]
               },
               "metadata": {
-                "operationMetadataId": "3f07064b-b3fb-4a03-bca1-9567b8c8c353"
+                "operationMetadataId": "e0000000-0048-4000-8000-000000000048"
               },
               "type": "Query",
               "inputs": {
@@ -137,7 +137,7 @@
                 ]
               },
               "metadata": {
-                "operationMetadataId": "83dc045e-1fbb-435d-bebf-a11d28c5a8d4"
+                "operationMetadataId": "e0000000-0049-4000-8000-000000000049"
               },
               "type": "Compose",
               "inputs": "@if(not(empty(coalesce(triggerBody()?['search'], ''))), body('Filter_By_Search'), body('Get_Lecturers')?['value'])",
@@ -150,7 +150,7 @@
                 ]
               },
               "metadata": {
-                "operationMetadataId": "c13fdaf5-4427-4ea7-b41f-0eed5c0ed1b1"
+                "operationMetadataId": "e0000000-0050-4000-8000-000000000050"
               },
               "type": "Select",
               "inputs": {
@@ -191,7 +191,7 @@
                 ]
               },
               "metadata": {
-                "operationMetadataId": "72f0c514-50b1-480d-b289-0fe29155b36b"
+                "operationMetadataId": "e0000000-0051-4000-8000-000000000051"
               },
               "type": "Response",
               "inputs": {
@@ -207,7 +207,7 @@
           },
           "runAfter": {},
           "metadata": {
-            "operationMetadataId": "1121b83c-7874-4fe2-9a96-f1363f37407f"
+            "operationMetadataId": "e0000000-0052-4000-8000-000000000052"
           },
           "type": "Scope"
         },
@@ -218,7 +218,7 @@
                 "Send_error_notification": {
                   "runAfter": {},
                   "metadata": {
-                    "operationMetadataId": "11c74c00-31ef-49bf-b6f8-c3fbc6cae557"
+                    "operationMetadataId": "e0000000-0053-4000-8000-000000000053"
                   },
                   "type": "OpenApiConnection",
                   "inputs": {
@@ -228,9 +228,9 @@
                       "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
                     },
                     "parameters": {
-                      "emailMessage/To": "@parameters('Flow Error Emails (smkb_pvch_FlowErrorEmails)')",
-                      "emailMessage/Subject": "@concat('(', toUpper(parameters('Environment Name (smkb_pvch_EnvironmentName)')), ') [ERROR] smkb_pvch_ManagerGetLecturers failed')",
-                      "emailMessage/Body": "@concat('<p><strong>smkb_pvch_ManagerGetLecturers</strong> failed in <strong>', parameters('Environment Name (smkb_pvch_EnvironmentName)'), '</strong>.</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/To": "@parameters('Flow Error Emails (smkb_sol_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('Environment Name (smkb_sol_EnvironmentName)')), ') [ERROR] smkb_sol_ManagerGetLecturers failed')",
+                      "emailMessage/Body": "@concat('<p><strong>smkb_sol_ManagerGetLecturers</strong> failed in <strong>', parameters('Environment Name (smkb_sol_EnvironmentName)'), '</strong>.</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",
                       "emailMessage/From": "noreply@smkb.ac.il",
                       "emailMessage/Importance": "High"
                     },
@@ -239,9 +239,9 @@
                 }
               },
               "runAfter": {},
-              "expression": "@not(empty(trim(parameters('Flow Error Emails (smkb_pvch_FlowErrorEmails)'))))",
+              "expression": "@not(empty(trim(parameters('Flow Error Emails (smkb_sol_FlowErrorEmails)'))))",
               "metadata": {
-                "operationMetadataId": "feb258ee-2c67-428b-8528-9fecbd435c64"
+                "operationMetadataId": "e0000000-0054-4000-8000-000000000054"
               },
               "type": "If"
             },
@@ -254,7 +254,7 @@
                 ]
               },
               "metadata": {
-                "operationMetadataId": "7384d7dd-9bee-4ec3-ac81-5d173e6707fe"
+                "operationMetadataId": "e0000000-0055-4000-8000-000000000055"
               },
               "type": "Response",
               "inputs": {
@@ -276,7 +276,7 @@
             ]
           },
           "metadata": {
-            "operationMetadataId": "1622a1cd-02ca-4073-9ade-7195447d90b6"
+            "operationMetadataId": "e0000000-0056-4000-8000-000000000056"
           },
           "type": "Scope",
           "description": "Error handler — runs ONLY on unexpected failures in Main_Flow."

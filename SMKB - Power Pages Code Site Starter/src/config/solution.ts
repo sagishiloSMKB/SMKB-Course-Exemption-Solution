@@ -25,7 +25,7 @@ export interface LanguageDef {
 
 export interface SolutionConfig {
   /**
-   * Solution short prefix, lowercase, no underscore — e.g. 'pvch'. It is the middle
+   * Solution short prefix, lowercase, no underscore — e.g. 'evt'. It is the middle
    * segment of every component's schema name (smkb_<prefix>_<PascalName>), and drives
    * sessionStorage keys and the site name (uppercased) — see POWER_PAGES_SITE_NAME.
    */
@@ -33,7 +33,7 @@ export interface SolutionConfig {
   /**
    * Human site name WITHOUT the prefix — e.g. 'Lecturer Portal'. The full Power
    * Pages site name is derived as `<PREFIX> - <siteName>` (see POWER_PAGES_SITE_NAME,
-   * e.g. 'PVCH - Lecturer Portal') and MUST be mirrored into `siteName` in
+   * e.g. 'EVT - Registration Portal') and MUST be mirrored into `siteName` in
    * powerpages.config.json — /ppcs-provision-site syncs it and /ppcs-deploy verifies
    * it. Keep it short and ASCII: it becomes the Dataverse site (adx_website) name.
    */
@@ -78,7 +78,7 @@ export const SESSION_STORAGE_KEY = `smkb-${SOLUTION.prefix}-auth`
 
 /**
  * Canonical Power Pages site name — the uppercased publisher prefix, then the
- * site name, e.g. 'PVCH - Lecturer Portal'. Every component this starter creates
+ * site name, e.g. 'EVT - Registration Portal'. Every component this starter creates
  * is namespaced to its solution through the prefix; the site (adx_website) carries
  * it in its own name. This value MUST be the `siteName` in powerpages.config.json
  * (PAC CLI reads that file directly): /ppcs-provision-site writes it there and

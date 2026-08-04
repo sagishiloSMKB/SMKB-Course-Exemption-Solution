@@ -88,7 +88,7 @@ Fill in `src/config/solution.ts` — the central per-solution identity file. It 
 
 ```typescript
 export const SOLUTION: SolutionConfig = {
-  prefix: 'pvch',                 // Dataverse publisher prefix (lowercase)
+  prefix: 'evt',                 // Dataverse publisher prefix (lowercase)
   siteName: 'Lecturer Portal',    // human site name, WITHOUT the prefix
   appName: { he: '…', en: '…' },  // shown in the app header
   documentTitle: '…',             // browser tab title
@@ -97,9 +97,9 @@ export const SOLUTION: SolutionConfig = {
 }
 ```
 
-**Site-name convention:** the Power Pages site is named `<PREFIX> - <siteName>` — here **`PVCH - Lecturer Portal`** — so every site is namespaced to its solution. You do **not** hand-edit the `siteName` in `powerpages.config.json`: `/ppcs-provision-site` (Step 5 below) derives `` `${prefix.toUpperCase()} - ${siteName}` `` from `solution.ts` and writes it into the config for you (replacing the `MY-SITE-NAME` placeholder). Provisioning without the skill? Set `powerpages.config.json`'s `siteName` to that same string by hand.
+**Site-name convention:** the Power Pages site is named `<PREFIX> - <siteName>` — here **`EVT - Registration Portal`** — so every site is namespaced to its solution. You do **not** hand-edit the `siteName` in `powerpages.config.json`: `/ppcs-provision-site` (Step 5 below) derives `` `${prefix.toUpperCase()} - ${siteName}` `` from `solution.ts` and writes it into the config for you (replacing the `MY-SITE-NAME` placeholder). Provisioning without the skill? Set `powerpages.config.json`'s `siteName` to that same string by hand.
 
-> ⚠️ **Power Pages appends a URL slug to your name during provisioning** (e.g. `"PVCH - Lecturer Portal"` → `"PVCH - Lecturer Portal - pvch-lecturer-portal"`). You will verify and update `siteName` to the exact provisioned name in Step 6. If `siteName` does not match exactly, subsequent `npm run deploy` calls will create a new orphan site instead of updating the correct one.
+> ⚠️ **Power Pages appends a URL slug to your name during provisioning** (e.g. `"EVT - Registration Portal"` → `"EVT - Lecturer Portal - evt-lecturer-portal"`). You will verify and update `siteName` to the exact provisioned name in Step 6. If `siteName` does not match exactly, subsequent `npm run deploy` calls will create a new orphan site instead of updating the correct one.
 
 > All new sites default to the **Enhanced Data Model**. This starter is designed for Enhanced Data Model only.
 

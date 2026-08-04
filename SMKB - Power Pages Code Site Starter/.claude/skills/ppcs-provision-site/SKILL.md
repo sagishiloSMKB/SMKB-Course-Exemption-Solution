@@ -42,7 +42,7 @@ For detailed recovery procedures, see [provision-reference.md](provision-referen
    name in `powerpages.config.json`; the next step derives it.)
 
 3. **Site name convention — derive and sync.** The Power Pages site name must be
-   `<PREFIX> - <siteName>` (uppercased prefix), e.g. `PVCH - Lecturer Portal`, so
+   `<PREFIX> - <siteName>` (uppercased prefix), e.g. `EVT - Registration Portal`, so
    every site created from this starter is namespaced to its solution. Read
    `SOLUTION.prefix` and `SOLUTION.siteName` from `src/config/solution.ts`, compute
    `<PREFIX.toUpperCase()> - <siteName>`, and set that exact string as `siteName`
@@ -145,8 +145,8 @@ For detailed recovery procedures, see [provision-reference.md](provision-referen
     (Replace `<siteName>` with the actual directory name inside `.powerpages-site/`.)
 
 14. **siteName sync** — Re-read `pac pages list -v`. Power Pages often appends a
-    URL slug to the name (e.g. "PVCH - Lecturer Portal" → "PVCH - Lecturer Portal -
-    pvch-lecturer-portal"). If the friendly name shown differs from `siteName` in
+    URL slug to the name (e.g. "EVT - Registration Portal" → "EVT - Registration Portal -
+    evt-registration-portal"). If the friendly name shown differs from `siteName` in
     `powerpages.config.json`, update the config file to match it exactly (PAC CLI
     upserts by this name — a mismatch creates an orphan site). The base name still
     begins with `<PREFIX> - ` from step 3; only the appended slug is new.

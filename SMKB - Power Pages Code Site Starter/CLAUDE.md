@@ -68,15 +68,15 @@ The router already has a catch-all `/:pathMatch(.*)*` route → `NotFoundView`; 
 
 Fill this file **first** on any new project — it is the single source for per-solution identity:
 
-- `SOLUTION.prefix` — Dataverse publisher prefix (lowercase, no underscore, e.g. `pvch`); also derives the exported `SESSION_STORAGE_KEY` and the site name (below)
-- `SOLUTION.siteName` — the human site name **without** the prefix (e.g. `Lecturer Portal`)
+- `SOLUTION.prefix` — Dataverse publisher prefix (lowercase, no underscore, e.g. `evt`); also derives the exported `SESSION_STORAGE_KEY` and the site name (below)
+- `SOLUTION.siteName` — the human site name **without** the prefix (e.g. `Registration Portal`)
 - `SOLUTION.appName` (`{ he, en }`), `documentTitle`, `defaultLanguage`, `languages[]`
 
 `App.vue` and `main.ts` read from it (header app name, `<html lang>`/`dir` set before mount, `document.title` override). The shipped values are the literal sentinel `CHANGEME` — `/ppcs-provision-site` and `/ppcs-deploy` grep for it and **halt** while any `CHANGEME` remains. Never hardcode these values elsewhere.
 
 ### Naming convention — `<PREFIX> - <Site Name>`
 
-Every site created from this starter is namespaced to its solution by the publisher prefix. The exported `POWER_PAGES_SITE_NAME` derives the canonical site name as `` `${SOLUTION.prefix.toUpperCase()} - ${SOLUTION.siteName}` `` → e.g. **`PVCH - Lecturer Portal`**. That exact string must be the `siteName` in `powerpages.config.json` (PAC CLI reads that file directly to create/find the `adx_website` record): `/ppcs-provision-site` step 3 derives and writes it, and `/ppcs-deploy` verifies `siteName` still starts with `<PREFIX> - `. Do not hand-set the site name in `powerpages.config.json` — set `prefix` + `siteName` in `solution.ts` and let the skill sync it. (Power Pages may append a URL slug during provisioning, e.g. `PVCH - Lecturer Portal - pvch-lecturer-portal`; the base name still leads with the prefix.)
+Every site created from this starter is namespaced to its solution by the publisher prefix. The exported `POWER_PAGES_SITE_NAME` derives the canonical site name as `` `${SOLUTION.prefix.toUpperCase()} - ${SOLUTION.siteName}` `` → e.g. **`EVT - Registration Portal`**. That exact string must be the `siteName` in `powerpages.config.json` (PAC CLI reads that file directly to create/find the `adx_website` record): `/ppcs-provision-site` step 3 derives and writes it, and `/ppcs-deploy` verifies `siteName` still starts with `<PREFIX> - `. Do not hand-set the site name in `powerpages.config.json` — set `prefix` + `siteName` in `solution.ts` and let the skill sync it. (Power Pages may append a URL slug during provisioning, e.g. `EVT - Registration Portal - evt-registration-portal`; the base name still leads with the prefix.)
 
 Custom Dataverse components a solution adds later (tables, columns, flows) follow the kit-wide convention `smkb_<prefix>_<PascalName>` — the publisher prefix `smkb_` plus this solution's short prefix, e.g. `smkb_evt_Registration` (see the root `CLAUDE.md` → Critical Rule 3; `SOLUTION.prefix` here is that short-prefix segment). **Exception:** the 16 shipped security site settings keep their platform-reserved names (`HTTP/Content-Security-Policy`, etc.) — recognized by Power Pages by exact name; never prefix them.
 

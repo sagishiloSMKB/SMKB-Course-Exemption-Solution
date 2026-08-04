@@ -158,11 +158,11 @@ expect('no-unused-trigger-inputs', 'good: not a Power Pages trigger',
 // ── Global rules ──
 // workflow-json-matches-customizations
 expectGlobal('workflow-json-matches-customizations', 'bad: flow not referenced',
-  { flowFiles: ['pvch_x-GUID.json'], customizationsXml: '<Workflows></Workflows>' }, 1)
+  { flowFiles: ['sol_x-GUID.json'], customizationsXml: '<Workflows></Workflows>' }, 1)
 expectGlobal('workflow-json-matches-customizations', 'bad: stale reference',
-  { flowFiles: [], customizationsXml: '<JsonFileName>/Workflows/pvch_y-GUID.json</JsonFileName>' }, 1)
+  { flowFiles: [], customizationsXml: '<JsonFileName>/Workflows/sol_y-GUID.json</JsonFileName>' }, 1)
 expectGlobal('workflow-json-matches-customizations', 'good: referenced + exists',
-  { flowFiles: ['pvch_x-GUID.json'], customizationsXml: '<JsonFileName>/Workflows/pvch_x-GUID.json</JsonFileName>' }, 0)
+  { flowFiles: ['sol_x-GUID.json'], customizationsXml: '<JsonFileName>/Workflows/sol_x-GUID.json</JsonFileName>' }, 0)
 
 // env-var-rootcomponents-complete
 expectGlobal('env-var-rootcomponents-complete', 'bad: missing RootComponent',
@@ -178,9 +178,9 @@ expectGlobal('xml-no-placeholders', 'good: clean xml',
 
 // xml-ascii-hyphen-only
 expectGlobal('xml-ascii-hyphen-only', 'bad: en-dash in xml',
-  { xmlFiles: [{ rel: 's.xml', raw: '<n>PVCH – Thing</n>' }] }, 1)
+  { xmlFiles: [{ rel: 's.xml', raw: '<n>SOL – Thing</n>' }] }, 1)
 expectGlobal('xml-ascii-hyphen-only', 'good: ascii hyphen',
-  { xmlFiles: [{ rel: 's.xml', raw: '<n>PVCH - Thing</n>' }] }, 0)
+  { xmlFiles: [{ rel: 's.xml', raw: '<n>SOL - Thing</n>' }] }, 0)
 
 // ── Coverage ──────────────────────────────────────────────────────────────────
 // The bad-input/good-input convention above is only worth anything if it is enforced:
