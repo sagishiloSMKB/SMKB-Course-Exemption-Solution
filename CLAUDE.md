@@ -103,8 +103,8 @@ deployment of placeholder or colliding components to the shared SMKB Power Platf
 ## Project Overview
 
 Five sub-starter folders, plus the `SMKB - Component Library` (reusable UI recipes — e.g. the OTP Auth
-Screen; the `@smkbacil/design-ui` package itself is consumed from the npm registry via `.npmrc`, not built
-here) and the `onboarding SMKB Apps Development` learning app:
+Screen; the `@smkbacil/design-ui` package itself is vendored into each consuming starter as a committed
+tarball, not built here) and the `onboarding SMKB Apps Development` learning app:
 
 - `SMKB - Dataverse Tables Starter` — custom table schemas (XML solution).
 - `SMKB - Environmental Variables Starter` — environment variable definitions (XML solution).

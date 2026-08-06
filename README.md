@@ -83,7 +83,7 @@ the config-drift and doc-boundary checks.
 Continuous integration is owned at the root too: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 runs flow-lint plus each code app's lint & unit tests on every push to `main` and every PR. It
 auto-discovers the flow-lint checker and the SPA folders, so it keeps working after Init Project renames
-the starters; set the `NPM_TOKEN` repo secret so the private `@smkbacil` package installs. An optional
+the starters, and needs **no repository secrets** — the private `@smkbacil` package is vendored. An optional
 Solution Checker job is included commented-out.
 
 ### First time using this starter kit?
@@ -120,6 +120,6 @@ SMKB - Power Platform Solution Starter Kit/
 ├── SMKB - Power Apps Starter/                <- Code App SPA (README, CLAUDE.md, deploy.ps1, src/, power.config.json)
 ├── SMKB - Power Pages Code Site Starter/     <- Code Site SPA (CLAUDE.md, GETTING-STARTED.md, src/, .powerpages-site/, .claude/skills/)
 │
-├── SMKB - Component Library/                 <- Reusable UI recipes (e.g. OTP Auth Screen); @smkbacil/design-ui is an external npm package
+├── SMKB - Component Library/                 <- Reusable UI recipes (e.g. OTP Auth Screen); @smkbacil/design-ui is vendored per starter
 └── onboarding SMKB Apps Development/          <- Pre-init learning app (removed during Init Project)
 ```

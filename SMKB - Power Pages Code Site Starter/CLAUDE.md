@@ -136,7 +136,7 @@ The portal session cookie does not transfer to localhost, so `user.isAuthenticat
 > **Deployment target: SMKB Apps Dev only** (`https://org229c958d.crm4.dynamics.com/`).
 > Never deploy to another environment without an explicit user request. When asked to deploy elsewhere, raise a concern and ask for confirmation before proceeding.
 
-> **NPM_TOKEN prerequisite:** `.npmrc` resolves the `@smkbacil` scope with an `NPM_TOKEN` environment variable (npm read token). `npm install` / `npm ci` fails without it — set `$env:NPM_TOKEN = "npm_xxx"` locally; in CI it comes from the repo-level `NPM_TOKEN` secret.
+> **No npm credential required.** `@smkbacil/design-ui` is a **private** package, but it is **vendored**: the as-published tarball is committed under `vendor/` and resolved with a `file:` spec, so installs need **no credential** at all. A token is used only by the root `scripts/vendor-design-ui.ps1` when someone deliberately updates the library. Never re-add an `.npmrc` here or change the spec back to a version range: `scripts/check-template-guards.mjs` fails the build for exactly that.
 
 ### First deploy (new project)
 1. Fill in `src/config/solution.ts` — including `prefix` and `siteName`; the site is named `<PREFIX> - <Site Name>` and `/ppcs-provision-site` writes that into `powerpages.config.json` for you (the provision/deploy skills halt while any `CHANGEME` remains)
@@ -160,7 +160,7 @@ npm run deploy
 ```
 
 ### CI/CD (`.github/workflows/deploy.yml`)
-Auto-deploys to **SMKB Apps Dev** on push to `main`. The build job runs lint + test before building. The workflow uses `environment: development` for secret isolation — all variables and secrets must be set under the **`development` GitHub environment** (not as repo-level vars/secrets): **variable** `PP_ENVIRONMENT_URL` (`https://org229c958d.crm4.dynamics.com/`) and **secrets** `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`. One exception: `NPM_TOKEN` is a **repo-level** secret (needed by `npm ci` before any environment is selected).
+Auto-deploys to **SMKB Apps Dev** on push to `main`. The build job runs lint + test before building. The workflow uses `environment: development` for secret isolation — all variables and secrets must be set under the **`development` GitHub environment** (not as repo-level vars/secrets): **variable** `PP_ENVIRONMENT_URL` (`https://org229c958d.crm4.dynamics.com/`) and **secrets** `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`. No npm secret is needed — `@smkbacil/design-ui` installs from the committed `vendor/` tarball.
 
 ### Promoting to stage or production
 Code sites use a **two-track** deployment model — compiled SPA assets and site configuration move independently. Running a Power Platform Pipeline alone leaves the site with a 500 error (config arrives, assets don't). Always run `pac pages upload-code-site --rootPath .` against the target environment after the pipeline completes. See [docs/ALM-CODE-SITES.md](./docs/ALM-CODE-SITES.md) for the full workflow.

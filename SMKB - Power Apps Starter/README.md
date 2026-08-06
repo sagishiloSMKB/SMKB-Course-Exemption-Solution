@@ -25,13 +25,10 @@ The starter ships **Hebrew / RTL by default** (`lang="he" dir="rtl"`), matching 
 | Node.js | 20+ | `node --version` |
 | pnpm | 9+ | `pnpm --version` — install via `npm i -g pnpm` |
 | PAC CLI | Latest | `pac --version` — [download](https://aka.ms/PowerAppsCLI). Needed once for `pac code init`. |
-| SMKB npm registry token | — | `@smkbacil/design-ui` is private — see below |
+| npm credential | **not needed** | `@smkbacil/design-ui` is vendored — see below |
 
-**SMKB npm registry:** this starter already ships an `.npmrc` that points the `@smkbacil` scope at npm with `_authToken=${NPM_TOKEN}`. You only need to supply a **read token** via an environment variable — never commit the token:
-
-```powershell
-$env:NPM_TOKEN = "npm_xxx"   # a token with read access to the @smkbacil scope
-```
+**No npm credential:** `@smkbacil/design-ui` is a **private** package, but it is **vendored**: the as-published tarball is committed under `vendor/` and resolved with a `file:` spec, so installs need **no credential** at all. A token is used only by the root `scripts/vendor-design-ui.ps1` when someone deliberately updates the library. `pnpm install` therefore works offline, on a
+brand-new machine, and in CI with no secret configured.
 
 The npm-based Power Apps CLI (`@microsoft/power-apps-cli`, used for flows) is installed automatically as a dev dependency and exposed via the `pnpm pa` script.
 
@@ -200,7 +197,7 @@ The deploy placeholder guard blocks on `sol_exampleflow`, so you can't accidenta
 ├── power.config.json         ← App ID, Environment ID, flow connection refs (pac code init + pnpm pa add-flow)
 ├── deploy.config.json        ← targetEnv + allowedEnvs + optional solutionName
 ├── deploy.ps1                ← placeholder guard + env guard + lint + test + build + pnpm pa push
-├── .npmrc                    ← @smkbacil private registry (auth via ${NPM_TOKEN})
+├── vendor/                   ← committed @smkbacil/design-ui tarball (no credential needed)
 ├── eslint.config.js          ← UI-only security rules (no fetch/XHR/WS, no v-html)
 ├── vitest.config.ts          ← unit-test runner (Node env)
 ├── vite.config.ts            ← Power Apps plugin + dev "../generated" → mock alias

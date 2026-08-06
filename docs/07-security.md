@@ -44,7 +44,7 @@ connections. Staff identity comes from the **unspoofable runtime context**, not 
   (`[FILL IN: smkb_<prefix>_… secret var names]`).
 - Flows read them **only** via the Dataverse unbound action `RetrieveEnvironmentVariableSecretValue` — never
   as `parameters()` (which would error) and **never returned to a client**.
-- No secret value is committed to the repo (the npm auth token is injected via `${NPM_TOKEN}`; `.npmrc`
+- No secret value is committed to the repo (the private `@smkbacil` package is vendored, so no npm
   references it, never stores it).
 - Any auth-secret columns (OTP, session token) are never selected into any client response.
 

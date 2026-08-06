@@ -2,6 +2,14 @@
 # _dist/ — PAC CLI solution zip staging (Tables, Flows, Env Vars starters)
 _dist/
 # dist/  — Vite/SPA build output (Power Apps, Power Pages starters)
+#
+# NOTE — this pattern is UNANCHORED, so it matches a dist/ directory at ANY depth. That is
+# intended for build output, but it is a trap for vendored packages: @smkbacil/design-ui ships
+# all of its code inside dist/, so committing an UNPACKED copy under vendor/ would commit only
+# package.json + README.md and silently drop every build artifact -- `git add` reports nothing,
+# CI installs a shell package, and the build dies later on missing exports.
+# That is one of the reasons the vendored package is a .tgz (not ignored) rather than a folder.
+# See scripts/vendor-design-ui.ps1.
 dist/
 *.zip
 

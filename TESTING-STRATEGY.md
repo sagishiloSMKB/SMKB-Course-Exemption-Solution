@@ -85,11 +85,11 @@ Plus **static/native** checks: **ESLint** (per app) and the **Power Platform Sol
 - **flow-lint (Layer 4):** zero-dependency Node ESM at `tools/flow-lint/` — `node lint.mjs` (+ `node test.mjs`
   self-test). Reads the flow JSON + solution XML; no Vue, no install.
 - **Local:** `pnpm test` / `npm test` per app runs the SPA specs; flow-lint runs the flow checks. No cloud,
-  and no `NPM_TOKEN` once the private `@smkbacil` package is cached locally.
+  and no npm credential at all - the private `@smkbacil` package is vendored per starter.
 - **Deploy gates:** each `deploy.ps1` / `npm run deploy` runs its checks first and aborts on failure (see
   [docs/08](docs/08-testing-and-quality-gates.md)).
 - **Pre-commit + CI:** the root `.githooks/pre-commit` runs ESLint + flow-lint on staged files;
-  `.github/workflows/ci.yml` runs flow-lint (no token) + per-app lint/test (needs `NPM_TOKEN`) + an optional
+  `.github/workflows/ci.yml` runs flow-lint + per-app lint/test - **no secrets required** - plus an optional
   `pac solution check` (needs `AZURE_*`). Layers 5–6 would run nightly/pre-deploy via a service principal.
 - **Flow integration auth/data:** SPN token to the Dataverse Web API, or call the Power Pages cloud-flow
   trigger endpoint with a test session; use a **disposable test user + records** in Dev and clean up after

@@ -105,10 +105,10 @@ UI-only.
 | **Provided assets** | [FILL IN: Figma, brand guide, logos, fonts, an existing site to match] |
 | **Accessibility / language** | [FILL IN: RTL? bilingual? WCAG target?] |
 
-> **Answer the design-system question now, not after CI goes red.** `@smkbacil/design-ui` is a **private**
-> package: a solution that ships none of it still forces a working `@smkbacil` token on every install, every
-> CI run and every new machine. If the answer is "its own identity", run **`/ppcs-remove-design-ui`** during
-> Phase 7 — it is an eight-step removal where two steps are easy to miss.
+> **Answer the design-system question early.** A solution that builds its own UI still carries every
+> design-ui wiring point and its vendored tarball for a library it never renders. If the answer is "its own
+> identity", run **`/ppcs-remove-design-ui`** during Phase 7 — a 13-step removal where two steps are easy to
+> miss. (It needs no credential: design-ui is vendored, so installs never authenticate.)
 
 ## 9. Security and compliance requirements
 

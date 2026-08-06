@@ -63,16 +63,19 @@ pac --version    # must show 1.44.x or later
 Install **"Power Platform Tools"** from the VS Code Marketplace.
 > ⚠️ Do NOT install both "Power Platform Tools" and "Power Platform Tools [PREVIEW]" at the same time — this causes known conflicts.
 
-#### NPM token for the `@smkbacil` scope
+#### No npm token needed
 
-`.npmrc` resolves `@smkbacil/design-ui` using an `NPM_TOKEN` environment variable (an npm **read** token). Without it, `npm install` / `npm ci` fails.
+`@smkbacil/design-ui` is private, but this starter does not fetch it from the registry: the
+as-published tarball is committed under `vendor/` and the dependency is a `file:` spec, so
+`npm install` / `npm ci` work offline and with **no authentication** — locally and in CI. No
+repo-level secret is required.
+
+To update the library (the only step that needs a token), run the root script from the repo root:
 
 ```powershell
-$env:NPM_TOKEN = "npm_xxx"   # current session
-# Or persist it: [Environment]::SetEnvironmentVariable("NPM_TOKEN", "npm_xxx", "User")
+powershell -ExecutionPolicy Bypass -File scripts/vendor-design-ui.ps1 -Check       # audit, no token
+powershell -ExecutionPolicy Bypass -File scripts/vendor-design-ui.ps1 -Version 0.17.0
 ```
-
-> For CI/CD, add `NPM_TOKEN` as a **repo-level** GitHub secret — the workflow's build job needs it for `npm ci`.
 
 #### Unblock JavaScript uploads in Dataverse (once per environment)
 

@@ -116,14 +116,11 @@ Required GitHub environment secrets/variables per environment:
 - `PP_ENVIRONMENT_URL_PROD` (variable) — Prod org URL
 - Shared secrets: `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`
   (use env-specific service principals if different orgs have different AAD tenants)
-- `NPM_TOKEN` (repo-level secret) — required by `.npmrc` for `npm ci`; an npm
-  token with read access to the private `@smkbacil` scope. Without it the
-  install step fails with "Failed to replace env in config". Expose it to any
-  job that runs `npm ci`/`npm install`:
-  ```yaml
-  env:
-    NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-  ```
+- **No npm secret.** `@smkbacil/design-ui` is vendored as a committed tarball and resolved with a
+  `file:` spec, so `npm ci` authenticates to nothing — in this repo, a fork, or any target
+  environment's workflow. Do not add an `NPM_TOKEN` secret; nothing reads it. (Earlier versions of
+  this starter did require one, and every consuming repo went red whenever the org-wide token
+  expired. That is the failure vendoring removed.)
 
 Note: `pac pages upload-code-site` (PAC CLI 2.8.1) supports only `--rootPath`,
 `--compiledPath`, and `--siteName` — there is no `--deploymentProfile` or

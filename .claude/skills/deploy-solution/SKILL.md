@@ -24,7 +24,7 @@ after each starter. All deploys target **SMKB-Apps-Dev only**; Stage/Prod go thr
 ## Steps
 
 1. Run `/pre-deploy-verify` first (config drift + doc boundaries + placeholder guards). Do not deploy if it fails.
-1b. **Get the deploy authorised — once** (Init Project H7 at Phase 8.2). This targets the shared
+1b. **Get the deploy authorised — once** (Init Project H5 at Phase 8.2). This targets the shared
    SMKB-Apps-Dev environment, so confirm the developer wants it and that `pac auth list` shows the Dev
    profile active. After that single go-ahead, work through every starter below **without asking again** —
    stop only for the portal handoffs, which the developer must physically perform.

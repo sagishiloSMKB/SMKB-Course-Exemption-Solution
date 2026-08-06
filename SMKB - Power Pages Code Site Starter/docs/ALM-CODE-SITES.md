@@ -303,9 +303,9 @@ are the GitHub environment name and the `PP_ENVIRONMENT_URL` variable value:
 #   secrets.AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID
 ```
 
-> **NPM_TOKEN:** the build job's `npm ci` needs the repo-level `NPM_TOKEN` secret
-> (npm read token for the `@smkbacil` scope). If the target environment's deploy runs
-> in a separate repo or fork, set `NPM_TOKEN` there too.
+> **No npm secret:** `@smkbacil/design-ui` is vendored as a committed tarball, so the
+> build job's `npm ci` needs no credential — in this repo, a fork, or any target
+> environment. Update the library with the root `scripts/vendor-design-ui.ps1`.
 
 ---
 

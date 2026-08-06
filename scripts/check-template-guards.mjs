@@ -120,6 +120,61 @@ for (const rule of GUARD_RULES) {
   }
 }
 
+// ── No consumer may depend on the private registry ────────────────────────────
+// The generated solution must install and build with NO credential. @smkbacil/design-ui is a
+// PRIVATE package, so a version spec ("^0.16.1") makes every install -- local, CI, every new
+// machine, forever -- depend on a live NPM_TOKEN. One expired org-wide token then turns every
+// consuming repo red at once, even though the DEPLOYED site never touches the token (the library
+// is compiled into assets/*.js at build time).
+//
+// So the invariant is inverted from the obvious one: rather than checking that a token works, we
+// check that no token is NEEDED. Every @smkbacil dependency must be a `file:` spec pointing at a
+// committed tarball that actually exists. Vendor or re-vendor with scripts/vendor-design-ui.ps1
+// (the one place the token is used, on a developer machine only).
+const PRIVATE_SCOPE = '@smkbacil/'
+function collectPackageJsons(dir, out = []) {
+  let entries = []
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return out }
+  for (const e of entries) {
+    if (e.name === 'node_modules' || e.name === 'dist' || e.name === '_dist' || e.name === '.git') continue
+    const abs = path.join(dir, e.name)
+    if (e.isDirectory()) collectPackageJsons(abs, out)
+    else if (e.name === 'package.json') out.push(abs)
+  }
+  return out
+}
+
+for (const abs of collectPackageJsons(repoRoot)) {
+  const rel = path.relative(repoRoot, abs).replace(/\\/g, '/')
+  let pkg
+  try { pkg = JSON.parse(fs.readFileSync(abs, 'utf8')) } catch { continue }
+  for (const field of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+    for (const [name, spec] of Object.entries(pkg[field] ?? {})) {
+      if (!name.startsWith(PRIVATE_SCOPE)) continue
+      if (typeof spec !== 'string') continue
+      if (!spec.startsWith('file:')) {
+        errors.push(
+          `${rel}  ${field}.${name} is "${spec}" - a registry spec for a PRIVATE package` +
+          `\n      effect: every install (local, CI, new machine) needs a live NPM_TOKEN` +
+          `\n      fix:    powershell -File scripts/vendor-design-ui.ps1 -Version <x.y.z>`
+        )
+        continue
+      }
+      // A file: spec pointing at a missing tarball fails at install time with a confusing
+      // error, so catch it here where the message can say what actually happened.
+      const target = path.resolve(path.dirname(abs), spec.slice('file:'.length))
+      if (!fs.existsSync(target)) {
+        errors.push(
+          `${rel}  ${field}.${name} points at a tarball that does not exist` +
+          `\n      missing: ${path.relative(repoRoot, target).replace(/\\/g, '/')}` +
+          `\n      cause:   it was never committed (check .gitignore) or the version changed` +
+          `\n      fix:     powershell -File scripts/vendor-design-ui.ps1`
+        )
+      }
+    }
+  }
+}
+
 // ── ASCII-only: every .ps1, and the solution XML the kit ships ────────────────
 const ASCII_TARGETS = []
 function collect(dir, test) {

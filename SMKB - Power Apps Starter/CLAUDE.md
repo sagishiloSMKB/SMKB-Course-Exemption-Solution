@@ -13,7 +13,7 @@ A **flow-based (UI-only)** Power Apps Code App starter: Vue 3 + Vite + TypeScrip
 ## Development Commands
 
 ```powershell
-pnpm install          # Install deps. Needs $env:NPM_TOKEN (read token for @smkbacil scope) once.
+pnpm install          # Install deps. No credential needed - design-ui is vendored under vendor/.
 pnpm dev              # Dev server — "../generated" barrel is aliased to an in-memory mock automatically
 pnpm build            # vue-tsc type check + Vite build → dist/
 pnpm lint             # ESLint — bans fetch/XHR/WebSocket & v-html; no stray console.log
@@ -49,7 +49,7 @@ Call shape is always: **`generated Service.Run(input)` → `unwrap<T>()` → cle
 ### Config files
 - `power.config.json` — PAC config (app ID, environment ID, flow connection references). Populated by `pac code init` + `pnpm pa add-flow`.
 - `deploy.config.json` — `targetEnv` (required), `allowedEnvs` (required, ships empty → deploy blocked), `solutionName` (optional).
-- `.npmrc` — points `@smkbacil` scope at npm with `_authToken=${NPM_TOKEN}`. Token supplied via env var, never committed.
+- `vendor/` — the committed `@smkbacil/design-ui` tarball. The dependency is a `file:` spec, so installs need no credential. Update it with the root `scripts/vendor-design-ui.ps1` (the only step that uses a token).
 
 ---
 
@@ -83,7 +83,7 @@ Also set `allowedEnvs` in `deploy.config.json` (it ships empty and blocks deploy
 
 ## First-Time Setup Order
 
-1. `$env:NPM_TOKEN = "npm_xxx"` then `pnpm install`
+1. `pnpm install` (no credential needed)
 2. Delete `power.config.json`, then:
    ```powershell
    pac code init --environment "https://your-org.crm.dynamics.com/" --displayName "Your App Name"

@@ -109,11 +109,9 @@ see [alm-reference.md](alm-reference.md).
    `src/modules/otp-auth/otpFlows.ts` (`createOtp`, `checkOtp`,
    `getPortalConfig`) as well.
 
-10. **Target-environment CI needs `NPM_TOKEN`.** The `.npmrc` requires the
-    `NPM_TOKEN` env var (npm token with read access to the `@smkbacil` scope)
-    or `npm ci` fails with "Failed to replace env in config". Set it as a
-    repo-level GitHub secret and expose it to the target environment's
-    workflow job.
+10. **Target-environment CI needs no npm secret.** `@smkbacil/design-ui` is
+    vendored as a committed tarball, so `npm ci` authenticates to nothing --
+    in this repo, a fork, or any target environment's workflow.
 
 11. **Restore Dev auth.**
     ```

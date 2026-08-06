@@ -8,8 +8,10 @@ name: CI
 # code-app (SPA) folders, so it keeps working after Init Project renames the starters. Jobs skip
 # gracefully when their target isn't present (e.g. a starter that wasn't activated).
 #
-# `NPM_TOKEN` (a read token for the private @smkbacil scope) must be set as a repo secret for the SPA
-# installs to resolve @smkbacil/design-ui.
+# NO SECRETS ARE REQUIRED. The private @smkbacil/design-ui package is vendored as a committed tarball
+# and resolved with a `file:` spec, so every install here works with no credential. The token is used
+# only on a developer machine, by scripts/vendor-design-ui.ps1, when the library is deliberately
+# updated. template-guards enforces that invariant on every push.
 
 on:
   push:
@@ -79,7 +81,7 @@ jobs:
               onboarding*|node_modules|.*) continue;;
               # A folder still named "SMKB - <X> Starter" is a NON-ACTIVATED starter: Init Project
               # renames every activated one, and Critical Rule 1 requires the rest to be left
-              # untouched. Gating CI on a pristine template spends a job (and an NPM_TOKEN install)
+              # untouched. Gating CI on a pristine template spends a job
               # on code that will never be deployed, and shows a red X for a starter the solution
               # is required not to touch.
               "SMKB - "*" Starter") echo "Skipping non-activated starter: $d" >&2; continue;;
@@ -105,48 +107,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      # Diagnose the credential BEFORE installing. An `npm error 404 @smkbacil/design-ui` names
-      # the wrong culprit: it reads as a missing package, and looks identical whether the secret
-      # is absent or merely expired. That ambiguity cost a real initialization a wrong diagnosis.
-      # Skipped entirely when the app declares no @smkbacil dependency, so a solution that uses
-      # none is never gated on a token it does not need.
-      - name: Check @smkbacil credential
-        working-directory: ${{ matrix.app }}
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if ! grep -q '"@smkbacil/' package.json; then
-            echo "No @smkbacil dependency in this app - skipping the credential check."
-            exit 0
-          fi
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "::error::NPM_TOKEN secret is not set on this repository. Add a token with read access to the @smkbacil scope (Settings -> Secrets -> Actions)."
-            exit 1
-          fi
-          # Use a THROWAWAY userconfig rather than writing ~/.npmrc: clobbering the runner's home
-          # config is fine on an ephemeral runner and destructive on a self-hosted one.
-          cfg="$(mktemp)"
-          printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$cfg"
-          if ! npm whoami --userconfig "$cfg" >/dev/null 2>&1; then
-            rm -f "$cfg"
-            echo "::error::NPM_TOKEN is set but the registry rejected it - expired or revoked. Mint a new one and update the secret in every consuming repo."
-            exit 1
-          fi
-          rm -f "$cfg"
-          echo "@smkbacil credential OK."
-
-      # The committed .npmrc reads ${NPM_TOKEN} for the private @smkbacil/design-ui scope.
+      # No credential step, and no NPM_TOKEN anywhere: @smkbacil/design-ui resolves from the
+      # committed tarball via its `file:` spec. template-guards fails the build if any consumer
+      # reverts to a registry spec, so this job cannot silently regain a token dependency.
+      #
+      # Use each app's OWN package manager. Running npm in a pnpm project silently ignores the
+      # committed pnpm-lock.yaml and resolves a different tree than the developer has.
       - name: Install
         working-directory: ${{ matrix.app }}
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm install --no-audit --no-fund
+        shell: bash
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            corepack enable
+            pnpm install --frozen-lockfile
+          else
+            npm ci --no-audit --no-fund
+          fi
       - name: Lint
         working-directory: ${{ matrix.app }}
-        run: npm run lint
+        shell: bash
+        run: |
+          if [ -f pnpm-lock.yaml ]; then pnpm run lint; else npm run lint; fi
       - name: Unit tests
         working-directory: ${{ matrix.app }}
-        run: npm test --if-present
+        shell: bash
+        run: |
+          if [ -f pnpm-lock.yaml ]; then pnpm test; else npm test --if-present; fi
 
   # OPTIONAL — Power Platform Solution Checker (Microsoft's static analysis, complements flow-lint).
   # Enable by setting the AZURE_* service-principal secrets and uncommenting. Export the solution

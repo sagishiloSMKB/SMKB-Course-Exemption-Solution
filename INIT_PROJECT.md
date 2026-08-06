@@ -87,21 +87,19 @@ The verification half is the point. Where a check is genuinely impossible from h
 
 | # | Your turn | Phase | Why it must be you | Agent verifies with |
 |---|---|---|---|---|
-| **H1** | Mint / refresh the `@smkbacil` npm token | 1.3 | credential | `npm whoami` — a warm `npm install` proves nothing |
-| **H2** | `pac auth create` / `pac auth select` | 1.2 | blocked in agent settings | `pac auth list` — the active `*` profile targets the Dev URL |
-| **H3** | Create the private GitHub repo | 3.3 | browser | `git ls-remote` succeeds and returns nothing (empty repo) |
-| **H4** | Add the `NPM_TOKEN` repo secret | 3.3 | credential + browser | the first CI run is green |
-| **H5** | `pnpm install` / `npm install` | 6.4 | blocked in agent settings | `node_modules` exists; `npm run lint` runs |
-| **H6** | **Restart Claude Code** after the folder renames | 6.3 | session-level | directory-scoped skills resolve to the new paths |
-| **H7** | Authorise the first deploy to shared Dev | 8.2 | the deploy gate | — this is the approval itself |
-| **H8** | `pac code init` — create the Power App record | 8.6 | must run locally before the first push | `power.config.json` exists (`appId` null is expected) |
-| **H9** | Set environment-variable **values** in the Maker portal | 8.4 | portal-only data entry | agent lists every definition and confirms each with you |
-| **H10** | Confirm flow connection references and **turn each flow on** | 8.5 | portal-only | flows import **disabled** — agent re-checks published state |
-| **H11** | Power Pages provisioning / reactivation + typing the web URL slug | 8.7 | browser | `pac pages list` shows the site; slug matches `powerPages.webUrlSlug` |
-| **H12** | **Convert the site to Production** | 8.7 | admin role + portal | `pac pages list -v` no longer reports `Trial` |
-| **H13** | Run the Power Platform Pipeline for Stage / Prod | 9 | portal-only by policy | **cannot be verified from here** — the agent lists what to check in the target |
-| **H14** | Review the drafted `docs/` | 10 | business intent | — |
-| **H15** | Approve the final commit and push | 11 | approval | `git status` reviewed before staging |
+| **H1** | `pac auth create` / `pac auth select` | 1.2 | blocked in agent settings | `pac auth list` — the active `*` profile targets the Dev URL |
+| **H2** | Create the private GitHub repo | 3.3 | browser | `git ls-remote` succeeds and returns nothing (empty repo) |
+| **H3** | `pnpm install` / `npm install` | 6.4 | blocked in agent settings | `node_modules` exists; `npm run lint` runs |
+| **H4** | **Restart Claude Code** after the folder renames | 6.3 | session-level | directory-scoped skills resolve to the new paths |
+| **H5** | Authorise the first deploy to shared Dev | 8.2 | the deploy gate | — this is the approval itself |
+| **H6** | `pac code init` — create the Power App record | 8.6 | must run locally before the first push | `power.config.json` exists (`appId` null is expected) |
+| **H7** | Set environment-variable **values** in the Maker portal | 8.4 | portal-only data entry | agent lists every definition and confirms each with you |
+| **H8** | Confirm flow connection references and **turn each flow on** | 8.5 | portal-only | flows import **disabled** — agent re-checks published state |
+| **H9** | Power Pages provisioning / reactivation + typing the web URL slug | 8.7 | browser | `pac pages list` shows the site; slug matches `powerPages.webUrlSlug` |
+| **H10** | **Convert the site to Production** | 8.7 | admin role + portal | `pac pages list -v` no longer reports `Trial` |
+| **H11** | Run the Power Platform Pipeline for Stage / Prod | 9 | portal-only by policy | **cannot be verified from here** — the agent lists what to check in the target |
+| **H12** | Review the drafted `docs/` | 10 | business intent | — |
+| **H13** | Approve the final commit and push | 11 | approval | `git status` reviewed before staging |
 
 **Everything not in that table is the agent's**: filling `solution.config.json`, running `apply-config.ps1` (identity, folder renames, doc pointers), writing `SOLUTION-SPEC.md`, authoring every table / flow / env var / screen, running the deploy scripts once authorised, running the verification gates, and drafting `docs/`.
 
@@ -145,7 +143,7 @@ The active profile (`*`) must target `https://org229c958d.crm4.dynamics.com/` (S
 
 > **Note for the agent:** run `pac auth list` using the **PowerShell tool** (not the Bash tool) — PAC CLI is a Windows executable and is only on the Windows PowerShell PATH. If it fails because PAC CLI is not installed, do not skip this — hand off to the developer and read the output they paste back.
 
-> **YOUR TURN — H2: fix the PAC profile** *(only if the active profile is wrong)*
+> **YOUR TURN — H1: fix the PAC profile** *(only if the active profile is wrong)*
 > (the agent cannot do this: `pac auth select` is blocked in agent settings)
 >  1. `pac auth list` — note the index of the profile targeting `https://org229c958d.crm4.dynamics.com/`
 >  2. `pac auth select --index <N>`
@@ -153,30 +151,24 @@ The active profile (`*`) must target `https://org229c958d.crm4.dynamics.com/` (S
 > **Then:** paste the new `pac auth list` output back.
 > **Agent verifies:** the `*` profile's URL is the Dev URL. Never run a deploy without this confirmed — with the wrong profile active, a deploy silently lands in the wrong environment.
 
-## 1.3 The npm credential
+## 1.3 No npm credential is needed
 
-Required if this solution ends up activating the Power Apps or Power Pages starter. Both resolve the private `@smkbacil/design-ui` package through `.npmrc` (`_authToken=${NPM_TOKEN}`), so `npm install` cannot succeed without a token holding read access to the `@smkbacil` scope.
+**Nothing in this flow requires an npm token.** The private `@smkbacil/design-ui` package is vendored
+into each starter as a committed tarball and resolved with a `file:` spec, so `npm install` / `pnpm
+install` work offline and with no authentication — locally, in CI, and on a brand-new machine.
 
-Verify the **credential**, not the variable:
+Confirm it if you want to:
 
 ```powershell
-npm whoami        # 401 => the token is expired or revoked, whether or not NPM_TOKEN is set
+powershell -ExecutionPolicy Bypass -File scripts/vendor-design-ui.ps1 -Check
 ```
 
-> **A successful `npm install` proves nothing about the credential.** The npm cache serves a warm
-> install indefinitely after the token dies, which is exactly how one initialization concluded twice
-> that the token was fine while CI — which has no cache — failed on every `@smkbacil` consumer.
-> `npm whoami` is the check.
-
-> **Sort this out now.** You will not know for certain which starters this solution activates until Phase 5 (it is derived from the specs), so the credential must be working before you need it at 6.4.
-
-> **YOUR TURN — H1: mint or refresh the token** *(only if `npm whoami` returns 401)*
-> (the agent cannot do this: it is a credential)
->  1. Mint a token with **read** access to the `@smkbacil` scope
->  2. `$env:NPM_TOKEN = "npm_xxx"`
->  3. It is an **org-wide** credential — if it had expired, every consuming repo was already failing, not just this one. Update it wherever it is stored.
-> **Then:** re-run `npm whoami`.
-> **Agent verifies:** `npm whoami` returns a username, not 401.
+> **Why it is built this way.** design-ui is compiled into `assets/*.js` at build time, so the deployed
+> site never fetches it — but with a version spec, *every* install would need a live token forever, and a
+> single expired org-wide credential would turn every consuming solution red at once. The token is now a
+> development-time concern only: it is used by `scripts/vendor-design-ui.ps1` when someone deliberately
+> updates the library, and nowhere else. `scripts/check-template-guards.mjs` fails the build if a
+> consumer ever reverts to a registry spec, so this cannot quietly regress.
 
 ---
 
@@ -240,26 +232,20 @@ Test-Path "onboarding SMKB Apps Development"     # Expected: False
 
 ## 3.3 Create the GitHub repository
 
-> **YOUR TURN — H3 + H4: create the repo and add the token secret**
-> (the agent cannot do this: it needs a browser, and the secret is a credential)
->
-> **H3 — the repository:**
->  1. Go to [github.com/SMKB-AC-IL](https://github.com/SMKB-AC-IL) → **New repository**
+> **YOUR TURN — H2: create the GitHub repository**
+> (the agent cannot do this: it needs a browser)
+>  1. Go to [github.com/SMKB-AC-IL](https://github.com/SMKB-AC-IL) -> **New repository**
 >  2. Name: the GitHub name the agent derived in Phase 2 (e.g. `SMKB-Events-Tickets-Solution`)
 >  3. Visibility: **Private**
 >  4. **Do NOT** add a README, .gitignore or license — the repo must be empty
 >  5. **Create repository**, then copy the HTTPS clone URL
 >
-> **H4 — the `NPM_TOKEN` secret, before the first push:**
->  6. **Settings → Secrets and variables → Actions → New repository secret**
->  7. Name `NPM_TOKEN`, value a token with read access to the `@smkbacil` scope
->
 > **Then:** paste the clone URL back.
-> **Agent verifies:** `git ls-remote <url>` succeeds and returns no refs (an empty repo), and the first CI run after 3.4 is green.
+> **Agent verifies:** `git ls-remote <url>` succeeds and returns no refs (an empty repo), and the first CI run after 3.4 is green. **No repository secrets are required** — CI needs no credential.
 
 > **GitHub repo names cannot contain spaces.** Type the name already-hyphenated. Pasting a folder-style name like `SMKB - Events Tickets - Solution` yields `SMKB---Events-Tickets-Solution` (triple hyphens), because GitHub silently converts each space.
 
-**Add `NPM_TOKEN` unconditionally**, even though activation is not decided until Phase 5. It is harmless if no starter ends up needing it — CI's credential pre-flight skips itself when no app declares an `@smkbacil` dependency. Adding it later means a red first push: every SPA job dies at `npm install` because `@smkbacil/design-ui` is genuinely private, and `npm error 404 @smkbacil/design-ui` names the *package*, not the credential, looking identical whether the secret is absent or merely expired.
+**No repository secrets to add.** Earlier versions of this flow required an `NPM_TOKEN` secret here, because the private `@smkbacil/design-ui` package was resolved from the registry at install time and CI went red on the very first push without it. The package is now vendored as a committed tarball, so CI authenticates to nothing. If you are looking at an older solution repo that still has the secret, it is harmless but no longer used.
 
 ## 3.4 Connect and push the baseline
 
@@ -306,14 +292,18 @@ Cover:
 - **Design** — the design system decision, provided assets, RTL/bilingual and accessibility needs.
 - **Constraints** — reviews it must pass, data classification, approval chains, retention obligations.
 
-> **Does this site use the SMKB design system, or its own visual identity? Ask now**, not after CI goes
-> red. The Code Site ships `@smkbacil/design-ui` (a **private** package) wired into `App.vue`,
-> `main.ts` and `composables/useFlowErrorToast.ts`. A solution that builds its own UI — a
-> like-for-like rebuild of an existing bespoke site, say — ships zero bytes of it, yet still forces a
-> working `@smkbacil` token on every `npm install`, every CI run and every new developer machine.
-> If the answer is "its own identity", run **`/ppcs-remove-design-ui`** during Phase 7; it is an
-> eight-step removal where two steps are easy to miss and the verification is the part everyone gets
-> wrong. Answering early turns that cleanup into a two-minute decision.
+> **Does this app or site use the SMKB design system, or its own visual identity? Ask now** — it is one
+> question with two clean answers, and the agent handles both:
+>
+> | Answer | What the agent does | Does the developer need anything? |
+> |---|---|---|
+> | **The SMKB design system** (the default) | Nothing. `@smkbacil/design-ui` is already **part of the project**: the package is committed under each starter's `vendor/` and resolved with a `file:` spec. It installs, builds and passes CI with **no credential**. | **No.** Not on this machine, not in CI, not in any deployed environment. |
+> | **Its own visual identity** | Runs **`/ppcs-remove-design-ui`** in Phase 7 and discards the library and *everything* wired to it — the dependency, the vendored tarball, the CSS imports, `createSmkb()`, the `smkb` build chunk, and the components that depend on it. | No. |
+>
+> The only time anyone needs an npm token is to pull a **newer version** of the library than the one
+> vendored here. That is a deliberate maintenance action, not part of building a solution — see
+> "Updating the design system" below. If a developer is ever *prompted* to authenticate during a
+> normal `npm install`, something has regressed: run `scripts/vendor-design-ui.ps1 -Check`.
 
 > **Rebuilding an existing solution? The deployed artifact is the specification — the repo is only
 > evidence for it.** Do not assume the default branch is what is live. On one rebuild `origin/main`
@@ -401,7 +391,7 @@ Cover:
 5. **Build sequence** — Critical Rule 4 order: Tables → Env Vars → Flows → Power Apps → Power Pages Code Site
 6. **Open questions** from `SOLUTION-SPEC.md` §11 that could change the shape of the build
 
-> **Power Apps — the app record must exist before the first deploy.** `pac code push` does NOT create app records; `pac code init` does, and it has no `--path` flag (run it from inside the folder). This is handoff **H8** at 8.6.
+> **Power Apps — the app record must exist before the first deploy.** `pac code push` does NOT create app records; `pac code init` does, and it has no `--path` flag (run it from inside the folder). This is handoff **H6** at 8.6.
 
 > **Cloud Flows — connection references** are shared, environment-level resources. Use the named SMKB connection-reference bank documented in the [Flows README](SMKB%20-%20Power%20Automate%20Flows%20Starter/README.md); only fall back to the export/unpack lookup (CLAUDE.md → "Connection References") if a needed connector is not already in the bank. Do NOT create a new connection reference per solution.
 
@@ -449,7 +439,7 @@ It deliberately leaves platform-assigned placeholders (app IDs, workflow GUIDs, 
 
 ## 6.3 Restart Claude Code
 
-> **YOUR TURN — H6: restart Claude Code**
+> **YOUR TURN — H4: restart Claude Code**
 > (the agent cannot do this: it is a session-level action)
 >  1. Restart Claude Code now that folders have been renamed.
 > **Then:** reopen and say "continue init".
@@ -461,7 +451,7 @@ This restart is survivable because `SOLUTION-SPEC.md` and the approved plan are 
 
 ## 6.4 Install dependencies
 
-> **YOUR TURN — H5: install the toolchains**
+> **YOUR TURN — H3: install the toolchains**
 > (the agent cannot do this: `install` is blocked in agent settings)
 >  1. For the Power Apps starter: `cd "SMKB - [Your App Name] - Power App"` then `pnpm install`
 >  2. For the Code Site: `cd "SMKB - [Your Site Name] - Power Pages Code Site"` then `npm install`
@@ -470,6 +460,8 @@ This restart is survivable because `SOLUTION-SPEC.md` and the approved plan are 
 > **Agent verifies:** `node_modules` exists in each, and `npm run lint` executes.
 
 Only activated starters with a `package.json` need this — skip Tables, Env Vars and Flows. The lint gate calls each starter's local ESLint, which needs `node_modules`.
+
+**No credential is required.** `@smkbacil/design-ui` resolves from the tarball committed under each starter's `vendor/`, so these installs work offline. If one fails asking for authentication, something has reverted to a registry spec — run `scripts/vendor-design-ui.ps1 -Check`.
 
 ---
 
@@ -500,7 +492,7 @@ Then, for each activated starter, its own `deploy.ps1` (or deploy flow) runs a p
 
 ## 8.2 Authorise the deploy
 
-> **YOUR TURN — H7: authorise the first deploy**
+> **YOUR TURN — H5: authorise the first deploy**
 > (this is a deploy to the shared SMKB-Apps-Dev environment)
 >  1. Confirm the plan is still what you want, and that `pac auth list` shows the Dev profile active.
 >  2. Say "deploy".
@@ -543,7 +535,7 @@ powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Dataverse Tab
 powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Environmental Variables\deploy.ps1"
 ```
 
-> **YOUR TURN — H9: set the environment-variable values**
+> **YOUR TURN — H7: set the environment-variable values**
 > (the agent cannot do this: portal-only data entry)
 >  1. **Power Apps Maker → Solutions → your solution → Environment Variables**
 >  2. For each variable: **Edit → Add current value**
@@ -558,7 +550,7 @@ powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Environmental
 powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Cloud Flows\deploy.ps1"
 ```
 
-> **YOUR TURN — H10: confirm connections and turn each flow on**
+> **YOUR TURN — H8: confirm connections and turn each flow on**
 > (the agent cannot do this: portal-only, and there is no `pac` verb to activate a flow)
 >  1. **Power Automate portal → Solutions → your solution → Cloud Flows**
 >  2. For each flow: **open → Edit → confirm the connection references → Save → Turn on**
@@ -569,7 +561,7 @@ powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Cloud Flows\d
 
 ## 8.6 Power Apps *(skip if not activated)*
 
-> **YOUR TURN — H8: create the app record** *(first time only)*
+> **YOUR TURN — H6: create the app record** *(first time only)*
 > (the agent cannot do this: it must run locally before the first push)
 >  1. `Push-Location ".\SMKB - [Component Name] - Power App"`
 >  2. Delete `power.config.json` first if it already exists
@@ -592,7 +584,7 @@ The Code Site provisions and deploys through its own skills — the agent drives
 
 1. **Provision (first time):** run **`/ppcs-provision-site`** — creates the site, runs the starter's `scripts/freshen-site-settings.ps1`, and applies the post-provision settings. Follow the [Getting Started guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/GETTING-STARTED.md).
 
-   > **YOUR TURN — H11: reactivate the site and type the web URL**
+   > **YOUR TURN — H9: reactivate the site and type the web URL**
    > (the agent cannot do this: browser, and the URL is typed by hand)
    >  1. In the maker portal, complete the site reactivation the skill pauses for.
    >  2. Type the web address the skill prints: `[prefix]-[kebab-site-name]-dev`.
@@ -607,7 +599,7 @@ The Code Site provisions and deploys through its own skills — the agent drives
 5. **Verify:** open the site URL in a browser; the Vue app should load.
 6. **Convert the site to Production — now, not later. MANDATORY.**
 
-   > **YOUR TURN — H12: convert the site to Production**
+   > **YOUR TURN — H10: convert the site to Production**
    > (the agent cannot do this: it needs an admin role in the Power Platform Admin Center)
    >  1. [Power Platform Admin Center](https://admin.powerplatform.microsoft.com) → **Manage → Power Pages**
    >  2. Select the site → **Convert to production**
@@ -661,7 +653,7 @@ Everything deployed above went to **SMKB-Apps-Dev only**. Stage and Production a
 - **Tables, Env Vars, Flows, Power Apps** travel in the solution — ensure their components are in it (env var `RootComponents`, flow `RootComponents`, the Code App's linked solution) and run the pipeline from the Maker portal.
 - **Power Pages Code Site** promotes on its own two-track model: run **`/ppcs-promote-to-env`** and follow the [Code Site ALM guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/ALM-CODE-SITES.md). Flow GUIDs are environment-specific, so re-register them (`/ppcs-register-flow`) in each target environment after promotion.
 
-> **YOUR TURN — H13: run the Pipeline**
+> **YOUR TURN — H11: run the Pipeline**
 > (the agent cannot do this: portal-only by policy — the kit's deploy scripts refuse any non-Dev URL)
 >  1. Maker portal → your solution → **Pipelines** → run the stage you want.
 > **Then:** say "done".
@@ -688,7 +680,7 @@ The kit ships a [`docs/`](docs/README.md) folder of solution-documentation **tem
 - Where `SOLUTION-SPEC.md` and the built solution disagree, that is a **finding** — surface it, don't paper over it.
 - The docs are **not** scanned by the deploy guards or `check-doc-boundaries.mjs`, so `[FILL IN]` placeholders never block a deploy — but a half-filled doc set is a review smell; complete them before promoting to Production.
 
-> **YOUR TURN — H14: review the drafted docs**
+> **YOUR TURN — H12: review the drafted docs**
 > (the agent cannot do this: business intent, retention decisions, approver identities)
 >  1. Read the drafted `docs/` and correct anything the agent got wrong or could not know.
 > **Then:** say "reviewed".
@@ -707,13 +699,46 @@ git commit -m "chore: activate starters and apply solution config for [Solution 
 git push
 ```
 
-> **YOUR TURN — H15: approve the commit**
+> **YOUR TURN — H13: approve the commit**
 > (the agent cannot do this: pushing is outward-facing, so it needs your explicit go-ahead)
 >  1. Review `git status` and the staged paths.
 >  2. Say "commit" / "push".
 > **Agent verifies:** it stages **specific paths** rather than `git add -A`, to avoid committing `.env`/credential files created during setup.
 
 This marks the boundary between "initialized from template" and "active development".
+
+---
+
+## Updating the design system (the only step that needs an npm token)
+
+Not part of Init Project. Do this when a solution needs a **newer** `@smkbacil/design-ui` than the one
+vendored in the repo — otherwise never.
+
+`@smkbacil/design-ui` is a private package, so fetching a new version needs a credential. Fetching is
+the *only* thing that does: once the tarball is committed, installs, CI and every deployed environment
+resolve it from disk.
+
+> **YOUR TURN — update the vendored library**
+> (the agent cannot do this: it needs an npm credential, which only a person can mint)
+>  1. Mint an npm token with **read** access to the `@smkbacil` scope.
+>  2. In a PowerShell terminal at the repo root:
+>     ```powershell
+>     $env:NPM_TOKEN = "<your token>"
+>     powershell -ExecutionPolicy Bypass -File scripts/vendor-design-ui.ps1 -Version <x.y.z>
+>     ```
+>  3. Commit the changed `vendor/*.tgz`, `package.json` and lockfiles **together**.
+> **Then:** paste the script output back.
+> **Agent verifies:** the script refuses to proceed unless the packed tarball's sha512 matches the
+> integrity the registry itself reports, so a corrupted or substituted download cannot land. Then
+> `scripts/vendor-design-ui.ps1 -Check` (no token needed) and a cold `npm ci` with no credential.
+
+Two things that will otherwise cost you an afternoon:
+
+- **`npm whoami` is the credential check — a successful `npm install` is not.** The npm/pnpm cache
+  serves a warm install indefinitely after a token dies. One initialization concluded *twice* that the
+  token was fine while CI, which has no cache, failed on every consumer.
+- **The token is org-wide.** If it has expired, every consuming repo was already failing, not just this
+  one. Mint once and update it wherever it is stored.
 
 ---
 

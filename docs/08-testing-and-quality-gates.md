@@ -73,7 +73,7 @@ Every direct deploy script also enforces the **SMKB-Apps-Dev-only** environment 
 Runs on every push to `main` and every PR:
 - **`flow-lint` job** — runs the flow-lint checker (no install needed).
 - **`spa-checks`** — for each code-app folder (auto-discovered): `install` → `lint` → `test`. Needs the
-  `NPM_TOKEN` repo secret (read token for the private `@smkbacil` scope) to install `@smkbacil/design-ui`.
+  no repository secrets - `@smkbacil/design-ui` installs from a committed `vendor/` tarball.
 - **`solution-check`** — Power Platform Solution Checker, shipped **commented-out**; enable once the
   `AZURE_*` service-principal secrets are set.
 

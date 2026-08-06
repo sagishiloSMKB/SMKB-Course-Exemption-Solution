@@ -1,12 +1,12 @@
 ---
 name: Power Pages Code Site — Remove the SMKB Design System
 description: >-
-  Removes @smkbacil/design-ui from a Code Site that builds its own UI, so the repo needs no
-  private-registry credential at all. Covers the five wiring points, the .npmrc / manualChunk /
-  optimizeDeps cleanup, and the cold-cache verification everyone gets wrong.
+  Removes @smkbacil/design-ui from a Code Site that builds its own UI, so the repo carries no
+  design-system code or vendored tarball it never renders. Covers the five wiring points, the
+  vendor / manualChunk / optimizeDeps cleanup, and the verification everyone gets wrong.
 when_to_use: >-
   User says "remove design-ui", "drop the design system", "we have our own UI/visual identity",
-  "get rid of NPM_TOKEN", or npm install fails on @smkbacil for a site with bespoke styling.
+  or a Code Site with bespoke styling still ships the SMKB component library.
 allowed-tools: Read Edit Write Grep Glob Bash(npm *)
 ---
 
@@ -52,26 +52,34 @@ Select-String -Path "src\**\*.ts","src\**\*.vue" -Pattern '@smkbacil|<Smkb|useSm
    `Smkb*` components, so it cannot survive the removal. **Copy `useTurnstile.ts` out first** if you
    want the captcha — it is standalone (its only imports are `vue` and `SOLUTION`) and already lives
    at `src/composables/useTurnstile.ts` in current versions of this starter.
-7. **`package.json`** — remove the `@smkbacil/design-ui` dependency.
+7. **`package.json`** — remove the `@smkbacil/design-ui` dependency, **and delete the vendored
+   tarball** it points at (`vendor/smkbacil-design-ui-*.tgz`, plus `vendor/` if now empty). Leaving
+   the tarball behind ships ~677 KB of a library the site never renders.
 8. **`vite.config.ts`** — remove `optimizeDeps: { exclude: ['@smkbacil/design-ui'] }` **and** the
    `smkb` entry from `manualChunks`.
 9. **`powerpages.config.json`** — remove `assets/smkb.js` from `bundleFilePatterns` if it is listed
    (the starter now ships `assets/*.js`, which needs no change).
-10. **`.npmrc`** — delete. It exists solely to authenticate that scope; leaving it keeps
-    `${NPM_TOKEN}` in play and can still fail installs.
-11. **`.github/workflows/ci.yml`** — nothing to do. The credential pre-flight already skips itself
-    when the app's `package.json` declares no `@smkbacil` dependency.
+10. **`.npmrc`** — nothing to do; this starter no longer ships one. design-ui is vendored, so
+    there was never a registry credential to remove. (Older solutions built from a pre-vendoring
+    version of the kit still have one — delete it there.)
+11. **`.github/workflows/ci.yml`** — nothing to do. It requires no secrets either way.
 
 ### Verify like CI does, not like a developer does
 
-12. **A warm npm cache will hide a broken setup**, so prove it from cold — this is the step everyone
-    gets wrong:
+12. **Rebuild from cold**, so a stale lockfile entry or a leftover `node_modules` copy cannot make a
+    broken removal look fine:
     ```powershell
     Remove-Item -Recurse -Force node_modules; Remove-Item -Force package-lock.json
-    npm install --no-audit --no-fund     # must succeed with NO npm credential at all
+    npm install --no-audit --no-fund
     npm run lint; npm run test; npm run build
     ```
-13. Confirm the bundle is genuinely clean — `dist/assets/index.js` must not contain `smkbacil`.
+    A tokenless install is no longer the signal it once was — every install in this kit is tokenless.
+    What you are proving here is that **nothing still references the package**.
+13. Confirm the bundle is genuinely clean — `dist/assets/index.js` must not contain `smkbacil`, and
+    `dist/assets/smkb.js` must no longer be emitted at all. Then run
+    `node scripts/check-template-guards.mjs` from the repo root: with the dependency gone it must
+    still pass (it now checks that every remaining `@smkbacil` dep is a `file:` spec whose tarball
+    exists — a half-removal that leaves the spec but deletes the tarball fails here).
 
 ## Error Handling
 
@@ -81,12 +89,13 @@ Select-String -Path "src\**\*.ts","src\**\*.vue" -Pattern '@smkbacil|<Smkb|useSm
   template. Re-run the usage grep from Context; `grep import` will not find these.
 - **Build succeeds but the bundle still contains `smkbacil`:** the `manualChunks` `smkb` entry or
   `optimizeDeps.exclude` is still present (steps 8).
-- **It installed fine locally before you started:** that proves nothing — the cache serves a warm
-  install long after a token dies. `npm whoami` is the credential check.
+- **`check-template-guards` fails after the removal:** the dependency is still declared but its
+  vendored tarball is gone (or vice versa). Remove both, or neither.
 
 ## Notes
 
-- This is a **one-way door for this solution**: re-adding the design system later means restoring
-  `.npmrc`, the dependency, `createSmkb()` and the CSS imports. Decide at Phase 4.
+- This is a **one-way door for this solution**: re-adding the design system later means re-vendoring
+  the tarball (`scripts/vendor-design-ui.ps1`), restoring the dependency, `createSmkb()` and the CSS
+  imports. Decide at Phase 4.
 - Keeping design-ui is the default and the norm. Only remove it when the site genuinely has its own
   visual identity — a bespoke rebuild, or a public page with an externally-designed look.

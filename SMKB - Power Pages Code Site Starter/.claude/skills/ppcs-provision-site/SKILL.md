@@ -50,13 +50,10 @@ For detailed recovery procedures, see [provision-reference.md](provision-referen
    the value PAC CLI uses to create the site record. Confirm the written value
    starts with `<PREFIX> - `.
 
-4. Check that the `NPM_TOKEN` environment variable is set (PowerShell:
-   `$env:NPM_TOKEN`). The `.npmrc` requires it — without it `npm install`
-   fails with "Failed to replace env in config". If not set, **stop** and
-   instruct the user:
-   ```powershell
-   $env:NPM_TOKEN = "npm_xxx"   # npm token with read access to the @smkbacil scope
-   ```
+4. No npm credential check is needed. `@smkbacil/design-ui` resolves from the
+   tarball committed under `vendor/`, so `npm install` works with no auth. If an
+   install ever asks for credentials, a spec has reverted to a version range --
+   run `scripts/vendor-design-ui.ps1 -Check` from the repo root.
 
 ### Phase 1 — Auth + First Deploy
 
@@ -213,8 +210,11 @@ For detailed recovery procedures, see [provision-reference.md](provision-referen
 - **Upload returns 403 on `.js` files:** JavaScript uploads are blocked in
   Dataverse. In PPAC → Environment Settings → Blocked Attachments, remove `js`
   from the blocked list, then retry.
-- **npm install fails with "Failed to replace env in config":** `NPM_TOKEN` is
-  not set in the current shell. See pre-flight step 4.
+- **npm install asks for authentication / 404s on `@smkbacil`:** the dependency
+  has reverted to a registry spec, or the `vendor/` tarball is missing. Run
+  `scripts/vendor-design-ui.ps1 -Check` from the repo root. (The old
+  "Failed to replace env in config" failure came from a committed `.npmrc`
+  reading the token variable; there is no longer an `.npmrc` to fail on.)
 - **Step 12 or 13 file not found:** The template files are created by `pac pages download`.
   If only one template file exists (not both), only the one that exists needs editing —
   Power Pages sometimes creates only the root-level or only the site-specific one.

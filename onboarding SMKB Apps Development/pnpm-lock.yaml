@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@smkbacil/design-ui':
-        specifier: ^0.16.1
-        version: 0.16.1(vue@3.5.34(typescript@5.6.3))
+        specifier: file:vendor/smkbacil-design-ui-0.16.1.tgz
+        version: file:vendor/smkbacil-design-ui-0.16.1.tgz(vue@3.5.34(typescript@5.6.3))
       vue:
         specifier: ^3.5.13
         version: 3.5.34(typescript@5.6.3)
@@ -381,8 +381,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@smkbacil/design-ui@0.16.1':
-    resolution: {integrity: sha512-amVCOENPZN3VMr4XyfDfcA6SlLW93pRT9oHgCPd4Yi5jzQWTJcY8ob27/nvxvc43bV8ZXJwb4vbEXK2f8daMWg==}
+  '@smkbacil/design-ui@file:vendor/smkbacil-design-ui-0.16.1.tgz':
+    resolution: {integrity: sha512-amVCOENPZN3VMr4XyfDfcA6SlLW93pRT9oHgCPd4Yi5jzQWTJcY8ob27/nvxvc43bV8ZXJwb4vbEXK2f8daMWg==, tarball: file:vendor/smkbacil-design-ui-0.16.1.tgz}
+    version: 0.16.1
     peerDependencies:
       vue: ^3.5.0
 
@@ -933,7 +934,7 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.60.4':
     optional: true
 
-  '@smkbacil/design-ui@0.16.1(vue@3.5.34(typescript@5.6.3))':
+  '@smkbacil/design-ui@file:vendor/smkbacil-design-ui-0.16.1.tgz(vue@3.5.34(typescript@5.6.3))':
     dependencies:
       vue: 3.5.34(typescript@5.6.3)
 

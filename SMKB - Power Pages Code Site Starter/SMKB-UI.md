@@ -25,7 +25,7 @@ app.use(createSmkb())   // registers all components globally
 app.mount('#app')
 ```
 
-**Power Apps / Power Pages / strict CSP environments:**
+**Power Apps / strict CSP environments:**
 
 Power Apps Code Apps serve assets through a proxy that corrupts binary font files (woff/woff2),
 causing `OTS parsing error` failures. Use `tokens-nofonts.css` to skip all `@font-face` declarations
@@ -44,13 +44,6 @@ const app = createApp(App)
 app.use(createSmkb())
 app.mount('#app')
 ```
-
-**This Power Pages Code Site starter defaults to `tokens-nofonts.css`** for a different root
-cause: `tokens.css` references bundled `.woff2` files that Vite emits as `assets/*.woff2`,
-which are not listed in `bundleFilePatterns` in `powerpages.config.json` — Power Pages serves
-`index.html` for any unlisted file, so the fonts fail with 404/MIME errors. `tokens.css` is
-still usable here: switch the import in `src/main.ts` **and** add the woff2 patterns
-(e.g. `assets/*.woff2`) to `bundleFilePatterns`.
 
 **Tree-shakeable alternative:**
 ```ts

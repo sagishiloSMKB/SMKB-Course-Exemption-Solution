@@ -16,7 +16,7 @@
     "solution:check": "powershell -ExecutionPolicy Bypass -File scripts/add-site-to-solution.ps1 -Check"
   },
   "dependencies": {
-    "@smkbacil/design-ui": "^0.16.1",
+    "@smkbacil/design-ui": "file:vendor/smkbacil-design-ui-0.16.1.tgz",
     "pinia": "^2.2.0",
     "vue": "^3.5.0",
     "vue-router": "^4.4.0"
