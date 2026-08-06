@@ -6,7 +6,7 @@ description: >-
   starter's placeholder-guard status. Read-only; reports pass/fail per check.
 when_to_use: >-
   User says "verify before deploy", "pre-deploy check", "is this safe to ship",
-  "check for drift", or is at Init Project Step 10.
+  "check for drift", or is at Init Project Phase 8.1.
 allowed-tools: Bash(powershell *) Bash(node *) Read Grep
 ---
 
@@ -14,7 +14,7 @@ allowed-tools: Bash(powershell *) Bash(node *) Read Grep
 
 Before any deploy, three separate gates must pass — each with its own exit semantics. This skill runs all
 three and reports a single pass/fail so "is this safe to ship?" is one call. It is **read-only** (it changes
-nothing). See [INIT_PROJECT.md](../../../INIT_PROJECT.md) Step 10.
+nothing). See [INIT_PROJECT.md](../../../INIT_PROJECT.md) Phase 8.1.
 
 ## Steps
 

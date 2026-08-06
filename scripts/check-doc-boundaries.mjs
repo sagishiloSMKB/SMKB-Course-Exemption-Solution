@@ -21,7 +21,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const DOCS = ['CLAUDE.md', 'README.md', 'INIT_PROJECT.md']
+// SOLUTION-SPEC.md is a root-owned template that links into the starters, so it gets the same
+// link-integrity check. Its [FILL IN] prompts are prose and trip nothing.
+const DOCS = ['CLAUDE.md', 'README.md', 'INIT_PROJECT.md', 'SOLUTION-SPEC.md']
 
 // Obsolete tokens from the retired Power Pages Liquid model + old Power Apps
 // direct-Dataverse model. None may appear in root docs.
@@ -38,7 +40,7 @@ const FORBIDDEN_ALWAYS = [
   // retired - it is the enhanced-data-model (modelVersion 2) Dataverse table that Code Sites
   // use, and the literal `--componentType` value the site-to-solution reconcile requires. The
   // ban made the kit structurally unable to document its own fix: the pre-commit hook rejected
-  // the Step 10b text as an "obsolete token". Do not re-add it.
+  // the Phase 8 deploy text as an "obsolete token". Do not re-add it.
 ]
 
 // Pure per-starter build/dev commands that should never be inlined in root prose

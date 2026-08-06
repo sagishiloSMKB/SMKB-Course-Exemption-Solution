@@ -20,7 +20,7 @@ existing bespoke page, say) ships **zero bytes** of it and still pays for it: th
 or expired token surfaces as `npm error 404 @smkbacil/design-ui`, which reads as a *missing package*
 and has cost a real initialization a wrong diagnosis.
 
-Decide this at **Init Project Step 6**, when the specs are gathered — "does this site use the SMKB
+Decide this at **Init Project Phase 4**, when the specs are gathered — "does this site use the SMKB
 design system, or its own visual identity?" — not after CI goes red on the first push.
 
 **The wiring is in five places, and the components are globally registered so `grep import` finds
@@ -87,6 +87,6 @@ Select-String -Path "src\**\*.ts","src\**\*.vue" -Pattern '@smkbacil|<Smkb|useSm
 ## Notes
 
 - This is a **one-way door for this solution**: re-adding the design system later means restoring
-  `.npmrc`, the dependency, `createSmkb()` and the CSS imports. Decide at Step 6.
+  `.npmrc`, the dependency, `createSmkb()` and the CSS imports. Decide at Phase 4.
 - Keeping design-ui is the default and the norm. Only remove it when the site genuinely has its own
   visual identity — a bespoke rebuild, or a public page with an externally-designed look.

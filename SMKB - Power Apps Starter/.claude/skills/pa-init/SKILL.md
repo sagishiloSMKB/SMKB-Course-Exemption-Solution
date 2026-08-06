@@ -20,7 +20,7 @@ no "New Code App" button in the portal, so the very first deploy fails until the
 `pac code init` has **no `--path` flag** (run it from inside the app folder), and `deploy.config.json` ships
 with an **empty `allowedEnvs`** which hard-blocks the deploy until you add your Dev URL. After init, `appId`
 in `power.config.json` is `null` — expected; it's filled on the first push. See the [README](../../../README.md)
-Step 3 and [INIT_PROJECT.md](../../../../INIT_PROJECT.md) Step 9 note.
+Step 3 and [INIT_PROJECT.md](../../../../INIT_PROJECT.md) Phase 5.3 (the note) / handoff H8 at Phase 8.6.
 
 ## Steps
 

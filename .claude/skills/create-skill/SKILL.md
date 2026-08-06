@@ -20,7 +20,7 @@ when working on files in that starter; root skills live in the repo-root `.claud
 scaffolds a new one in the right place with valid frontmatter so you don't hand-roll it. Owner → location +
 prefix:
 
-**Locate the starter folder by its type suffix, not by the template name.** Init Project Step 7
+**Locate the starter folder by its type suffix, not by the template name.** Init Project Phase 6
 renames every activated starter to `SMKB - <Component> - <Type>`, so the template names below only
 exist in a pristine kit — after init, use whichever folder ends in that type suffix.
 

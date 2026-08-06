@@ -9,7 +9,7 @@ generated most of the findings and **every one of them was written to the root l
 stayed empty. Two locations with one in use is worse than one: a reader cannot tell which is
 authoritative, and an auditor has to check both to know whether the mandatory logging happened.
 
-The root log is what the Init Project flow references (the Step 10b.F prompts), what the "Log
+The root log is what the Init Project flow references (the `DEPLOY-LOG` prompts), what the "Log
 Everything" standing instruction points at, and what gets reviewed when the starter kit is improved.
 
 This file is kept only as a signpost, so the split is not re-created.

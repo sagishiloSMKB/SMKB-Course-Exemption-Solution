@@ -74,7 +74,7 @@
     </div>
 
     <InfoCallout type="note">
-      <strong>This folder will be removed during Init Project (Step 3b).</strong>
+      <strong>This folder will be removed during Init Project (Phase 3.2).</strong>
       That's by design — the onboarding app is a local learning tool,
       not part of any solution repository. After Init Project, open Claude Code
       and say "init project" to begin your first solution.

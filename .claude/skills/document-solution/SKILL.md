@@ -7,7 +7,7 @@ description: >-
   TEMPLATE callout.
 when_to_use: >-
   User says "document the solution", "fill in the docs", "write the docs", "generate
-  documentation", or is at Init Project Step 12.
+  documentation", or is at Init Project Phase 10.
 allowed-tools: Read Edit Grep Glob
 ---
 
@@ -19,13 +19,18 @@ files: README + `00`–`09`). They are deliberately **not** scanned by any deplo
 the agent has full build context exactly once (at the end of Init Project). This skill captures that:
 replace every `[FILL IN: …]` with the solution's real detail, **cite the source file** for each non-obvious
 fact (the docs' own rule: the code is authoritative, the doc points at it), and remove template scaffolding.
-See [INIT_PROJECT.md](../../../INIT_PROJECT.md) Step 12.
+See [INIT_PROJECT.md](../../../INIT_PROJECT.md) Phase 10.
 
 ## Steps
 
-1. Inventory what to document: read `solution.config.json` `activate.*` + the actual tables (`Entities/*/Entity.xml`),
+1. **Start from [`SOLUTION-SPEC.md`](../../../SOLUTION-SPEC.md)** — captured at Phase 4, it already holds the
+   intent, audiences, data model, business rules, retention answers and design decisions **in the developer's
+   own words**. Read it first so the docs never have to reconstruct intent from code; it is the source for
+   exactly the facts code cannot tell you.
+2. Inventory what was actually built: read `solution.config.json` `activate.*` + the actual tables (`Entities/*/Entity.xml`),
    env vars (`environmentvariabledefinitions/*`), flows (`Workflows/*.json` + `Customizations.xml`), and app
-   folders. This is the ground truth the docs must match.
+   folders. This is the ground truth the docs must match. **Where it disagrees with `SOLUTION-SPEC.md`, that
+   is a finding** — surface it in the review handoff rather than quietly documenting whichever you read last.
 2. For **each** `docs/NN-*.md` (and `docs/README.md`), replace every `[FILL IN: …]`:
    - **General/kept** sections (the SMKB posture, flow-error contract, ALM model) — leave as-is; adjust only the specifics.
    - **Structural** sections — fill the tables/lists from the ground truth in Step 1. Use `smkb_<prefix>_<PascalName>` names and `PREFIX - Name` displays.

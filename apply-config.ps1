@@ -81,7 +81,7 @@ $ppTitle     = "$($cfg.powerPages.documentTitle)"
 $ppLang      = "$($cfg.powerPages.defaultLanguage)"
 $derivedSite = "$prefixUpper - $ppSite"
 
-# -- Derived starter folder names (INIT_PROJECT Step 7) ------------------------
+# -- Derived starter folder names (INIT_PROJECT Phase 6) ------------------------
 # An activated starter is renamed from its template name to 'SMKB - <Component> - <Type>'.
 # Tables / Env Vars / Flows are solution-wide, so their Component is the solution name; the
 # Power App and the Power Pages site are named after what they DO (Critical Rule 3).
@@ -159,6 +159,44 @@ function Invoke-AlmToken {
   else { Write-Host "  ok:      $Label" }
 }
 
+# Detect a shortPrefix that was changed AFTER a successful apply. That case is otherwise invisible:
+# Invoke-AlmToken and Rename-AlmFolder both rewrite only from the literal 'sol' segment, so an
+# already-renamed smkb_<old>_EnvironmentName matches neither the 'sol' source nor the new target -
+# both no-op, and -Check records nothing. The result is a split identity: solution.ts carries the new
+# prefix while the Dataverse schema names keep the old one.
+#
+# This reports; it deliberately does NOT rename. Once a definition has been deployed its schema name
+# is fixed in Dataverse, so re-prefixing the folder would import a NEW variable and orphan the live
+# one (taking its value with it). The prefix is effectively single-shot after the first deploy, which
+# is why identity is settled at INIT_PROJECT Phase 2, before anything is applied.
+function Test-EnvVarPrefix {
+  param([string]$Base)
+  if (-not (Test-Path -LiteralPath $Base)) { return }
+  $stale = @()
+  foreach ($d in @(Get-ChildItem -LiteralPath $Base -Directory -ErrorAction SilentlyContinue)) {
+    if ($d.Name -match '^smkb_([a-z]{2,5})_(.+)$') {
+      $found = $Matches[1]
+      $leaf  = $Matches[2]
+      if (($script:shippedEnvVars -contains $leaf) -and ($found -ne 'sol') -and ($found -ne $prefix)) {
+        $stale += "$($d.Name) carries prefix '$found', but solution.config.json says '$prefix'"
+      }
+    }
+  }
+  if (-not $stale.Count) { return }
+  if ($Check) {
+    foreach ($s in $stale) { $script:drift += "EnvVars prefix mismatch: $s  ($Base)" }
+    return
+  }
+  Write-Host ""
+  Write-Host "  WARNING: shortPrefix was changed after these env-var definitions were already renamed:" -ForegroundColor Yellow
+  foreach ($s in $stale) { Write-Host "           - $s" -ForegroundColor Yellow }
+  Write-Host "           Nothing was rewritten. If they have NOT been deployed yet, rename the folders and" -ForegroundColor Yellow
+  Write-Host "           their schemaname/displayname to the new prefix by hand, then re-run -Check." -ForegroundColor Yellow
+  Write-Host "           If they HAVE been deployed, keep the old prefix: a Dataverse schema name is fixed" -ForegroundColor Yellow
+  Write-Host "           once imported, so a new prefix creates a second variable and orphans the live one." -ForegroundColor Yellow
+  $script:warned = $true
+}
+
 function Rename-AlmFolder {
   param([string]$Base, [string]$OldName, [string]$NewName, [string]$Label)
   $old = Join-Path $Base $OldName
@@ -187,7 +225,7 @@ function Rename-AlmFolder {
 }
 
 # -- Starter folder renames + the doc pointers that follow them ----------------
-# INIT_PROJECT Step 7 used to be a MANUAL rename, and every piece of root tooling addressed the
+# INIT_PROJECT Phase 6 renaming used to be a MANUAL step, and every piece of root tooling addressed the
 # starters by their TEMPLATE names - so renaming broke all of it, mostly silently:
 #   * this script wrote nothing and -Check reported "No drift" (it found no files to compare),
 #   * the pre-commit lint dispatch stopped matching any staged file,
@@ -338,7 +376,7 @@ Write-Host ("  solution: {0} ({1})   prefix: {2}   env: {3}" -f $displayName, $u
 Write-Host ""
 
 # (Starter roots are resolved above via Get-StarterRoot - never hardcoded to a template name,
-#  or every write below silently becomes a no-op once Step 7 renames the folders.)
+#  or every write below silently becomes a no-op once Phase 6 renames the folders.)
 
 # Solution.xml identity (UniqueName + solution display name) - the 3 XML starters.
 $solXmlPattern = '(<SolutionManifest>\s*<UniqueName>)[^<]*(</UniqueName>\s*<LocalizedNames>\s*<LocalizedName description=")[^"]*(")'
@@ -391,6 +429,8 @@ if ($cfg.activate.environmentVariables) {
     elseif (Test-Path -LiteralPath $xmlNew) { Invoke-AlmToken -Path $xmlNew -Label "EnvVars $newFolder schema/display" }
     Rename-AlmFolder -Base $evBase -OldName $oldFolder -NewName $newFolder -Label "EnvVars folder $oldFolder"
   }
+  # Catch a prefix changed after a previous successful apply (neither branch above can see it).
+  Test-EnvVarPrefix -Base $evBase
   # The shipped vars are also declared as RootComponents in Solution.xml - keep those
   # schemaNames in lockstep with the folder/schemaname rename above, or the definitions
   # import unlinked from the solution and never reach Stage/Prod.

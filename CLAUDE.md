@@ -25,6 +25,9 @@ doubt about where a fact belongs, use this.
 - Solution-level documentation & review templates — the root `docs/` set (a per-solution artifact, drafted
   at the end of Init Project), `TESTING-STRATEGY.md`, and the `audit/` templates. (Distinct from a starter's
   *own* `docs/`, which documents that starter's mechanics.)
+- The solution specification — `SOLUTION-SPEC.md`. Captured at Init Project Phase 4, it is the **input**
+  artifact (what the solution must do, in the developer's words) as against `docs/`, the **output** artifact
+  drafted at the end. It is also what the starter-activation decision is derived from, so it is root's.
 - The cross-starter **security baseline** — `SECURITY-BASELINE.md`. A house standard spanning every
   starter, so it is root's: what ships hardened by default, what is statically enforced, and which
   trade-offs are accepted. Each starter documents its own half of a control; root owns the map.
@@ -61,6 +64,7 @@ that owns it:
 | Code Site ALM / promotion, flow-error contract | [ALM](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/ALM-CODE-SITES.md) · [flow errors](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/FLOW-ERROR-CONTRACT.md) |
 | Dataverse tables — schema authoring, deploy | [Tables README](SMKB%20-%20Dataverse%20Tables%20Starter/README.md) |
 | Environment variables — definitions, ALM vars | [Env Vars README](SMKB%20-%20Environmental%20Variables%20Starter/README.md) |
+| **Solution specification** — what this solution must do; captured at init, drives starter activation | [SOLUTION-SPEC.md](SOLUTION-SPEC.md) |
 | Solution documentation (architecture, security, privacy, ALM …) — templates, filled per solution at init | [docs/](docs/README.md) |
 | Testing strategy — the layered testing method | [TESTING-STRATEGY.md](TESTING-STRATEGY.md) |
 | **Security baseline** — shipped defaults, enforced invariants, accepted trade-offs (read before any security review) | [SECURITY-BASELINE.md](SECURITY-BASELINE.md) |
@@ -161,7 +165,7 @@ Never run a deploy without confirming the auth target. If the wrong profile is a
 2. Run `pnpm run dev` inside `onboarding SMKB Apps Development/`
 3. Tell the user: "Onboarding app is running at **http://localhost:5173** — open it in your browser to begin."
 
-**Note:** `init onboarding` is meant to run before `init project`. It does not require the repo to be initialized. The onboarding folder is removed in Init Project Step 3b and will not be part of any solution repository.
+**Note:** `init onboarding` is meant to run before `init project`. It does not require the repo to be initialized. The onboarding folder is removed in Init Project Phase 3.2 and will not be part of any solution repository.
 
 ---
 
@@ -171,10 +175,18 @@ Never run a deploy without confirming the auth target. If the wrong profile is a
 - User says `init project`, `initialize project`, `/init-project`, or similar
 - OR the pre-session check above finds the starter kit remote (proactively offer to run Init Project)
 
-**When triggered:** follow [`INIT_PROJECT.md`](INIT_PROJECT.md) step by step.
-- Confirm with the user after each step before moving to the next
-- Do NOT skip steps or reorder them
-- The git remote removal (Step 3) is mandatory — never proceed past Step 5 without it
+**When triggered:** follow [`INIT_PROJECT.md`](INIT_PROJECT.md) phase by phase.
+- **Do not confirm every step.** The flow has exactly **three decision points** — confirm the derived
+  identity (Phase 2), approve the plan (Phase 5), authorise the first deploy (Phase 8.2) — plus the guided
+  handoffs the user must physically perform. Everything else you decide and proceed with. Asking after each
+  step is the behaviour this flow was restructured to remove.
+- **Do not skip a phase or run one out of order.** The ordering carries real dependencies: identity is
+  recorded before the baseline commit, the specs are written down before the restart that would otherwise
+  lose them, and nothing that *acts* on the architecture (config flags, folder renames, installs) may run
+  before the Phase 5 approval.
+- Every manual step is a **guided handoff**: give the exact path, then **verify the outcome** rather than
+  trusting "done". `INIT_PROJECT.md` indexes all of them as `H1`–`H15`.
+- The git remote removal (Phase 3.1) is mandatory — never push before it.
 
 **This is a one-time operation.** Once Init Project has been completed and the remote points to the new solution repo, this command will not be triggered again in future sessions.
 
@@ -194,7 +206,7 @@ powershell -ExecutionPolicy Bypass -File apply-config.ps1           # write iden
 powershell -ExecutionPolicy Bypass -File apply-config.ps1 -Check    # fail if any starter has drifted (used in pre-commit)
 ```
 
-**The script also owns the starter folder renames.** Init Project Step 7 is a *decision*, not a manual
+**The script also owns the starter folder renames.** Init Project Phase 5 is a *decision*, not a manual
 `mv`: `apply-config.ps1` writes identity, then renames each activated starter to
 `SMKB - <Component> - <Type>`, then rewrites the starter links in `CLAUDE.md` / `README.md` /
 `INIT_PROJECT.md` — one atomic run, renames last. Renaming by hand instead makes all root tooling
@@ -212,22 +224,37 @@ references — so each starter's own `deploy.ps1` placeholder guard stays armed 
 
 ---
 
-## CRITICAL RULE 1 — Always Ask Which Starters to Activate
+## CRITICAL RULE 1 — Derive Starter Activation From the Spec
 
-At the beginning of any new solution engagement, BEFORE touching any files, you MUST ask the user (note: during Init Project, follow the Step 6→7 sequence in INIT_PROJECT.md instead — spec gathering happens before starter selection):
+**Activation is your decision, not a menu the user picks from.** Never open a new solution engagement by
+listing the five starters and asking which ones they want — the user should not have to know what a starter
+is, or map their requirements onto the kit's internal structure. That is your job.
 
-> "Which starters do you want to activate for this solution?
-> - Dataverse Tables (custom data tables)
-> - Environmental Variables (config values per environment)
-> - Power Automate Flows (automated workflows)
-> - Power Apps (Code App SPA — staff/admin interface)
-> - Power Pages Code Site (web portal — public-facing)
->
-> You can activate any combination. Starters you don't need should remain completely untouched."
+**On an already-initialized repo (a regular session):** *read* which starters are active — the `activate`
+flags in [`solution.config.json`](solution.config.json), corroborated by the folder names (an activated
+starter has been renamed to `SMKB - <Component> - <Type>`; one still named `SMKB - <X> Starter` is not
+activated). Do not ask the user a question the repo already answers.
 
-Do NOT assume all starters are needed. Do NOT modify or deploy any starter the user hasn't explicitly confirmed they want to use.
+**On a fresh clone (Init Project):** gather the specifications first, then derive the architecture from them,
+then **state** your conclusion. The sequence is Phase 4 → Phase 5 in [`INIT_PROJECT.md`](INIT_PROJECT.md):
 
-**Unused starters** must be left with their placeholder names and never deployed. They are templates for future solutions.
+1. Capture what the solution must do, and record it in [`SOLUTION-SPEC.md`](SOLUTION-SPEC.md).
+2. Work out the architecture from those specs — does this need custom tables? per-environment config?
+   server-side automation? a staff-facing app? a portal?
+3. Map that to starters, derive the component names, and **tell the user which starters you are activating
+   and why**, as part of the Phase 5 plan.
+4. The user approves the plan **once**. Their approval is a confirmation that your architecture matches what
+   they had in mind — not a starter-selection step.
+
+Deriving activation from a generic checklist *before* understanding the solution produces wrong
+activations (activating Flows before confirming any flow is needed), and the component names are
+**functional** names that only the specs can supply.
+
+**The safety property is unchanged and absolute:** a starter you did not activate must be left **completely
+untouched** — do not rename its folder, modify its files, or deploy it. Unused starters keep their
+placeholder names and are templates for future solutions. Record the ones you deliberately did *not*
+activate, and why, in `SOLUTION-SPEC.md` §12 — an explicit "no flows are needed because …" is worth more
+later than silence.
 
 ---
 

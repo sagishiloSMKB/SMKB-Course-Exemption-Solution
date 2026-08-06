@@ -81,7 +81,7 @@
         </div>
         <div class="hook-detail">
           <div class="hook-detail-label">How it's activated</div>
-          <div class="hook-detail-value"><code>git config core.hooksPath .githooks</code> — run once during Init Project Step 5b</div>
+          <div class="hook-detail-value"><code>git config core.hooksPath .githooks</code> — run once during Init Project Phase 3.5</div>
         </div>
         <div class="hook-detail">
           <div class="hook-detail-label">Requires</div>

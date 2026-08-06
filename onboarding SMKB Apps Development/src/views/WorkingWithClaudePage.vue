@@ -85,16 +85,19 @@
     <div class="section">
       <h2>Plan mode</h2>
       <p>
-        When you provide product specifications in Step 9, Claude automatically enters
-        <strong>Plan mode</strong>. In plan mode, Claude reads code and writes a plan
-        file — but makes no changes until you approve the plan. This prevents Claude
-        from starting the wrong implementation while you review the approach.
+        Once you have given Claude the specifications (Init Project Phase 4), it works out
+        the architecture and enters <strong>Plan mode</strong> for Phase 5. In plan mode,
+        Claude reads code and writes a plan file — but makes no changes until you approve
+        the plan. This prevents Claude from starting the wrong implementation while you
+        review the approach.
       </p>
 
       <InfoCallout type="note">
-        Plan mode is triggered automatically at Step 9. You don't need to do anything
-        special — Claude will enter it when it receives your specifications and exit it
-        only after you approve the plan.
+        Plan mode is triggered automatically at Phase 5. You don't need to do anything
+        special — Claude enters it once it has your specifications and exits only after
+        you approve the plan. That approval is also where Claude tells you
+        <strong>which starters it is activating and why</strong> — you don't pick them
+        from a list.
       </InfoCallout>
     </div>
 

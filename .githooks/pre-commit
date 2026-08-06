@@ -44,7 +44,7 @@ lint_starter() {
   return 0
 }
 
-# Match BOTH the template folder name and the renamed form (Init Project Step 7 renames every
+# Match BOTH the template folder name and the renamed form (Init Project Phase 6 renames every
 # activated starter). Addressing only the template name made this dispatch silently inert on all
 # real solution code the moment the folders moved. The globs are unquoted on purpose so the shell
 # expands them; `for` does not word-split its results, so the spaces in the names are safe.

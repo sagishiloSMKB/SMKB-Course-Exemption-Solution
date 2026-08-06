@@ -9,8 +9,9 @@ The root holds the init flow, the one solution-wide config, and the conventions 
 starters. Each starter owns its own build, deploy, and architecture docs. This README is the
 entry point; the operating rules live in [`CLAUDE.md`](CLAUDE.md).
 
-> **Working with AI (Claude)?** Claude asks which starters to activate before touching files, fills
-> solution identity from one config, and refuses to deploy until each starter's own guard passes.
+> **Working with AI (Claude)?** You give Claude the solution's name and the specifications; it derives
+> the architecture, **tells you which starters it is activating and why**, fills solution identity from
+> one config, and refuses to deploy until each starter's own guard passes.
 > See [`CLAUDE.md`](CLAUDE.md) for the full rules and the "Root vs Starters" ownership charter.
 
 ---

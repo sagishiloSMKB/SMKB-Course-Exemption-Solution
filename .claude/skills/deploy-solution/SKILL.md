@@ -6,7 +6,7 @@ description: >-
   starter's own deploy, logging each outcome, and pausing for the manual portal steps.
 when_to_use: >-
   User says "deploy the solution", "deploy everything", "deploy all starters", "run
-  the deploys", or is at Init Project Step 10b.
+  the deploys", or is at Init Project Phase 8.
 disable-model-invocation: true
 allowed-tools: Read Edit Bash(powershell *) Bash(npm *) Bash(node *)
 ---
@@ -17,33 +17,37 @@ Deployment **order is load-bearing** (Critical Rule 4): flows reference tables +
 reference flows — so Tables → Env Vars → Flows → Power Apps → Power Pages, **one at a time**, never proceeding
 until the current one is confirmed. This skill also enforces the two things routinely skipped: the **manual
 portal handoffs** (set env-var values, confirm connection references, turn flows on) and the **mandatory
-outcome log** (`10b.F`) appended to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](../../../STARTER_AGENT_FEEDBACK_AND_NOTES.md)
+outcome log** (`DEPLOY-LOG`) appended to [`STARTER_AGENT_FEEDBACK_AND_NOTES.md`](../../../STARTER_AGENT_FEEDBACK_AND_NOTES.md)
 after each starter. All deploys target **SMKB-Apps-Dev only**; Stage/Prod go through the pipeline. See
-[INIT_PROJECT.md](../../../INIT_PROJECT.md) Step 10b and CLAUDE.md Critical Rule 4.
+[INIT_PROJECT.md](../../../INIT_PROJECT.md) Phase 8 and CLAUDE.md Critical Rule 4.
 
 ## Steps
 
 1. Run `/pre-deploy-verify` first (config drift + doc boundaries + placeholder guards). Do not deploy if it fails.
+1b. **Get the deploy authorised — once** (Init Project H7 at Phase 8.2). This targets the shared
+   SMKB-Apps-Dev environment, so confirm the developer wants it and that `pac auth list` shows the Dev
+   profile active. After that single go-ahead, work through every starter below **without asking again** —
+   stop only for the portal handoffs, which the developer must physically perform.
 2. For **each activated** starter, in this order — skip any not activated:
 
    **① Dataverse Tables** → invoke `/dvt-deploy` (runs `guid-freshen.ps1` once, then `deploy.ps1`).
-   Developer: verify tables in make.powerapps.com → Dataverse → Tables. **Log 10b.F.**
+   Developer: verify tables in make.powerapps.com → Dataverse → Tables. **Log DEPLOY-LOG.**
 
    **② Environmental Variables** → run its `deploy.ps1`. **PAUSE** — developer sets each variable's runtime
    **value** (Maker → Solutions → your solution → Environment Variables → Edit → Add current value); Secret
-   vars get a Key Vault reference. **Log 10b.F.**
+   vars get a Key Vault reference. **Log DEPLOY-LOG.**
 
    **③ Cloud Flows** → invoke `/flow-deploy`. **PAUSE** — developer opens each flow (Power Automate →
    Solutions → your solution → Cloud Flows), confirms connection references, Saves, and **turns it on**
-   (flows import disabled). **Log 10b.F.**
+   (flows import disabled). **Log DEPLOY-LOG.**
 
    **④ Power Apps** → run `/pa-init` first if no app record exists, then its `deploy.ps1`. Developer: confirm
-   the app appears in the environment. **Log 10b.F.**
+   the app appears in the environment. **Log DEPLOY-LOG.**
 
    **⑤ Power Pages Code Site** → drive its own skills: `/ppcs-provision-site` (first time) → `/ppcs-register-flow`
-   per flow → `/ppcs-deploy`. Developer: open the site URL. **Log 10b.F.**
+   per flow → `/ppcs-deploy`. Developer: open the site URL. **Log DEPLOY-LOG.**
 
-3. After each starter, append a dated `10b.F` entry to `STARTER_AGENT_FEEDBACK_AND_NOTES.md`: did the deploy
+3. After each starter, append a dated `DEPLOY-LOG` entry to `STARTER_AGENT_FEEDBACK_AND_NOTES.md`: did the deploy
    complete cleanly? were components visible? any guard false-positives or unclear instructions? **This log is mandatory.**
 
 ## Error Handling
