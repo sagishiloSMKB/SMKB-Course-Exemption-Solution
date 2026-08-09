@@ -72,17 +72,17 @@ Configured as Power Pages site settings (`.powerpages-site/site-settings/`):
 **CSP — the standard set, shipped by the kit:** `default-src 'self'`; scripts, styles, images, fonts and
 `connect-src` restricted to `'self'` plus the required Microsoft Power Platform CDNs; `object-src 'none'`;
 `base-uri 'self'`; `frame-ancestors 'self'`; `form-action 'self'`; `upgrade-insecure-requests`. The enforced
-and report-only files are kept **byte-identical** to each other.
+and report-only files carry the **same host allowlist** in every directive. They differ on purpose in one keyword: enforced `script-src` uses `'nonce'`, report-only uses `'unsafe-inline'`, because Power Pages substitutes the nonce and injects its script hash into the enforced header only — report-only is a permissive new-source monitor, not a mirror.
 
 HTTPS, **HSTS** and `X-Frame-Options` are provisioned by the Power Pages platform — verify HSTS with
 `curl -I` rather than adding a competing site setting.
 
 **This solution's additions:** `[FILL IN: any additional allowed origins — e.g. a bot-check domain in
 connect-src/frame-src, an open-data API in connect-src. Use the Power Pages starter's
-/ppcs-add-csp-domain skill so both CSP files stay identical.]`
+/ppcs-add-csp-domain skill so a new host lands in both CSP files.]`
 
 **Accepted kit-wide** (do not re-raise — see [SECURITY-BASELINE.md](../SECURITY-BASELINE.md)):
-`style-src 'unsafe-inline'` is required by the design system's runtime style injection, and
+`style-src 'unsafe-inline'` is required by dynamic inline style **attributes** (`:style`, `v-show`, `<Transition>`, `element.style.setProperty`) that no nonce or hash can cover, plus the `<style>` elements Power Pages injects itself, and
 `script-src 'unsafe-hashes'` is injected by the Power Pages platform itself.
 
 `[FILL IN: any accepted CSP finding specific to this solution.]`

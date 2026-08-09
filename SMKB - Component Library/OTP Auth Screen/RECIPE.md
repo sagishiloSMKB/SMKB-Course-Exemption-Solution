@@ -9,7 +9,7 @@ Copy this folder into a new solution and follow the steps below. Every `[ADAPT]`
 A two-step email → OTP authentication screen for Power Pages portals:
 
 - **Step 1 — Email:** User enters their email address and clicks Send. The `smkb_sol_CreateOtp` Power Automate flow is called. It sends a verification code via one or more channels (SMS, college email, personal email) and returns a `channels` array with masked delivery addresses.
-- **Step 2 — OTP:** User enters the 6-digit code. The `smkb_sol_CheckOtp` flow validates it and returns the user's identity record. On success, session is stored in `sessionStorage` (30-min TTL) and the user is redirected.
+- **Step 2 — OTP:** User enters the 6-digit code. The `smkb_sol_CheckOtp` flow validates it and returns the user's identity record. On success, the session is stored in `sessionStorage` and the user is redirected. **Three limits apply and they are not the same thing:** the server's session row expires after **1 hour** (the real authority - every authenticated flow re-checks it), this client caps a session at **30 minutes** since login, and an **idle timeout** ends it after 15 minutes of inactivity. The strictest one wins.
 
 **Dev mode (no flows needed):** When `FLOW_CREATE_OTP_URL` is empty and `import.meta.env.DEV` is true, `createOtp` returns mock channels and `checkOtp` accepts `123456` as valid. Run `pnpm dev` immediately after copying the files to verify the screen works visually.
 
@@ -136,14 +136,19 @@ Search all copied files for `[ADAPT]` and resolve each one:
 
 ### G. Copy and rename the flow templates
 
-Copy both files from `flow-templates/` into your solution's `Workflows/` folder:
+Copy these files from `flow-templates/` into your solution's `Workflows/` folder:
 
 ```
-flow-templates/smkb_sol_CreateOtp-TEMPLATE.json  →  Workflows/smkb_[sol]_CreateOtp-[guid].json
-flow-templates/smkb_sol_CheckOtp-TEMPLATE.json   →  Workflows/smkb_[sol]_CheckOtp-[guid].json
+flow-templates/smkb_sol_CreateOtp-TEMPLATE.json      →  Workflows/smkb_[sol]_CreateOtp-[guid].json
+flow-templates/smkb_sol_CheckOtp-TEMPLATE.json       →  Workflows/smkb_[sol]_CheckOtp-[guid].json
+flow-templates/smkb_sol_RevokeSession-TEMPLATE.json  →  Workflows/smkb_[sol]_RevokeSession-[guid].json
 ```
 
-Replace placeholders throughout both files:
+`RevokeSession` is the 4th flow — skip it only if you accept that logout will not invalidate a token
+server-side (see §8 “Revoke a session, don't just wait for it to expire”). Register it with the
+**Anonymous** web role, like `CreateOtp` and `CheckOtp`.
+
+Replace placeholders throughout all of them:
 
 | Placeholder | Replace with |
 |------------|-------------|
@@ -248,7 +253,9 @@ Before deploying `smkb_sol_CheckOtp`, create a table in your solution — schema
 
 > Create the columns with **PascalCase schema** names (`smkb_[sol]_Token`, `smkb_[sol]_ExpiresAt`, …); Dataverse exposes their lowercased **logical** names (shown above) — those are what the flow JSON and OData responses use.
 
-Token TTL is 1 hour. Expired rows accumulate over time — add a scheduled cleanup flow (e.g. daily) that deletes rows where `smkb_sol_expires_at` is in the past.
+Server token TTL is **1 hour** - the authority, re-checked by every authenticated flow. (The client adds its own stricter caps; see step 1.) Expired rows accumulate, so add a scheduled cleanup flow (e.g. daily) that deletes rows where `smkb_sol_expires_at` is in the past.
+
+**Revocation, not just expiry.** A session must also be killable on demand - see §8 “Revoke a session, don't just wait for it to expire”.
 
 ### L. Wire up smkb_sol_CheckOtp
 
@@ -321,7 +328,8 @@ This ensures the authenticated user can only read and modify their own record, e
 - [ ] **SESSION_KEY unique** — `useAuth.ts` `SESSION_KEY` does not clash with other portal apps on the same domain
 - [ ] **Site settings committed** with new GUIDs, empty `adx_value` — grep for `00000000-0000-0000-0000-000000000001` → zero matches in `sitesetting.yml`
 - [ ] **Trigger URLs set** in Power Pages design studio (not in git) after flow deploy
-- [ ] **Production smoke test** — real email → OTP received → login succeeds → session persists on page reload, expires after the 1-hour TTL
+- [ ] **Production smoke test** — real email → OTP received → login succeeds → session persists on page reload, dies after 15 minutes idle, and is rejected after the 1-hour server TTL
+- [ ] **Logout actually revokes** — sign out, then replay the old token against an authenticated flow: it must return `UNAUTHORIZED`, not data
 
 ---
 
@@ -396,16 +404,54 @@ compliance-driven change; treat it as a project, not a checkbox on this recipe.
 Verify a bot token **server-side, before any lookup or send**. Client-side widget rendering is not the
 control; the `siteverify` call in the flow is.
 
-- Gate the whole branch on a **non-empty public site key**, so a solution with no Cloudflare account
-  works unchanged.
-- When the key *is* set, **fail closed**: reject unless `siteverify` returned success. Run the check
-  with `runAfter` covering `Succeeded`, `Failed` **and** `Skipped`, so a secret-fetch, HTTP or parse
-  error rejects rather than falling through — otherwise a transient failure becomes an open door.
+- **Fail closed on failure.** When a site key is set, reject unless `siteverify` returned success. Run
+  the check with `runAfter` covering `Succeeded`, `Failed` **and** `Skipped`, so a secret-fetch, HTTP or
+  parse error rejects rather than falling through — otherwise a transient failure becomes an open door.
+- **Fail closed on *misconfiguration* too — this is the one people miss.** An empty site key means
+  "someone forgot", not "bot protection is off". `Guard_Turnstile_Misconfigured` in
+  `smkb_sol_CreateOtp-TEMPLATE.json` runs **first**, before any lookup or send: if the site key is
+  empty **and** `smkb_sol_EnvironmentName` is not `dev`, it answers `CONFIG_ERROR` and terminates.
+  `dev` keeps working with no Cloudflare account; Stage and Prod refuse to run unprotected. An ops
+  mistake must never silently degrade into an open endpoint.
+- **Deliberately shipping no bot protection?** Delete the guard **and** the `Verify_Turnstile` scope
+  together, and record that decision in `SOLUTION-SPEC.md` §9. Removing only the guard leaves a flow
+  that is protected in `dev` and open everywhere else — the worst of both.
 - Return `CAPTCHA_FAILED`. It reveals nothing about the account.
 
-The `/ppcs-add-turnstile` skill wires the client and CSP halves; the fail-closed server gate is
-demonstrated end to end by the `CreateOtp` reference flow in
-[`examples/`](../../SMKB%20-%20Power%20Automate%20Flows%20Starter/examples/README.md).
+The `/ppcs-add-turnstile` skill wires the client and CSP halves. The fail-closed server gate and the
+misconfiguration guard now ship **in this recipe's own `CreateOtp` template**, in Dataverse idiom — the
+SharePoint-shaped reference flow in
+[`examples/`](../../SMKB%20-%20Power%20Automate%20Flows%20Starter/examples/README.md) is a second
+illustration, no longer the only place the pattern exists.
+
+### Revoke a session, don't just wait for it to expire
+
+Expiry alone is not revocation. Until this was added, `logout()` cleared `sessionStorage` and nothing
+else — so a token copied out of a browser kept working against every authenticated flow until its
+absolute TTL elapsed. Logout looked like a security boundary and was not one.
+
+Three parts, and they only work together:
+
+1. **`smkb_sol_RevokeSession-TEMPLATE.json`** (the 4th flow) — takes one `authToken`, finds the session
+   row and pushes its expiry into the past. Register it with the **Anonymous** web role: the token *is*
+   the credential, and whoever holds it may revoke it. It returns the **same** `{ "status": "ok" }` for
+   a missing, unknown, already-expired or freshly-revoked token — idempotent, and no way to probe
+   whether a token was real. `secureData: ["inputs"]` on both Dataverse calls (they are
+   `OpenApiConnection` actions, so that is valid — **never** on a `Compose`).
+2. **The client calls it fire-and-forget** on explicit logout *and* on idle timeout, before clearing
+   local state while the token is still in hand. Failures are swallowed: the absolute expiry remains the
+   backstop, and a revocation error must never block someone from logging out.
+3. **Revoke on every auth-adjacent write.** Any flow that changes something an attacker could use to
+   take over the account — phone, email, bank details — must expire the caller's sessions **in the same
+   operation** that records the change, forcing re-authentication. In this recipe's shape that means
+   updating the session rows matched by the **session-resolved** user id, not nulling two columns on a
+   user row (that is the SharePoint layout, where the session lives on the user record). Tell the user
+   what will happen: they are signed out immediately after the change.
+
+> **Idle timeout.** Both shipped clients arm a 15-minute inactivity timer on login *and* on a page
+> reload (a refresh restores the session without going through `login()`, so arming it only in `login()`
+> would silently disable it). Activity listeners are throttled to 30s and are attached only while
+> authenticated. On fire it runs the same path as an explicit logout, revoke included.
 
 ### Rate limiting has three layers, and the recipe ships one
 

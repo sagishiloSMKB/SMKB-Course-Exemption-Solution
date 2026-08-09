@@ -77,6 +77,33 @@ export async function createOtp(email: string, contextId?: string): Promise<Crea
 }
 
 // [ADAPT]: rename contextId to match createOtp above
+/**
+ * Invalidate a session token server-side (the `revokeSession` flow). Fire-and-forget:
+ * never awaited, failures swallowed - the absolute expiry is the backstop. Without
+ * it, logout clears only sessionStorage and a copied token outlives the logout.
+ *
+ * The flow answers identically whatever happened, so it cannot be used to probe
+ * whether a token is valid.
+ *
+ * [ADAPT]: add FLOW_REVOKE_SESSION_URL to config.ts, from a
+ * window.__SMKB_FLOW_REVOKE_SESSION__ global injected by the Liquid web template -
+ * the same way the create/check URLs arrive (RECIPE.md step B). Leave it empty and
+ * logout still clears local state; the token then lives until its absolute expiry.
+ */
+export function revokeSession(authToken: string): void {
+  const url = (config as { FLOW_REVOKE_SESSION_URL?: string }).FLOW_REVOKE_SESSION_URL
+  if (!authToken || !url) return
+  // keepalive so the request survives the navigation that usually follows a logout.
+  void fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ authToken }),
+    keepalive: true,
+  }).catch(() => {
+    /* Swallowed on purpose - see above. */
+  })
+}
+
 export async function checkOtp(email: string, otp: string, contextId?: string): Promise<CheckOtpResult> {
   const EMPTY_TOKEN = { authToken: '', authTokenExpiresAt: '' }
 

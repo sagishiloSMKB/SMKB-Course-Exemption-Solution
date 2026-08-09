@@ -13,10 +13,10 @@ check it on every build, so it cannot rot.
 
 | File | Purpose |
 |---|---|
-| `otpFlows.ts` | Flow GUID registry for the 3 required flows (empty ⇒ DEV mock active) |
+| `otpFlows.ts` | Flow GUID registry: 3 required + `revokeSession` (empty ⇒ DEV mock active) |
 | `otpAuthConfig.ts` | Per-solution knobs: paths, blocked statuses, routing hooks |
 | `useAuth.ts` | Singleton auth state in sessionStorage (key from `SOLUTION.prefix`), expiry-checked |
-| `authService.ts` | `createOtp` / `checkOtp` (+ IL phone normalization) with DEV mocks |
+| `authService.ts` | `createOtp` / `checkOtp` / `revokeSession` (+ IL phone normalization) with DEV mocks |
 | `configService.ts` | Anonymous portal config: support contact + Turnstile site key |
 | `invokeAuthFlow.ts` | `invokeFlow` wrapper that guards the session token and fires `smkb:session-expired` |
 | `useTurnstile.ts` | Cloudflare Turnstile explicit-render bootstrap (no-op without a site key) |
@@ -58,7 +58,7 @@ Response action returns **statusCode 200**; errors are `{ "errorCode": "<CODE>" 
 
 > The hardened flow templates and the full reasoning are the single source:
 > `SMKB - Component Library/OTP Auth Screen/RECIPE.md` → "Security baseline for this module". Build the
-> three flows from those templates rather than from these bullets, which are the client-side contract.
+> four flows from those templates rather than from these bullets, which are the client-side contract.
 
 ### 3. get_portal_config
 - **Inputs:** none

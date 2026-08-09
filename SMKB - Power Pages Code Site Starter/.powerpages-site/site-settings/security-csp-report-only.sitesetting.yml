@@ -1,7 +1,11 @@
 description: >-
-  Baseline Content Security Policy in report-only mode. Logs violations to the browser
-  console without blocking — safe to ship in a starter. Promote to
-  HTTP/Content-Security-Policy once violations are cleared.
+  A permissive NEW-SOURCE MONITOR, not a mirror of the enforced policy. It logs a violation
+  when the site loads something from a host the enforced policy does not allow, so a new
+  dependency is noticed before it is blocked. It deliberately keeps 'unsafe-inline' in
+  script-src where the enforced policy uses 'nonce': Power Pages substitutes a real nonce and
+  injects its own script hash into the ENFORCED header only, so a nonce here would report every
+  legitimate platform inline script as a violation and bury the real ones. Same host allowlist
+  as the enforced policy; keyword sources may be looser here. See /ppcs-add-csp-domain.
 id: aaaaaaaa-0004-4000-8000-000000000004
 name: HTTP/Content-Security-Policy-Report-Only
-value: "default-src 'self'; script-src 'self' content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn 'nonce'; style-src 'self' 'unsafe-inline' content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn; img-src 'self' data: blob: content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn; font-src 'self' data: content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn; connect-src 'self' content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests;"
+value: "default-src 'self'; script-src 'self' content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn 'unsafe-inline'; style-src 'self' 'unsafe-inline' content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn; img-src 'self' data: blob: content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn; font-src 'self' data: content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn; connect-src 'self' content.powerapps.com content.powerapps.us content.appsplatform.us content.powerapps.cn; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests;"

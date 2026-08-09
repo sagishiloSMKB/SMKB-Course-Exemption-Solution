@@ -45,6 +45,27 @@
             "schemaName": "smkb_sol_FlowErrorEmails",
             "description": "Semicolon-separated email addresses for flow error notifications."
           }
+        },
+        "TURNSTILE_SITE_KEY (smkb_sol_TurnstileSiteKey)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "description": "PUBLIC Cloudflare Turnstile site key. Empty = Turnstile not configured. In any environment other than 'dev' an empty value is treated as a MISCONFIGURATION (CONFIG_ERROR), not as 'bot protection off' - see Guard_Turnstile_Misconfigured."
+          }
+        },
+        "OTP_DAILY_CAP (smkb_sol_OtpDailyCap)": {
+          "defaultValue": 300,
+          "type": "Int",
+          "metadata": {
+            "description": "Global cap: the maximum number of OTPs this solution will send across ALL identifiers in a rolling 24h window. Backstop against a spray across many addresses, which a per-identifier limit cannot see."
+          }
+        },
+        "SECURITY_ALERT_EMAILS (smkb_sol_SecurityAlertEmails)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "description": "Semicolon-separated recipients alerted when the global cap trips. Empty = no alert (the cap still rejects). Never JSON - see the Env Vars README."
+          }
         }
       },
       "triggers": {
@@ -107,7 +128,9 @@
                     "runStatus": "Succeeded"
                   },
                   "runAfter": {
-                    "Respond_invalid_input": ["Succeeded"]
+                    "Respond_invalid_input": [
+                      "Succeeded"
+                    ]
                   }
                 }
               },
@@ -115,6 +138,109 @@
                 "actions": {}
               },
               "runAfter": {}
+            },
+            "Guard_Turnstile_Misconfigured": {
+              "type": "If",
+              "description": "MISCONFIG GUARD, runs first: no Turnstile site key and not 'dev' -> CONFIG_ERROR and stop, before any lookup or send. An unset key must never silently become an open endpoint. Opting out? Delete this AND Verify_Turnstile together.",
+              "expression": {
+                "and": [
+                  {
+                    "equals": [
+                      "@empty(trim(parameters('TURNSTILE_SITE_KEY (smkb_sol_TurnstileSiteKey)')))",
+                      true
+                    ]
+                  },
+                  {
+                    "not": {
+                      "equals": [
+                        "@toLower(trim(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')))",
+                        "dev"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "actions": {
+                "Respond_config_error": {
+                  "type": "Response",
+                  "kind": "PowerPages",
+                  "description": "HTTP 200 + errorCode, per the flow-error contract. The client maps an unknown code to its generic message, so this leaks nothing to a caller while naming the cause in run history.",
+                  "inputs": {
+                    "statusCode": 200,
+                    "body": {
+                      "errorCode": "CONFIG_ERROR"
+                    }
+                  }
+                },
+                "Terminate_after_config_error": {
+                  "type": "Terminate",
+                  "runAfter": {
+                    "Respond_config_error": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "description": "Succeeded, not Failed - a handled business outcome must not page anyone."
+                }
+              },
+              "runAfter": {
+                "Validate_Input": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Verify_Turnstile": {
+              "type": "Scope",
+              "description": "FAIL-CLOSED bot check, before any lookup or send. Rejects unless siteverify returns success:true; the inner condition also runs on Failed/Skipped, so a fetch or parse error gives a null body and therefore a rejection. Details in RECIPE.md.",
+              "runAfter": {
+                "Guard_Turnstile_Misconfigured": [
+                  "Succeeded"
+                ]
+              },
+              "actions": {
+                "IMPLEMENT_Verify_Turnstile": {
+                  "type": "If",
+                  "description": "[IMPLEMENT] Real siteverify call: Key Vault secret read (secureData outputs) -> Http POST to challenges.cloudflare.com (secureData inputs) -> ParseJson -> reject unless success is true. Keep REJECT as the default branch. Full steps in RECIPE.md.",
+                  "expression": {
+                    "and": [
+                      {
+                        "not": {
+                          "equals": [
+                            "@empty(trim(parameters('TURNSTILE_SITE_KEY (smkb_sol_TurnstileSiteKey)')))",
+                            true
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "actions": {
+                    "Respond_captcha_failed": {
+                      "type": "Response",
+                      "kind": "PowerPages",
+                      "description": "Uniform rejection - same shape as every other business error.",
+                      "inputs": {
+                        "statusCode": 200,
+                        "body": {
+                          "errorCode": "CAPTCHA_FAILED"
+                        }
+                      }
+                    },
+                    "Terminate_after_captcha_failed": {
+                      "type": "Terminate",
+                      "runAfter": {
+                        "Respond_captcha_failed": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "runStatus": "Succeeded"
+                      }
+                    }
+                  }
+                }
+              }
             },
             "IMPLEMENT_List_Recent_OTP_Requests": {
               "type": "OpenApiConnection",
@@ -133,7 +259,9 @@
                 "authentication": "@parameters('$authentication')"
               },
               "runAfter": {
-                "Validate_Input": ["Succeeded"]
+                "Verify_Turnstile": [
+                  "Succeeded"
+                ]
               }
             },
             "If_Rate_Limited": {
@@ -162,7 +290,9 @@
                     "runStatus": "Succeeded"
                   },
                   "runAfter": {
-                    "Respond_rate_limited": ["Succeeded"]
+                    "Respond_rate_limited": [
+                      "Succeeded"
+                    ]
                   }
                 }
               },
@@ -170,7 +300,52 @@
                 "actions": {}
               },
               "runAfter": {
-                "IMPLEMENT_List_Recent_OTP_Requests": ["Succeeded"]
+                "IMPLEMENT_List_Recent_OTP_Requests": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "If_Global_Cap_Exceeded": {
+              "type": "If",
+              "description": "GLOBAL CAP - the backstop a per-identifier limit cannot give you: a spray across many addresses. Rejects past OTP_DAILY_CAP with the SAME generic RATE_LIMITED code, so a caller cannot tell which limit they hit. Alert SECURITY_ALERT_EMAILS, debounced.",
+              "expression": {
+                "and": [
+                  {
+                    "greaterOrEquals": [
+                      "@length(coalesce(body('IMPLEMENT_List_Recent_OTP_Requests')?['value'], json('[]')))",
+                      "@parameters('OTP_DAILY_CAP (smkb_sol_OtpDailyCap)')"
+                    ]
+                  }
+                ]
+              },
+              "actions": {
+                "Respond_global_cap": {
+                  "type": "Response",
+                  "kind": "PowerPages",
+                  "description": "Same generic RATE_LIMITED code as the per-identifier limit - a caller must not be able to tell which limit they hit.",
+                  "inputs": {
+                    "statusCode": 200,
+                    "body": {
+                      "errorCode": "RATE_LIMITED"
+                    }
+                  }
+                },
+                "Terminate_after_global_cap": {
+                  "type": "Terminate",
+                  "runAfter": {
+                    "Respond_global_cap": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  }
+                }
+              },
+              "runAfter": {
+                "If_Rate_Limited": [
+                  "Succeeded"
+                ]
               }
             },
             "IMPLEMENT_PLACEHOLDER": {
@@ -178,7 +353,9 @@
               "description": "[IMPLEMENT — BUSINESS LOGIC]: Replace this Compose action with your actual OTP generation and send actions.\n\nWhat to build:\n  1. Generate 6-digit OTP: use rand(100000, 999999) — never sequential or timestamp-based.\n  2. Create a Dataverse OTP record: { email, otp_code, expires_at: addMinutes(utcNow(), 10), attempts: 0 }.\n  3. Send OTP via SMS or email to the user.\n  4. Build a 'channels' array: [{ type: 'sms'|'email_college'|'email_personal', maskedValue: '...' }].\n  5. Pass channels to Respond_to_PowerPages.\n\nSecurity notes:\n  - Hashing the OTP is NOT required for 6-digit codes — the 5-attempt lockout in smkb_sol_CheckOtp is the primary protection.\n  - On any send failure, return a business error (see pattern below) rather than letting the scope throw — send failures are expected conditions, not bugs.\n\nCRITICAL — two error categories:\n\n(A) BUSINESS ERRORS (NOT_FOUND, OTP_SEND_FAILED — expected, do NOT send error email):\n    Pattern: Response(4xx) → Terminate(runStatus: Succeeded)\n    Terminate(Succeeded) ends the run cleanly. Handle_Flow_Error does NOT run.\n    Example:\n      Respond_not_found  → { statusCode: 400, body: { code: 'NOT_FOUND' } }\n      Terminate_not_found → { runStatus: 'Succeeded' }\n\n(B) TECHNICAL ERRORS (Dataverse connection failure, null reference — unexpected bugs):\n    Let them throw unhandled. The scope fails → Handle_Flow_Error runs → error email sent → 500 returned to caller.",
               "inputs": "[IMPLEMENT]",
               "runAfter": {
-                "If_Rate_Limited": ["Succeeded"]
+                "If_Global_Cap_Exceeded": [
+                  "Succeeded"
+                ]
               }
             },
             "Respond_to_PowerPages": {
@@ -194,7 +371,9 @@
                 }
               },
               "runAfter": {
-                "IMPLEMENT_PLACEHOLDER": ["Succeeded"]
+                "IMPLEMENT_PLACEHOLDER": [
+                  "Succeeded"
+                ]
               }
             }
           },
@@ -248,7 +427,11 @@
                 }
               },
               "runAfter": {
-                "Check_Error_Emails_Configured": ["Succeeded", "Failed", "Skipped"]
+                "Check_Error_Emails_Configured": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
               }
             }
           },

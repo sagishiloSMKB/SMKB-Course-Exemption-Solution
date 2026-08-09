@@ -61,7 +61,8 @@ API paths use the entity set name (e.g. `/_api/contacts`).
 .powerpages-site/site-settings/security-csp-report-only.sitesetting.yml  ← report-only
 ```
 
-Both must be updated identically. The `adx_value` field contains the full CSP string.
+Add the host to both. Their `script-src` keyword sources differ deliberately (`'nonce'` enforced,
+`'unsafe-inline'` report-only) — that is not drift. The `adx_value` field contains the full CSP string.
 
 ---
 

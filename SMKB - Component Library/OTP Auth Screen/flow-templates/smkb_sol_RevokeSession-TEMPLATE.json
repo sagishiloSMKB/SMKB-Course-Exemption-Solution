@@ -1,0 +1,269 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps_[yourid]": {
+        "runtimeSource": "invoker",
+        "connection": {},
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      },
+      "shared_office365_[yourid]": {
+        "runtimeSource": "invoker",
+        "connection": {},
+        "api": {
+          "name": "shared_office365"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "undefined",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "ENVIRONMENT_NAME (smkb_sol_EnvironmentName)": {
+          "defaultValue": "dev",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_sol_EnvironmentName",
+            "description": "Logical environment name (dev/stage/prod)."
+          }
+        },
+        "ERROR_EMAILS (smkb_sol_FlowErrorEmails)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_sol_FlowErrorEmails",
+            "description": "Semicolon-separated email addresses for flow error notifications."
+          }
+        }
+      },
+      "triggers": {
+        "When_Power_Pages_calls_the_flow": {
+          "type": "Request",
+          "kind": "PowerPages",
+          "description": "Register with the ANONYMOUS Users web role. The token in the body IS the credential - there is nothing else to authenticate with, and a caller holding a token is entitled to revoke it.",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "authToken": {
+                  "title": "authToken",
+                  "type": "string",
+                  "description": "The session token to invalidate."
+                }
+              },
+              "required": [
+                "authToken"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Main_Flow": {
+          "type": "Scope",
+          "description": "Revoke (invalidate) a session token on demand. Called fire-and-forget by the client on explicit logout and on idle timeout, so a token stops working immediately instead of lingering until its absolute expiry. Register with the ANONYMOUS Users web role.",
+          "actions": {
+            "Validate_Input": {
+              "type": "If",
+              "description": "No token supplied - answer identically and stop.",
+              "expression": {
+                "and": [
+                  {
+                    "equals": [
+                      "@empty(trim(coalesce(triggerBody()?['authToken'], '')))",
+                      true
+                    ]
+                  }
+                ]
+              },
+              "actions": {
+                "Respond_ok_no_token": {
+                  "type": "Response",
+                  "kind": "PowerPages",
+                  "description": "ALWAYS the same body, whatever happened. Revocation is idempotent and must not reveal whether a token was real.",
+                  "inputs": {
+                    "statusCode": 200,
+                    "body": {
+                      "status": "ok"
+                    }
+                  }
+                },
+                "Terminate_after_no_token": {
+                  "type": "Terminate",
+                  "runAfter": {
+                    "Respond_ok_no_token": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  }
+                }
+              }
+            },
+            "IMPLEMENT_Get_Auth_Session": {
+              "type": "OpenApiConnection",
+              "description": "[IMPLEMENT] Dataverse ListRecords on the sessions table, $filter token eq the trigger's authToken (escape quotes), $top 1. secureData inputs - the token IS the secret, and this is an OpenApiConnection so securing it is valid (never a Compose).",
+              "runAfter": {
+                "Validate_Input": [
+                  "Succeeded"
+                ]
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs"
+                  ]
+                }
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "[IMPLEMENT]:smkb_sol_sessions",
+                  "$filter": "[IMPLEMENT]:smkb_sol_token eq '@{triggerBody()?['authToken']}'",
+                  "$top": 1
+                }
+              }
+            },
+            "If_Session_Found": {
+              "type": "If",
+              "description": "Only expire when a row actually matched. An unknown token falls through to the same response.",
+              "expression": {
+                "and": [
+                  {
+                    "greater": [
+                      "@length(coalesce(body('IMPLEMENT_Get_Auth_Session')?['value'], json('[]')))",
+                      0
+                    ]
+                  }
+                ]
+              },
+              "actions": {
+                "IMPLEMENT_Expire_Session": {
+                  "type": "OpenApiConnection",
+                  "description": "[IMPLEMENT] Dataverse UpdateRecord by the row GUID, setting the expiry into the past (or DeleteRecord if you prefer no history). Do NOT patch by a client-supplied id - use the GUID from the lookup above. secureData inputs for the same reason as the lookup.",
+                  "runtimeConfiguration": {
+                    "secureData": {
+                      "properties": [
+                        "inputs"
+                      ]
+                    }
+                  },
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "UpdateRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "[IMPLEMENT]:smkb_sol_sessions",
+                      "recordId": "@{first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['[IMPLEMENT]:smkb_sol_sessionid']}",
+                      "item/[IMPLEMENT]:smkb_sol_expires_at": "@{addHours(utcNow(), -1)}"
+                    }
+                  }
+                }
+              },
+              "runAfter": {
+                "IMPLEMENT_Get_Auth_Session": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Respond_ok": {
+              "type": "Response",
+              "kind": "PowerPages",
+              "description": "ALWAYS the same body - missing, unknown, already expired, or just revoked. Idempotent, no enumeration signal. The client treats it as fire-and-forget.",
+              "inputs": {
+                "statusCode": 200,
+                "body": {
+                  "status": "ok"
+                }
+              },
+              "runAfter": {
+                "If_Session_Found": [
+                  "Succeeded"
+                ]
+              }
+            }
+          }
+        },
+        "Handle_Flow_Error": {
+          "type": "Scope",
+          "description": "Error handler — runs ONLY on unexpected technical failures (unhandled exception in Main_Flow). Business errors (INVALID_CODE, LOCKED) use Terminate(Succeeded) inside Main_Flow and never reach here.",
+          "actions": {
+            "Check_Error_Emails_Configured": {
+              "type": "If",
+              "description": "Only send the error email if smkb_sol_FlowErrorEmails is configured. Skipping silently when the env var is empty avoids spurious SendEmailV2 failures that would add noise to every error handler run.",
+              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)'))))",
+              "actions": {
+                "Send_error_notification": {
+                  "type": "OpenApiConnection",
+                  "description": "Send error alert to all addresses in smkb_sol_FlowErrorEmails (semicolon-separated String env var).",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365_[yourid]",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/From": "[sol]NoReply@yourdomain.com",
+                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [ERROR] smkb_sol_CheckOtp failed')",
+                      "emailMessage/Body": "@concat('<p>The flow <strong>smkb_sol_CheckOtp</strong> failed unexpectedly in the <strong>', parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), '</strong> environment.</p><p><strong>Triggered by:</strong> ', coalesce(triggerBody()?['email'], '(unknown)'), '</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p><p>Open Power Automate &#8594; Cloud flows &#8594; smkb_sol_CheckOtp &#8594; Run history to investigate.</p>')",
+                      "emailMessage/Importance": "High"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Respond_with_error": {
+              "type": "Response",
+              "description": "Always return a response so the Power Pages caller does not hang.",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "errorCode": "ERROR"
+                }
+              },
+              "runAfter": {
+                "Check_Error_Emails_Configured": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Main_Flow": [
+              "Failed",
+              "TimedOut"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

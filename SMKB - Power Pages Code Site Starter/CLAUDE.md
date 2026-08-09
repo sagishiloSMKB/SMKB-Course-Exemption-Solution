@@ -84,7 +84,7 @@ Custom Dataverse components a solution adds later (tables, columns, flows) follo
 
 ## OTP auth module (optional)
 
-`src/modules/otp-auth/` ships **dormant** — phone OTP + Cloudflare Turnstile + sessionStorage session + `smkb:session-expired` event + router guard. Nothing imports it, so it adds zero bundle bytes until wired. Enable with `/ppcs-enable-otp-auth`, which adds the login/locked-out routes, router guard, App.vue session-expired wiring, and `challenges.cloudflare.com` to `script-src`/`frame-src`/`connect-src` in **both** CSP site settings. The module README (`src/modules/otp-auth/README.md`) documents the 3 required flows (`createOtp` / `checkOtp` / `getPortalConfig`, Anonymous Users role). Authenticated calls use the module's `invokeAuthFlow`, which passes `authToken` for server-side re-validation. Dev mock: leave the GUIDs in `otpFlows.ts` empty and run `npm run dev` — any phone number works with OTP `123456`.
+`src/modules/otp-auth/` ships **dormant** — phone OTP + Cloudflare Turnstile + sessionStorage session + `smkb:session-expired` event + router guard. Nothing imports it, so it adds zero bundle bytes until wired. Enable with `/ppcs-enable-otp-auth`, which adds the login/locked-out routes, router guard, App.vue session-expired wiring, and `challenges.cloudflare.com` to `script-src`/`frame-src`/`connect-src` in **both** CSP site settings. The module README (`src/modules/otp-auth/README.md`) documents the flows it needs (`createOtp` / `checkOtp` / `getPortalConfig`, plus the recommended `revokeSession` — all Anonymous Users role). Authenticated calls use the module's `invokeAuthFlow`, which passes `authToken` for server-side re-validation. `logout()` calls `revokeSession` fire-and-forget and a 15-minute idle timeout runs the same path, so a token stops working when the user leaves rather than only at its absolute expiry. Dev mock: leave the GUIDs in `otpFlows.ts` empty and run `npm run dev` — any phone number works with OTP `123456`.
 
 ---
 
@@ -192,7 +192,7 @@ The starter ships 16 custom security site settings in `.powerpages-site/site-set
 |---|---|---|---|
 | `security-x-content-type-options.sitesetting.yml` | `HTTP/X-Content-Type-Options` | `nosniff` | Prevents MIME-type sniffing attacks |
 | `security-x-xss-protection.sitesetting.yml` | `HTTP/X-XSS-Protection` | `0` | Disables the legacy browser XSS filter — leaving it on can introduce bypass vectors; CSP replaces it |
-| `security-csp-report-only.sitesetting.yml` | `HTTP/Content-Security-Policy-Report-Only` | Baseline CSP | Logs CSP violations to the browser console without blocking anything — safe to ship in a starter |
+| `security-csp-report-only.sitesetting.yml` | `HTTP/Content-Security-Policy-Report-Only` | Same hosts, looser keywords | A **new-source monitor**: logs when the site loads from a host the enforced policy does not allow, without blocking |
 | `security-csp.sitesetting.yml` | `HTTP/Content-Security-Policy` | Enforced CSP | Blocks disallowed sources; ships alongside report-only |
 | `security-csp-inject-unsafe-eval.sitesetting.yml` | `HTTP/Content-Security-Policy/Inject-unsafe-eval` | `false` | Prevents Power Pages from auto-injecting `unsafe-eval` |
 | `security-referrer-policy.sitesetting.yml` | `HTTP/Referrer-Policy` | `strict-origin-when-cross-origin` | Full path same-origin, origin only cross-origin, nothing on an HTTPS→HTTP downgrade |
@@ -233,9 +233,15 @@ curl -I https://<your-site>.powerappsportals.com | grep -i strict-transport-secu
 
 Do **not** create a site setting for HSTS. A hand-written `HTTP/Strict-Transport-Security` competes with the platform's own header and gives a false sense of ownership; if the header is genuinely missing, that is a platform issue to raise, not a YAML file to add.
 
-The CSP value is tailored for this SPA — all Vite bundles are served from `'self'`, Power Pages platform scripts come from `content.powerapps.com` (and the other Microsoft CDN domains included), styles require `'unsafe-inline'` for `@smkbacil/design-ui`'s Vue style injection. The `'nonce'` token is a Power Pages placeholder replaced with a cryptographically unique nonce on every request. `object-src 'none'` and `base-uri 'self'` close plugin embedding and `<base>` hijacking; `upgrade-insecure-requests` rewrites any stray `http://` subresource to HTTPS.
+**The enforced policy.** All Vite bundles are served from `'self'`; Power Pages platform scripts come from `content.powerapps.com` (and the other Microsoft CDN domains included). `style-src` keeps `'unsafe-inline'` because it is required by dynamic inline style **attributes** (`:style`, `v-show`, `<Transition>`, `element.style.setProperty`) that no nonce or hash can cover, plus the `<style>` elements Power Pages injects itself. It is **not** CSS-in-JS: `@smkbacil/design-ui` ships a static stylesheet that Vite extracts to a self-served `assets/index.css`. The `'nonce'` token is a Power Pages placeholder replaced with a cryptographically unique nonce on every request — and the platform also injects its own script hash + `'unsafe-hashes'` here, which is why `script-src` needs no `'unsafe-inline'`. `object-src 'none'` and `base-uri 'self'` close plugin embedding and `<base>` hijacking; `upgrade-insecure-requests` rewrites any stray `http://` subresource to HTTPS.
 
-The CSP report-only value is tailored for this SPA — all Vite bundles are served from `'self'`, Power Pages platform scripts come from `content.powerapps.com` (and the other Microsoft CDN domains included), styles require `'unsafe-inline'` for `@smkbacil/design-ui`'s Vue style injection. The `'nonce'` token is a Power Pages placeholder replaced with a cryptographically unique nonce on every request.
+**The report-only policy is a permissive new-source monitor, not a mirror.** It carries the **same host allowlist** as the enforced policy, so it fires when the site loads from a host the enforced policy does not allow — you learn about a new dependency before it is blocked. It deliberately uses `'unsafe-inline'` where the enforced policy uses `'nonce'`: **Power Pages substitutes the nonce and injects its script hash into the enforced header only**, so a nonce here would report every legitimate platform inline script as a violation and bury the real ones.
+
+> **The invariant is the host allowlist, not the whole string.** Keep the hosts equal in every directive; let the keyword sources differ. `/ppcs-add-csp-domain` enforces exactly that. Verify the platform behaviour on a deployed site with:
+> ```bash
+> curl -sI https://<your-site>.powerappsportals.com | grep -i '^content-security-policy'
+> ```
+> The enforced header should show a real nonce and an injected hash; the report-only header should not.
 
 ### Placeholder GUIDs and the freshen script
 
@@ -268,12 +274,12 @@ After first deploy, two Power Pages site checker findings remain and cannot be r
 
 | Finding | Risk | Why accepted |
 |---|---|---|
-| `style-src unsafe-inline` | Moderate | `@smkbacil/design-ui` uses Vue runtime style injection. Removing `unsafe-inline` breaks all component styling. |
+| `style-src unsafe-inline` | Moderate | Dynamic inline style **attributes** (`:style`, `v-show`, `<Transition>`, `element.style.setProperty`) cannot be covered by a nonce or hash, and Power Pages injects its own `<style>` elements. Not CSS-in-JS — design-ui ships a static stylesheet. Removing `unsafe-inline` breaks all component styling. |
 | `script-src unsafe-hashes` | Low | Injected by the Power Pages platform itself — not configurable via site settings. |
 
 > If you add a library that uses `eval` at runtime (some charting or PDF libraries), set `HTTP/Content-Security-Policy/Inject-unsafe-eval` to `true` in the downloaded site settings file and redeploy.
 
-> If you add external resources (analytics, fonts, maps, Azure Blob images), add their domains to the relevant directives in both `security-csp.sitesetting.yml` and `security-csp-report-only.sitesetting.yml` before deploying.
+> If you add external resources (analytics, fonts, maps, Azure Blob images), add their **hosts** to the relevant directives in both `security-csp.sitesetting.yml` and `security-csp-report-only.sitesetting.yml` before deploying — use `/ppcs-add-csp-domain`, which does both and leaves the intended keyword difference alone.
 
 ### What's intentionally absent
 

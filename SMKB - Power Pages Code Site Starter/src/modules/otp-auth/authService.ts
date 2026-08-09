@@ -74,6 +74,26 @@ export async function createOtp(phone: string, turnstileToken = ''): Promise<Cre
   }
 }
 
+/**
+ * Invalidate a session token server-side. Fire-and-forget: the caller must not
+ * await a result or care about failure, because the absolute token expiry is the
+ * backstop. Without this, logout only clears sessionStorage and a copied token
+ * keeps working until it expires on its own.
+ *
+ * The flow answers with the same body whatever happened (unknown token, already
+ * expired, just revoked), so nothing here can be used to probe token validity.
+ */
+export function revokeSession(authToken: string): void {
+  if (!authToken || !OTP_FLOWS.revokeSession) return
+  try {
+    void invokeFlow(OTP_FLOWS.revokeSession, { authToken }).catch(() => {
+      /* Swallowed on purpose - see the doc comment above. */
+    })
+  } catch {
+    /* Never let revocation failure block a logout. */
+  }
+}
+
 export async function checkOtp(phone: string, otp: string): Promise<CheckOtpResult> {
   phone = normalizePhone(phone)
   const EMPTY = {

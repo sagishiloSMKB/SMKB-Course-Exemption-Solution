@@ -52,7 +52,7 @@ environments, and the Env Vars starter README for the Secret-type rules.
    form still works in Dev without a key. Never treat an empty key as "verification passed" on the
    server — see step 5.
 
-### CSP (both files, kept identical)
+### CSP (add the host to both files)
 
 4. Add `https://challenges.cloudflare.com` to **three** directives — `script-src` (the widget
    script), `frame-src` (it renders in an iframe) and `connect-src`. Use `/ppcs-add-csp-domain`,

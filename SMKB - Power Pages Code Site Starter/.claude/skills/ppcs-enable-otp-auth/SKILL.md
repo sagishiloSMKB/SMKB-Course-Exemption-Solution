@@ -90,7 +90,9 @@ documented in [src/modules/otp-auth/README.md](../../../src/modules/otp-auth/REA
    - `frame-src` (challenge iframe) — **create the directive if missing**
      (insert e.g. `frame-src 'self' https://challenges.cloudflare.com;` before `frame-ancestors`)
    - `connect-src` (token exchange)
-   Keep the two files' values identical (same drift rule as /ppcs-add-csp-domain).
+   Add `challenges.cloudflare.com` to **both** files. Their `script-src` keyword sources differ on
+   purpose (`'nonce'` enforced, `'unsafe-inline'` report-only) — do not "sync" that away. Same host
+   rule as /ppcs-add-csp-domain.
 
 ### Flows
 

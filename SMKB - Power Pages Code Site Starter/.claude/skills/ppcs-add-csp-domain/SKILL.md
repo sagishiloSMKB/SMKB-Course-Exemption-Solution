@@ -2,8 +2,9 @@
 name: Power Pages Code Site — Add Domain to CSP
 description: >-
   Adds an external domain to both Power Pages Code Site CSP site settings
-  (enforced + report-only) in the correct directive. Detects drift between the
-  two files before editing. Prevents report-only from falling out of sync.
+  (enforced + report-only) in the correct directive. Compares the host allowlists
+  before editing so report-only never falls behind, while leaving the two files'
+  deliberately different keyword sources alone.
 when_to_use: >-
   User says "add [domain] to CSP", "CSP blocks [domain]", "allow [domain]",
   "external script/font/image blocked", "add analytics", "add maps", "add Azure
@@ -15,15 +16,24 @@ allowed-tools: Read Edit
 
 ## Context
 
-This project ships **two** CSP site settings files that must stay in sync:
+This project ships **two** CSP site settings files with **different jobs**:
 
 - `security-csp.sitesetting.yml` — the **enforced** CSP (blocks violating requests)
-- `security-csp-report-only.sitesetting.yml` — the **report-only** CSP (logs
-  violations to the browser console without blocking)
+- `security-csp-report-only.sitesetting.yml` — a **permissive new-source monitor**.
+  It logs a violation when the site loads from a host the enforced policy does not
+  allow, so a new dependency is noticed before it is blocked.
 
-The most common mistake: adding a domain to only the enforced file. This fixes
-the block but creates drift — future violations are no longer caught by the
-report-only policy. **Both files must always be identical.**
+**The invariant is the host allowlist, not the whole string.** Both files must
+carry the **same hosts** in every directive. Their **keyword sources** (`'nonce'`,
+`'unsafe-inline'`, …) may differ, and one pair deliberately does:
+
+| Directive | Enforced | Report-only | Why |
+|---|---|---|---|
+| `script-src` | `'nonce'` | `'unsafe-inline'` | Power Pages substitutes a real per-request nonce and injects its own script hash into the **enforced** header only. A nonce in report-only would report every legitimate platform inline script as a violation and bury the real ones. |
+
+So: adding a domain to only the enforced file is still the mistake this skill
+exists to prevent — but a `script-src` keyword difference is **correct** and must
+not be "fixed".
 
 For CSP directive reference and common integration patterns, there are no
 separate reference files needed — all patterns are in this SKILL.md.
@@ -60,13 +70,22 @@ separate reference files needed — all patterns are in this SKILL.md.
    - `.powerpages-site/site-settings/security-csp.sitesetting.yml`
    - `.powerpages-site/site-settings/security-csp-report-only.sitesetting.yml`
 
-3. **Check for drift.**
-   Compare the `value` field (the CSP string) in both files. If they differ:
-   > Warning: The enforced and report-only CSP files are out of sync. This
-   > means violations have been going unreported. I'll show you the difference
-   > before making any changes.
-   Show what differs between the two. Ask the user whether to sync them first
-   (use the enforced file as the source of truth) before adding the new domain.
+3. **Check for host drift — compare host lists, never the whole string.**
+   Split each file's `value` into directives, and within each directive separate
+   **hosts** (bare names like `content.powerapps.com`) from **keyword sources**
+   (anything quoted: `'self'`, `'nonce'`, `'unsafe-inline'`, `'none'`).
+
+   - **Compare the hosts only.** If a directive's host list differs between the
+     two files, that is real drift — a domain was added to one and not the other:
+     > Warning: `<directive>` allows `<host>` in one file but not the other, so
+     > violations for it are going unreported. I'll show you the difference
+     > before making any changes.
+     Show the difference and offer to add the missing host to whichever file lacks
+     it. **Add the missing host — never overwrite one file's whole value with the
+     other's**, which would destroy the intended keyword difference below.
+   - **Ignore keyword differences.** `script-src` legitimately carries `'nonce'`
+     in the enforced file and `'unsafe-inline'` in report-only (see Context).
+     Do not report it, and do not "sync" it.
 
 4. **Add the domain to the correct directive(s).**
    In the CSP string (the `value` field), find the relevant directive line and
@@ -82,9 +101,11 @@ separate reference files needed — all patterns are in this SKILL.md.
    `content.powerapps.com`, `cdn.example.com`), not `https://…`. Avoid wildcards
    (`*.example.com`) unless strictly necessary — they are a security risk.
 
-5. **Edit both files simultaneously.**
-   Apply the exact same change to `security-csp.sitesetting.yml` AND
-   `security-csp-report-only.sitesetting.yml`. Never edit just one.
+5. **Add the host to both files.**
+   Apply the same *host* addition to `security-csp.sitesetting.yml` AND
+   `security-csp-report-only.sitesetting.yml`. Never edit just one — a host present
+   in only the enforced file is blocked-and-unreported; present in only report-only
+   it is reported-and-still-blocked. Leave each file's keyword sources as they are.
 
 6. **Special case — `unsafe-eval`.**
    If the user needs `unsafe-eval` (e.g. for a PDF library, charting library, or
@@ -112,10 +133,15 @@ separate reference files needed — all patterns are in this SKILL.md.
 
 After adding a domain, two Power Pages site checker findings remain permanent
 and expected (do not try to fix them):
-- `style-src unsafe-inline` — required by `@smkbacil/design-ui` Vue style injection
+- `style-src unsafe-inline` — required by dynamic inline style **attributes**
+  (`:style`, `v-show`, `<Transition>`, `element.style.setProperty`), which no nonce
+  or hash can cover, plus the `<style>` elements Power Pages injects itself. It is
+  **not** CSS-in-JS: `@smkbacil/design-ui` ships a static stylesheet that Vite
+  extracts to a self-served `assets/index.css`.
 - `script-src unsafe-hashes` — injected by the Power Pages platform
 
-For changes to CSP in a **production environment**, test with the report-only
-file first: add the domain only to `security-csp-report-only.sitesetting.yml`,
-deploy, verify no unexpected violations in the browser console, then add it to
-`security-csp.sitesetting.yml` and redeploy.
+**Staging a risky change in production:** you may add a host to
+`security-csp-report-only.sitesetting.yml` first, deploy, watch the console, then
+add it to `security-csp.sitesetting.yml`. That is a *temporary, intentional* host
+difference — step 3 will report it on the next run, which is correct: finish the
+rollout, or remove it. Do not leave it indefinitely.

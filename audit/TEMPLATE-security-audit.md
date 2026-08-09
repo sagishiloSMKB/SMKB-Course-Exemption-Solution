@@ -55,7 +55,7 @@ entitled to assume was true before this solution was built on top of it.
 | Baseline control | How to confirm | Status |
 |---|---|---|
 | The 6 built-in login/registration paths are still `false` | grep `.powerpages-site/site-settings/auth-*-disabled.sitesetting.yml` | `[FILL IN]` |
-| CSP still carries `object-src 'none'`, `base-uri 'self'`, `upgrade-insecure-requests`, `frame-ancestors 'self'`, `form-action 'self'` | both CSP files, and they are still **byte-identical** to each other | `[FILL IN]` |
+| CSP still carries `object-src 'none'`, `base-uri 'self'`, `upgrade-insecure-requests`, `frame-ancestors 'self'`, `form-action 'self'` | both CSP files; the **host allowlists** still match directive-for-directive (the `script-src` keyword difference is intentional) | `[FILL IN]` |
 | `Referrer-Policy` + `Permissions-Policy` settings present | site-settings folder | `[FILL IN]` |
 | HSTS is emitted by the platform | `curl -I https://<site>` — do **not** add a competing site setting | `[FILL IN]` |
 | Every site setting has a real GUID, not a placeholder | grep for `aaaaaaaa-` → zero matches | `[FILL IN]` |
@@ -67,6 +67,22 @@ entitled to assume was true before this solution was built on top of it.
 | Global cap + abuse alert env vars are set in this environment | `smkb_<prefix>_OtpDailyCap`, `smkb_<prefix>_SecurityAlertEmails` | `[FILL IN]` |
 | OTP/session tables are restricted to the service account | Dataverse security roles | `[FILL IN]` |
 | Run-history access is limited (the fallback for values that cannot be secured) | flow owners/co-owners + environment admins | `[FILL IN]` |
+| Bot protection fails closed on **misconfiguration**, not just on failure | the OTP-create flow's first post-validation step returns `CONFIG_ERROR` when the site key is empty and the environment is not `dev`. If bot protection was dropped deliberately, both the guard *and* the verify scope are gone and it is recorded in `SOLUTION-SPEC.md` | `[FILL IN]` |
+| Logout actually revokes server-side | sign out, then replay the old token against an authenticated flow — it must answer `UNAUTHORIZED`, not data | `[FILL IN]` |
+| Sessions are expired on every auth-adjacent write (phone / email / bank details) | read each such flow: the session rows are expired in the same operation as the change | `[FILL IN]` |
+| Idle timeout is active in the shipped client | leave the app untouched past the timeout — it signs out and revokes | `[FILL IN]` |
+
+### Owner / environment actions
+
+These are not code and cannot be confirmed from the repo. See
+[SECURITY-BASELINE.md](../SECURITY-BASELINE.md) → "Owner / environment actions".
+
+| Owner action | How to confirm | Status |
+|---|---|---|
+| Security telemetry exists and alerts on `errorCode` volume (**not** on HTTP status — everything is 200 here) | a query or dashboard, and a named alert recipient | `[FILL IN]` |
+| Dependency, secret and static analysis scanning enabled in CI, plus Solution Checker | the CI run shows the jobs; branch protection requires them | `[FILL IN]` |
+| Per-IP / distributed rate limiting at the edge, or the residual accepted in writing | a WAF rule, or a signed-off acceptance | `[FILL IN]` |
+| Attempt counters are atomic, or the race is accepted in writing | the counter store, or a signed-off acceptance | `[FILL IN]` |
 
 ## Verified-safe (checked, no issue)
 

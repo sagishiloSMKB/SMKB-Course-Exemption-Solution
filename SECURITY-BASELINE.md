@@ -67,8 +67,11 @@ These fail a build, a commit, or a deploy. They are the part of the baseline tha
 | ESLint no-direct-network | the SPA cannot bypass the flow boundary |
 | `scripts/check-template-guards.mjs` | no shipped file trips its own placeholder guard; `.ps1`/solution XML stay ASCII |
 | flow-lint self-test coverage gate | every rule has a firing test and a silent test — so this table stays honest |
+| `description-max-length` (error) | no action description over 256 chars — over the limit a flow imports fine and then **fails to activate** |
 
 Run them all: each starter's `deploy.ps1`, the pre-commit hook, and CI.
+
+**Not statically enforced, and worth naming as such:** session revocation on logout, the idle timeout, and expiring sessions on an auth-adjacent write are *conventions in the OTP recipe*, not lint rules — no static check can tell whether a given write is auth-adjacent. They are audit-table rows instead. Treat a solution that skipped them as a finding, not as a passing default.
 
 ---
 
@@ -76,7 +79,7 @@ Run them all: each starter's `deploy.ps1`, the pre-commit hook, and CI.
 
 Each of these was considered and left in place. If a review raises one, the answer is here.
 
-**`style-src 'unsafe-inline'`** — the design system injects styles at runtime through Vue; removing it
+**`style-src 'unsafe-inline'`** — required by dynamic inline style **attributes** (`:style`, `v-show`, `<Transition>`, `element.style.setProperty`) that no nonce or hash can cover, plus the `<style>` elements Power Pages injects itself; It is **not** CSS-in-JS: `@smkbacil/design-ui` ships a static stylesheet that Vite extracts to a self-served `assets/index.css`. Removing it
 breaks all component styling. Recorded in the Code Site "Known accepted findings" table.
 
 **Response timing distinguishes not-found from wrong-code.** A short-circuit returns faster than a full
@@ -105,6 +108,37 @@ reads as a control that is not there.
 **File validation reads only the first few bytes.** Extension, magic bytes and size are
 defense-in-depth. Storage-layer AV scanning does the rest, and the portal never serves an upload as
 active content. This is not a malware-scanning tier and should not be described as one.
+
+**No HTML sanitizer ships, because nothing renders HTML.** There is no `v-html`, no `innerHTML`, no
+markdown or rich-text renderer anywhere in either SPA, and no design-system component takes an
+HTML-string prop — every extension point is a Vue slot, which is compiled VNodes, not parsed markup.
+The control is `vue/no-v-html: 'error'` in both ESLint configs, with zero `eslint-disable` for it in the
+repo. A build-time prohibition is stronger than a runtime sanitizer, and shipping DOMPurify alongside it
+would signal that rendering HTML is a supported pattern here — which is the door the ban is holding shut.
+
+> **If a solution ever does need authored HTML**, this is the required pattern, added *in that solution*:
+> **DOMPurify** (public package, no credential) with an explicit tag/attribute allowlist and an anchor
+> hook forcing `https?:`/`mailto:` plus `rel="noopener" target="_blank"`; the `eslint-disable` scoped to
+> the single sanitized component and nowhere else. Never hand-roll an allowlist — that is the finding an
+> auditor will raise, and correctly.
+
+---
+
+## Owner / environment actions
+
+The starter cannot ship these — they live in Dataverse security roles, the Power Platform admin centre,
+GitHub settings or the network edge. They are listed here so a reviewer can confirm them instead of
+re-discovering them, and each has a matching row in
+[`audit/TEMPLATE-security-audit.md`](audit/TEMPLATE-security-audit.md).
+
+| Owner action | Why the starter cannot ship it | How a reviewer confirms it |
+|---|---|---|
+| **Security telemetry and alerting** — emit structured events (outcome, `errorCode`, actor) and alert on thresholds. **Key the thresholds on the payload, not the HTTP status:** Power Pages forces the 200 + `errorCode` contract, so every business rejection is an HTTP 200 and status-based alerting sees nothing. | Needs an Application Insights / Log Analytics workspace and retention policy owned by the environment, not the repo. The shipped lockout and global-cap alert emails cover only those two events. | A dashboard or query exists that counts `errorCode` by kind over time, and someone receives an alert |
+| **Restrict the OTP / session table to the flow's service account**, and keep the token and code columns out of views, search and exports. | Dataverse security roles are environment data. | The table's roles list only the service account; a normal user cannot read the token column |
+| **Pipeline scanning** — enable the commented-out Solution Checker job (needs the `AZURE_*` service-principal secrets), plus dependency (SCA), secret and static analysis scanning, and protected-branch gates. | Needs org/repo settings and a service principal. The kit ships `flow-lint`, ESLint and the template guards; none of them is a CVE or secret scanner. | The CI run shows the extra jobs, and a branch protection rule requires them |
+| **Per-IP / distributed rate limiting at the WAF or front door.** | A cloud flow has no trustworthy client IP (see Accepted trade-offs). | An edge rule exists, or the risk is accepted in writing |
+| **Atomic attempt counters** if abuse volume warrants it — move them to a store with real concurrency, or to the edge. | The connector has no compare-and-swap, so two simultaneous attempts can both read the same count. The shipped per-identifier limit, lockout and global cap are the baseline, not a guarantee. | Either the counter store changed, or the residual is accepted in writing |
+| **Run-history access** — audit who holds owner/co-owner on each flow and admin on the environment. | Platform permissions. It is the fallback control for any value that cannot be secured in the action config. | The owner list is reviewed and minimal |
 
 ---
 
@@ -141,7 +175,8 @@ Each of these cost a debugging cycle in a real deployment. Several fail **silent
 | Flow security patterns (ownership, file validation, anti-enumeration, caps, Secure I/O) | [FLOW_SNIPPETS.md](SMKB%20-%20Power%20Automate%20Flows%20Starter/FLOW_SNIPPETS.md) §15–19 |
 | The lint rules and how to add one | [flow-lint README](SMKB%20-%20Power%20Automate%20Flows%20Starter/tools/flow-lint/README.md) |
 | Shipped site settings, CSP, login lockdown, HSTS | [Code Site CLAUDE.md](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/CLAUDE.md) → Security Configuration |
-| Shared OTP module hardening | [OTP RECIPE.md](SMKB%20-%20Component%20Library/OTP%20Auth%20Screen/RECIPE.md) → Security baseline |
+| Shared OTP module hardening, session revocation, idle timeout | [OTP RECIPE.md](SMKB%20-%20Component%20Library/OTP%20Auth%20Screen/RECIPE.md) → Security baseline |
+| Bot protection: client, CSP, and the fail-closed server gate | [`/ppcs-add-turnstile`](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/.claude/skills/ppcs-add-turnstile/SKILL.md) |
 | Abuse-threshold env vars | [Env Vars README](SMKB%20-%20Environmental%20Variables%20Starter/README.md) → Security Baseline Variables |
 | Per-solution security record | [docs/07-security.md](docs/07-security.md) · [docs/06-data-privacy.md](docs/06-data-privacy.md) |
 | Pre-go-live audit | [audit/](audit/README.md) · [`/security-audit`](.claude/skills/security-audit/SKILL.md) |
