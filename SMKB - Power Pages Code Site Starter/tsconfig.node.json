@@ -7,5 +7,8 @@
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": ["vite.config.ts"]
+  // vitest.config.ts and eslint.config.js were type-checked by nothing at all: not by
+  // tsconfig.json (which includes only src/**) and not here. A broken vitest config surfaced as
+  // "0 tests found", which reads like a passing suite.
+  "include": ["vite.config.ts", "vitest.config.ts", "eslint.config.js"]
 }

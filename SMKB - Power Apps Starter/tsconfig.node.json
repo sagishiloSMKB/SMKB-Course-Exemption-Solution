@@ -16,5 +16,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts"]
+  // vitest.config.ts and eslint.config.js were type-checked by nothing: not by tsconfig.app.json
+  // (src/** only) and not here. A broken vitest config reports "0 tests found", which reads like
+  // a green suite.
+  "include": ["vite.config.ts", "vitest.config.ts", "eslint.config.js"]
 }

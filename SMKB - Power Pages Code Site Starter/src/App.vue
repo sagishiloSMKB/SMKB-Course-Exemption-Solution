@@ -30,10 +30,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { SmkbButton } from '@smkbacil/design-ui'
 import { usePortalUser } from './composables/usePortalUser'
+import { useLanguage } from './composables/useLanguage'
 import { signIn, signOut } from './services/auth'
 import { SOLUTION } from './config/solution'
 
@@ -47,8 +48,11 @@ const isStandalonePage = computed(() => STANDALONE_ROUTES.has(route.name as stri
 
 const { user } = usePortalUser()
 
-// Current language code — drives SmkbAppHeader language toggle and document direction
-const lang = ref(SOLUTION.defaultLanguage)
+// Current language code - the SHARED ref (composables/useLanguage.ts), not a local one.
+// While it was local, nothing outside this component could read it: every message elsewhere
+// resolved against SOLUTION.defaultLanguage, so toggling to English left all error text in
+// Hebrew, and <html dir> was never updated after mount.
+const { langModel: lang } = useLanguage()
 
 // User menu config for SmkbAppHeader — populated from the Power Pages session
 const userMenuConfig = computed(() => ({

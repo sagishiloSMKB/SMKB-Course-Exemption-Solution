@@ -16,7 +16,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    // arr[i] is T | undefined, not T - `strict` does not cover this. Kept in step with the Code
+    // Site starter's tsconfig, where turning it on found four real possibly-undefined reads.
+    // src/generated/** is excluded below, so generated code cannot be broken by it.
+    "noUncheckedIndexedAccess": true
   },
   "include": ["src/**/*"]
 }

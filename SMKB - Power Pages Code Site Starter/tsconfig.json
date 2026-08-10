@@ -15,6 +15,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+    // arr[i] is T | undefined, not T. `strict` does NOT cover this, and it is the single most
+    // common real bug shape in this codebase: every digits[i] / arr[i].name / map[key] read was
+    // typed as definitely-present. fileUtils reached `.name` on a possibly-absent File that way.
+    "noUncheckedIndexedAccess": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]

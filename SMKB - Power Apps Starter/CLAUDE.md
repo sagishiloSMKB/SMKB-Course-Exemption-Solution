@@ -17,7 +17,7 @@ pnpm install          # Install deps. No credential needed - design-ui is vendor
 pnpm dev              # Dev server — "../generated" barrel is aliased to an in-memory mock automatically
 pnpm build            # vue-tsc type check + Vite build → dist/
 pnpm lint             # ESLint — bans fetch/XHR/WebSocket & v-html; no stray console.log
-pnpm test             # Vitest — runs src/**/*.spec.ts (Node env)
+pnpm test             # Vitest - src/**/*.spec.ts; node env, jsdom for composables/*.spec.ts + *.dom.spec.ts
 pnpm pa <cmd>         # npm-based Power Apps CLI (e.g. pnpm pa add-flow, pnpm pa push)
 powershell -ExecutionPolicy Bypass -File deploy.ps1   # placeholder + env guard + lint + test + build + pnpm pa push
 ```
@@ -38,7 +38,30 @@ Call shape is always: **`generated Service.Run(input)` → `unwrap<T>()` → cle
 `vite.config.ts` aliases any bare-barrel import (`from '.../generated'`) to `src/services/mock/generated.ts` **only in `mode === 'development'`**. In build/prod the real `src/generated/` barrel is used. To mock a new flow in dev, add one export to `src/services/mock/generated.ts` — no new file, no new alias. Deep imports (`../generated/models/X`) are not aliased, so type-only imports still resolve to the real files.
 
 ### Hash routing
-`createWebHashHistory()` (`/#/...`). Required — the Power Apps player intercepts non-hash URLs. Prefer not to rely on client-side role guards for security: identity comes from the runtime (`getContext()`), access is gated by app-sharing, and flows are the real boundary.
+`createWebHashHistory()` (`/#/...`). Required — the Power Apps player intercepts non-hash URLs. Prefer not to rely on client-side role guards for security: identity comes from the runtime (`getContext()` — see the SDK note below), access is gated by app-sharing, and flows are the real boundary.
+
+### The Power Apps SDK — no bootstrap call is required (verified)
+
+A security review asked whether the app is missing an `initialize()` call on `@microsoft/power-apps`.
+**It is not, and there is nothing to add.** Checked against the installed SDK (`@microsoft/power-apps`
+**1.1.3**, requested as `^1.0.3`):
+
+- `@microsoft/power-apps/app` exports exactly `setConfig`, `getContext`, and the `IConfig` / `IContext`
+  types. There is **no `initialize` export**.
+- `@microsoft/power-apps/data` exports `getClient` and the picklist serializers. The generated flow
+  services call `getClient(dataSourcesInfo)` at class scope and `executeAsync(...)` per call — there is
+  no bootstrap step in that path to omit.
+- The only `initialize*` symbol anywhere in the package is `initializeLogger(logger)` under
+  `@microsoft/power-apps/telemetry`. That is an **optional** telemetry sink, not an app bootstrap.
+- `@microsoft/power-apps-vite`'s plugin does not inject one either.
+
+**One real gap the check did surface, stated plainly:** nothing in this starter imports
+`@microsoft/power-apps/app` at all, so `getContext()` is *documented* as the identity source and never
+actually called. That is correct for the shipped skeleton — no view needs the identity yet — but if a
+solution starts making authorization decisions from the signed-in user, call `getContext()` inside
+`onMounted()` (never at module scope) and treat its result as a display convenience: the flow must
+re-derive and re-check identity server-side regardless. Re-verify the export list above if the SDK
+major version changes.
 
 ### Design system
 `@smkbacil/design-ui` registered globally via `app.use(createSmkb())` in `src/main.ts`; components need no per-file import. CSS tokens imported at the top of `main.ts` (uses `tokens-nofonts.css` — the Power Apps asset proxy corrupts web fonts). Reference: `SMKB-UI.md` (auto-generated, do not hand-edit).

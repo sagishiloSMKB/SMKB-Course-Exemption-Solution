@@ -23,9 +23,26 @@ npm run test:watch  # Vitest in watch mode
 npm run deploy      # lint + test + build + pac pages upload-code-site --rootPath .
 ```
 
-**Vitest is configured** (`vitest.config.ts` — node environment, picks up `src/**/*.spec.ts`). Add specs next to the code they test (see `src/services/flowErrors.spec.ts` and `src/utils/sessionCache.spec.ts`). `npm run deploy` refuses to upload if lint or tests fail.
+**Vitest is configured** (`vitest.config.ts`, picks up `src/**/*.spec.ts`). Add specs next to the code
+they test. `npm run deploy` refuses to upload if lint or tests fail.
+
+**Two environments, and picking the right one matters.** The default is `node` — fast, and correct for
+pure logic. A spec that needs browser globals runs under **jsdom**, selected by path:
+`src/modules/**/*.spec.ts`, `src/composables/**/*.spec.ts`, or any `*.dom.spec.ts` anywhere. Name a
+spec `foo.dom.spec.ts` to opt in from elsewhere.
+
+That split is not a convenience. `src/modules/otp-auth/useAuth.ts` reads `sessionStorage` and attaches
+`window` listeners at **module scope**, so under a node-only config the import threw before the first
+assertion ran: the idle timer, the absolute-expiry timer and the logout/revoke paths were
+**untestable**, not merely untested. They now have `useAuth.spec.ts`. Existing examples to copy:
+`flowErrors.spec.ts` and `sessionCache.spec.ts` (node), `useAuth.spec.ts`, `invokeAuthFlow.spec.ts`,
+`cloudFlow.dom.spec.ts` and `fileUtils.dom.spec.ts` (jsdom).
 
 TypeScript strict mode is enabled. `npm run build` runs `vue-tsc` — fix all type errors before deploying. `noUnusedLocals` and `noUnusedParameters` are both on; prefix intentionally unused variables with `_` to suppress the error.
+
+**`noUncheckedIndexedAccess` is on too**, and it is the one option worth knowing about before you write code here: `arr[i]` and `map[key]` are typed `T | undefined`, not `T`. `strict` alone does **not** cover that, and turning it on found four real possibly-undefined reads in the shipped code — including a `FileReader` result that resolved an upload promise with `undefined`, sending the literal string `"undefined"` to a flow as a file's contents. Handle the `undefined` branch; do not reach for `!` or a cast to silence it.
+
+ESLint's `@typescript-eslint/no-explicit-any` is an **error**, not a warning. The flow boundary here is typed generics over unknown JSON, which is precisely where a stray `any` erases the checking that boundary exists for. Use `unknown` and narrow.
 
 **Optional pre-commit hook:** `.githooks/pre-commit` runs ESLint on staged `.vue`/`.ts` files (skips gracefully before `npm install`). It is **not** auto-installed — enable it per clone with `git config core.hooksPath .githooks`.
 
@@ -36,7 +53,7 @@ TypeScript strict mode is enabled. `npm run build` runs `vue-tsc` — fix all ty
 ## Architecture
 
 - **Entry:** `src/main.ts` — creates Vue app, installs Pinia + Router, calls `createSmkb()` (global component registration), mounts to `#app`
-- **Shell:** `src/App.vue` — `SmkbLayout` wrapper with `SmkbAppHeader` (branding, language/theme toggles, user menu) and `<RouterView />`. The `lang` ref here drives the active language and document direction (RTL/LTR).
+- **Shell:** `src/App.vue` — `SmkbLayout` wrapper with `SmkbAppHeader` (branding, language/theme toggles, user menu) and `<RouterView />`. The header's language toggle is bound to the **shared** language ref in [`src/composables/useLanguage.ts`](./src/composables/useLanguage.ts), which also keeps `<html lang>`/`<html dir>` in step. It was a ref local to `App.vue`: nothing else could read it, so every message outside the header resolved against `SOLUTION.defaultLanguage` and `<html dir>` was set once in `main.ts` and never updated. `flowErrorMessage()` and the OTP module's message table both default to the active language now.
 - **Pages:** `src/views/` — one `.vue` file per route. `HomeView.vue` and `AboutView.vue` are demo starters; replace or delete them. Add a view here, then register it in `src/router/index.ts`.
 - **Routing:** `createWebHistory()` — HTML5 history mode required (hash mode breaks Power Pages auth redirects)
 - **State:** `src/stores/` — create Pinia stores here (directory not pre-created; add it when needed)
@@ -45,11 +62,12 @@ TypeScript strict mode is enabled. `npm run build` runs `vue-tsc` — fix all ty
 - **Backend (flows-only):** ALL backend work goes through Power Automate cloud flows via `src/services/cloudFlow.ts` (`invokeFlow()`, `FlowError`, `SessionExpiredError`, `unwrapFlowResult`). Primary transport in the deployed runtime is `window.shell.ajaxSafePost`; a fetch + CSRF fallback (`src/services/csrf.ts`) covers local dev. ESLint bans `fetch`/XHR/WebSocket outside those two files. The Dataverse Web API is the opt-out path — run `/ppcs-enable-web-api` to restore `portalApi.ts`.
 - **Solution identity:** `src/config/solution.ts` — central per-solution constants (`SOLUTION.prefix`, `appName`, `documentTitle`, `defaultLanguage`, `languages[]`). Ships with `CHANGEME` sentinels; fill it first (see "Solution identity" below).
 - **Flow registry:** `src/config/flows.ts` — ships empty; add each flow GUID after Studio registration (`/ppcs-register-flow`)
-- **Utils:** `src/utils/` — `sessionCache.ts` (`createSessionCache`: sessionStorage cache + inflight dedup for flow reads), `safeJson.ts` (`safeJsonParse`), `fileUtils.ts` (`buildNamedFilePayload` — base64 + naming for flow file uploads)
+- **Utils:** `src/utils/` — `sessionCache.ts` (`createSessionCache`: session cache + in-flight dedup, and an `invalidate()` that cancels the commit of a load already in flight), `safeJson.ts` (`safeJsonParse`), `fileUtils.ts` (`buildNamedFilePayload` — base64 + naming for flow file uploads; attachment labels are spreadsheet-style so they keep working past 26 files)
+- **Language:** `src/composables/useLanguage.ts` — the one shared active-language ref; also mirrors `<html lang>`/`dir`. Read it with `currentLanguage()` outside a component.
 - **Auth:** Server-managed OAuth (Power Pages portal) — `src/services/auth.ts` only redirects; no client-side token handling
 - **OTP auth (optional):** `src/modules/otp-auth/` — dormant phone-OTP auth module, zero bundle bytes until wired; enable with `/ppcs-enable-otp-auth`
 - **User context:** `src/composables/usePortalUser.ts` — reads `window.Microsoft.Dynamic365.Portal.User`
-- **Error UX:** `src/composables/useFlowErrorToast.ts` — localized toast for failed flow calls; messages live in `src/services/flowErrors.ts` (he/en maps keyed by `SOLUTION.defaultLanguage`). `useFormValidation` is also available.
+- **Error UX:** `src/composables/useFlowErrorToast.ts` — localized toast for failed flow calls; messages live in `src/services/flowErrors.ts` (he/en maps resolved against the **active** language, so the header toggle reaches them). `useFormValidation` is also available.
 
 ### Adding a new page
 
@@ -84,7 +102,7 @@ Custom Dataverse components a solution adds later (tables, columns, flows) follo
 
 ## OTP auth module (optional)
 
-`src/modules/otp-auth/` ships **dormant** — phone OTP + Cloudflare Turnstile + sessionStorage session + `smkb:session-expired` event + router guard. Nothing imports it, so it adds zero bundle bytes until wired. Enable with `/ppcs-enable-otp-auth`, which adds the login/locked-out routes, router guard, App.vue session-expired wiring, and `challenges.cloudflare.com` to `script-src`/`frame-src`/`connect-src` in **both** CSP site settings. The module README (`src/modules/otp-auth/README.md`) documents the flows it needs (`createOtp` / `checkOtp` / `getPortalConfig`, plus the recommended `revokeSession` — all Anonymous Users role). Authenticated calls use the module's `invokeAuthFlow`, which passes `authToken` for server-side re-validation. `logout()` calls `revokeSession` fire-and-forget and a 15-minute idle timeout runs the same path, so a token stops working when the user leaves rather than only at its absolute expiry. Dev mock: leave the GUIDs in `otpFlows.ts` empty and run `npm run dev` — any phone number works with OTP `123456`.
+`src/modules/otp-auth/` ships **dormant** — phone OTP + Cloudflare Turnstile + sessionStorage session + `smkb:session-expired` event + router guard. Nothing imports it, so it adds zero bundle bytes until wired. Enable with `/ppcs-enable-otp-auth`, which adds the login/locked-out routes, router guard, App.vue session-expired wiring, and `challenges.cloudflare.com` to `script-src`/`frame-src`/`connect-src` in **both** CSP site settings. The module README (`src/modules/otp-auth/README.md`) documents the flows it needs (`createOtp` / `checkOtp` / `getPortalConfig`, plus the recommended `revokeSession` — all Anonymous Users role). Authenticated calls use the module's `invokeAuthFlow`, which passes `authToken` for server-side re-validation. A 15-minute idle timeout and an absolute-expiry timer both sign the user out, so a token stops working when the user leaves rather than only when it expires. **Two logout entry points, and the difference matters:** `logout()` fires `revokeSession` and forgets it — correct for the timers, which do not navigate. A handler that navigates afterwards must use **`logoutAndRevoke()`**, which awaits a *bounded* revoke before clearing state: `window.shell.ajaxSafePost` has no `keepalive`, so a `router.push()` can abort the in-flight revoke and leave the token valid server-side, which is the exact failure revocation exists to prevent. Dev mock: leave the GUIDs in `otpFlows.ts` empty and run `npm run dev` — any phone number works with OTP `123456`.
 
 ---
 
@@ -254,7 +272,12 @@ The script is **safe to run again**. It only ever touches a file that still hold
 placeholder, so if the starter later ships another setting (a new header, a new auth
 lockdown), a re-run gives that one a real GUID and leaves every assigned GUID alone.
 Without that, a late-added setting would deploy carrying the literal template placeholder.
-Placeholders must be **lowercase** — the replacement scan is case-sensitive.
+
+Placeholder **case does not matter**: the file filter and the replacement both run with `(?i)`, and
+the matched value is lowercased before it becomes a map key. This doc previously said the scan was
+case-sensitive and that placeholders must be lowercase — the opposite of what the script does, and a
+reader who trusted it would have hand-lowercased a placeholder for no reason (or worse, assumed an
+uppercase one was safely ignored).
 
 After `pac pages download`, PAC CLI overwrites these files with the system-assigned
 Dataverse GUIDs. Subsequent deploys are fully idempotent.

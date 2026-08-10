@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from './useAuth'
 import { createOtp, checkOtp, normalizePhone, type OtpChannel } from './authService'
 import { getPortalConfig } from './configService'
+import { otpErrorMessage, otpChannelLabel } from './otpMessages'
 import { useTurnstile } from './useTurnstile'
 import { OTP_AUTH_CONFIG } from './otpAuthConfig'
 import { SOLUTION } from '../../config/solution'
@@ -116,46 +117,18 @@ function retryTurnstile() {
 const otpValue       = computed(() => digits.value.join(''))
 const verifyDisabled = computed(() => otpValue.value.length < 6 || retryActive.value)
 
-const errorMessage = computed(() => {
-  if (!errorCode.value) return ''
-  switch (errorCode.value) {
-    case 'INVALID_PHONE':    return 'נא להזין מספר טלפון תקין'
-    // Anti-enumeration: the FLOW is what must not distinguish these cases — a generic
-    // message here is cosmetic if the response body still carries a specific code, since
-    // anyone can read it in the network tab. The hardened templates therefore return a
-    // single INVALID_CODE for no-pending-code, expired and wrong-code, and answer an
-    // unknown number on the phone step exactly as they answer a successful send.
-    // See SMKB - Component Library/OTP Auth Screen/RECIPE.md -> "Security baseline".
-    case 'INVALID_CODE':     return attemptsLeft.value !== null
-                               ? `הקוד שגוי. נותרו ${attemptsLeft.value} ניסיונות`
-                               : 'הקוד שגוי או שתוקפו פג. בקש/י קוד חדש'
-    // LOCKED is the one specific code we still return, because a stuck user needs to know
-    // why. It describes the ATTEMPT STATE, never the account.
-    case 'LOCKED':           return step.value === 'otp'
-                               ? 'יותר מדי ניסיונות שגויים. בקש/י קוד חדש'
-                               : 'יותר מדי נסיונות. נסה/י שוב מאוחר יותר'
-    // Legacy codes from a flow built before the recipe was hardened. Kept so an older
-    // deployment degrades gracefully, and mapped to the SAME generic text as INVALID_CODE
-    // so the client never widens what the flow reveals.
-    case 'NOT_FOUND':
-    case 'WRONG_OTP':
-    case 'EXPIRED':
-    case 'ACCOUNT_ARCHIVED': return 'הקוד שגוי או שתוקפו פג. בקש/י קוד חדש'
-    case 'OTP_SEND_FAILED':  return 'לא ניתן לשלוח את קוד האימות. אנא נסה שוב'
-    case 'RATE_LIMITED':     return 'כבר נשלח קוד. ניתן לבקש קוד חדש בעוד כדקה'
-    case 'INVALID_INPUT':    return 'נא להזין מספר טלפון תקין'
-    case 'CAPTCHA_FAILED':   return 'אימות האבטחה נכשל, נסה/י שוב'
-    default:                 return 'אירעה שגיאה. אנא נסה שוב'
-  }
-})
+// Messages live in otpMessages.ts, keyed by language and resolved against the ACTIVE one.
+// This used to be a switch of Hebrew literals here, so the header's language toggle changed the
+// chrome and left every error in Hebrew - and an `en`-default solution shipped Hebrew errors with
+// no toggle involved. The anti-enumeration reasoning (one generic INVALID_CODE for
+// no-pending-code / expired / wrong, LOCKED as the one specific code) moved with them and is
+// documented at the top of that file: read it before "improving" any of this text.
+const errorMessage = computed(() =>
+  otpErrorMessage(errorCode.value, step.value, attemptsLeft.value),
+)
 
 function channelLabel(type: OtpChannel['type']): string {
-  switch (type) {
-    case 'sms':            return 'מספר טלפון'
-    case 'email_college':
-    case 'email_personal': return 'דוא״ל'
-    default:               return ''
-  }
+  return otpChannelLabel(type)
 }
 
 // ── OTP digit grid ─────────────────────────────────────────────────────────
@@ -346,12 +319,15 @@ async function verify() {
     authToken:          result.authToken,
     authTokenExpiresAt: result.authTokenExpiresAt,
   })
-  // Post-login routing — solution-specific overrides go in otpAuthConfig.ts.
+  // Post-login routing - solution-specific overrides go in otpAuthConfig.ts.
+  // Awaited: an unawaited router.push swallows a navigation guard's rejection into an unhandled
+  // promise, so a guard that redirects or aborts fails silently and the user is left on the
+  // login screen with no error.
   const status = result.status
   const custom = OTP_AUTH_CONFIG.onLoginRedirect?.(status)
-  if (custom) router.push(custom)
-  else if (OTP_AUTH_CONFIG.blockedStatuses.includes(status)) router.push(OTP_AUTH_CONFIG.lockedOutPath)
-  else router.push(OTP_AUTH_CONFIG.homePath)
+  const target = custom
+    ?? (OTP_AUTH_CONFIG.blockedStatuses.includes(status) ? OTP_AUTH_CONFIG.lockedOutPath : OTP_AUTH_CONFIG.homePath)
+  await router.push(target)
 }
 
 async function resend() {

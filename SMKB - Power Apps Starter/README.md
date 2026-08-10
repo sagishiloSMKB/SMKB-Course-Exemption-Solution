@@ -170,7 +170,10 @@ Vue component → domain service (src/services/*) → generated flow service (sr
 
 ```powershell
 pnpm lint   # ESLint — bans direct network calls & v-html, no stray console.log
-pnpm test   # Vitest — runs every src/**/*.spec.ts in a Node environment
+pnpm test   # Vitest - every src/**/*.spec.ts. Node environment by default; jsdom for
+            # src/composables/**/*.spec.ts and any *.dom.spec.ts (a spec that needs
+            # window/sessionStorage/a Vue ref). Without that escape hatch a module
+            # touching window at import time is untestable, not merely untested.
 ```
 
 `deploy.ps1` runs **lint → test → build → push** and aborts on the first failure, so nothing ships that fails a gate. Colocate a `*.spec.ts` next to any pure-logic module you add.
@@ -199,7 +202,7 @@ The deploy placeholder guard blocks on `sol_exampleflow`, so you can't accidenta
 ├── deploy.ps1                ← placeholder guard + env guard + lint + test + build + pnpm pa push
 ├── vendor/                   ← committed @smkbacil/design-ui tarball (no credential needed)
 ├── eslint.config.js          ← UI-only security rules (no fetch/XHR/WS, no v-html)
-├── vitest.config.ts          ← unit-test runner (Node env)
+├── vitest.config.ts          ← unit-test runner (node env; jsdom by path glob)
 ├── vite.config.ts            ← Power Apps plugin + dev "../generated" → mock alias
 ├── .power/schemas/           ← generated connector schemas (committed)
 └── src/

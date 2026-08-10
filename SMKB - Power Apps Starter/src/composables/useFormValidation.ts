@@ -29,9 +29,13 @@ export function useFormValidation(validators: Validators) {
   /** Run every validator, populate `errors`, and return whether the form is valid. */
   function validateAll(): boolean {
     let valid = true
-    for (const field of Object.keys(validators)) {
-      errors[field] = validators[field]()
-      if (errors[field]) valid = false
+    // Object.entries, not keys-then-index: with noUncheckedIndexedAccess a keyed read is
+    // `T | undefined`, and validateField() already used `?.() ?? ''` for the same reason.
+    // Kept identical to the Code Site starter's twin.
+    for (const [field, rule] of Object.entries(validators)) {
+      const message = rule()
+      errors[field] = message
+      if (message) valid = false
     }
     return valid
   }

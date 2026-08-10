@@ -80,7 +80,12 @@ Plus **static/native** checks: **ESLint** (per app) and the **Power Platform Sol
 
 ## Infrastructure & wiring
 
-- **Vitest per SPA:** each app has `vitest` + a `test` script + a standalone `vitest.config.ts` (Node env).
+- **Vitest per SPA:** each app has `vitest` + a `test` script + a standalone `vitest.config.ts`. The
+  **node** environment is the default (fast, correct for pure logic); **jsdom** is selected by path
+  — `src/composables/**/*.spec.ts`, `src/modules/**/*.spec.ts` (Code Site), and any `*.dom.spec.ts`.
+  Choose deliberately: a module that touches `window` or `sessionStorage` at import time cannot be
+  imported at all under node, so a missing jsdom glob makes a file **untestable** rather than
+  untested — which is indistinguishable from a clean suite.
   Specs live beside the code as `src/**/*.spec.ts`. (Add `@vue/test-utils` + jsdom for Layer 2.)
 - **flow-lint (Layer 4):** zero-dependency Node ESM at `tools/flow-lint/` — `node lint.mjs` (+ `node test.mjs`
   self-test). Reads the flow JSON + solution XML; no Vue, no install.

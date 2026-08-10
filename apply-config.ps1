@@ -98,6 +98,16 @@ $prefix      = "$($cfg.shortPrefix)"
 $prefixUpper = $prefix.ToUpperInvariant()
 $targetUrl   = "$($cfg.targetEnvUrl)"
 $envId       = "$($cfg.environmentId)"
+# Previously read by nobody. publisherPrefix is now an ENFORCED constant (see Assert-Valid) and
+# paRegion is pushed into power.config.json below - an unconsumed config key is worse than no key,
+# because someone eventually edits it and expects an effect.
+$pubPrefix   = "$($cfg.publisherPrefix)"
+$paRegion    = "$($cfg.powerApps.region)"
+# webUrlSlug was also read by nobody: CLAUDE.md tells the developer to record the Power Pages web
+# address here so it lives in version control, and /ppcs-provision-site prints it at the
+# reactivation pause - but nothing ever validated it, so a repo could carry CHANGEME-WEB-URL-SLUG
+# and the skill would print that at the one moment the value is typed by hand and hard to change.
+$ppSlug      = "$($cfg.powerPages.webUrlSlug)"
 $appDisplay  = "$($cfg.powerApps.appDisplayName)"
 $ppSite      = "$($cfg.powerPages.siteName)"
 $ppHe        = "$($cfg.powerPages.appNameHe)"
@@ -129,6 +139,24 @@ function Test-Initialized {
           $prefix -ne 'sol' -and $prefix -ne '')
 }
 
+# Is a value still a shipped placeholder? ONE predicate for every field.
+#
+# The checks below used to be per-field ad hoc: powerApps.appDisplayName was compared only to
+# 'Your App Display Name', while powerPages fields matched 'CHANGEME*'. So
+# appDisplayName = 'CHANGEME-APP-NAME' - the exact shape every other field uses, and the shape a
+# developer copies from its neighbours - passed validation, and the placeholder was written into
+# power.config.json and deployed as the app's display name.
+function Test-Sentinel {
+  param([string]$Value)
+  if ($null -eq $Value) { return $true }
+  $v = $Value.Trim()
+  if ($v -eq '') { return $true }
+  if ($v -like 'CHANGEME*') { return $true }
+  # The literal values this file ships with.
+  return @('YourSolutionName', 'Your Solution Name', 'Your App Display Name',
+           'your-default-value-here', 'your-org.crm') -contains $v
+}
+
 function Assert-Valid {
   $errs = @()
   if ($uniqueName -eq '' -or $uniqueName -eq 'YourSolutionName') { $errs += 'solutionUniqueName is unset (still "YourSolutionName").' }
@@ -139,11 +167,23 @@ function Assert-Valid {
   if ($envId -notmatch '^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$') { $errs += 'environmentId must be a GUID.' }
   if ($envId -eq '00000000-0000-0000-0000-000000000000') { $errs += 'environmentId is still all-zeros.' }
   if ($targetUrl -notmatch '^https://.+/$') { $errs += 'targetEnvUrl must be an https URL ending in "/".' }
-  if ($cfg.activate.powerApps -and ($appDisplay -eq 'Your App Display Name' -or $appDisplay -eq '')) { $errs += 'powerApps.appDisplayName is unset.' }
+  if ($cfg.activate.powerApps -and (Test-Sentinel $appDisplay)) { $errs += "powerApps.appDisplayName is still a placeholder ('$appDisplay')." }
+  # The publisher is org-wide and fixed (CLAUDE.md Critical Rule 5: one publisher, SKMBCore /
+  # prefix 'smkb', never one per solution). Nothing reads this value to BUILD a name - every
+  # schema name in the kit is written with a literal smkb_ - so changing it here would have
+  # produced a config that says one thing and a solution that does another, silently. Enforce the
+  # constant instead of leaving the key inert.
+  if ($pubPrefix -ne 'smkb') {
+    $errs += "publisherPrefix must be 'smkb' (got '$pubPrefix'). The publisher is org-wide and fixed - see CLAUDE.md Critical Rule 5. The per-solution namespace is shortPrefix."
+  }
+  if ($cfg.activate.powerApps -and $paRegion -notin @('prod', 'preview', 'test')) {
+    $errs += "powerApps.region must be one of prod / preview / test (got '$paRegion') - it is written into power.config.json."
+  }
   if ($cfg.activate.powerApps -and $paComponent -eq '') { $errs += 'powerApps.componentName is unset and could not be derived from appDisplayName (it names the Power App folder).' }
   if ($cfg.activate.powerPages) {
-    foreach ($pair in @(@('siteName',$ppSite),@('appNameHe',$ppHe),@('appNameEn',$ppEn),@('documentTitle',$ppTitle))) {
-      if ($pair[1] -like 'CHANGEME*' -or $pair[1] -eq '') { $errs += "powerPages.$($pair[0]) is unset (still CHANGEME)." }
+    foreach ($pair in @(@('siteName',$ppSite),@('appNameHe',$ppHe),@('appNameEn',$ppEn),
+                        @('documentTitle',$ppTitle),@('webUrlSlug',$ppSlug))) {
+      if (Test-Sentinel $pair[1]) { $errs += "powerPages.$($pair[0]) is still a placeholder ('$($pair[1])')." }
     }
   }
   # Values that become FOLDER NAMES must be legal path segments. Without this the run writes
@@ -512,6 +552,7 @@ if ($cfg.activate.powerApps) {
   $pc = Join-Path $paRoot 'power.config.json'
   Invoke-Op -Path $pc -Pattern '("appDisplayName":\s*)"[^"]*"' -Replacement ('${1}"' + (EscJson $appDisplay) + '"') -Label 'PowerApps power.config appDisplayName'
   Invoke-Op -Path $pc -Pattern '("environmentId":\s*)"[^"]*"'  -Replacement ('${1}"' + (EscJson $envId)      + '"') -Label 'PowerApps power.config environmentId'
+  Invoke-Op -Path $pc -Pattern '("region":\s*)"[^"]*"'         -Replacement ('${1}"' + (EscJson $paRegion)   + '"') -Label 'PowerApps power.config region'
 }
 
 # Power Pages - src/config/solution.ts + powerpages.config.json.

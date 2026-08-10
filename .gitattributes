@@ -3,3 +3,13 @@
 # silently disable the config-drift / doc-boundary gates on a fresh Windows clone.
 .githooks/pre-commit text eol=lf
 *.mjs               text eol=lf
+
+# The vendored @smkbacil/design-ui tarball. Without this, a repo configured with
+# core.autocrlf=true can line-ending-mangle the gzip stream on checkout, and the failure surfaces
+# as an unreadable tarball at install time rather than as anything to do with git.
+*.tgz               binary
+
+# Dataverse solution XML is produced and consumed by Windows tooling (pac, the maker portal), so
+# pin CRLF rather than letting each clone's autocrlf setting decide - a mixed-ending Solution.xml
+# produces a whole-file diff on the next pac round-trip and buries the real change.
+*.xml               text eol=crlf

@@ -49,7 +49,10 @@ lint_starter() {
   fi
   rel=$(printf '%s\n' "$files" | sed "s#^${dir}/##")
   echo "pre-commit: [$dir] linting staged files ..."
-  ( cd "$dir" && printf '%s\n' "$rel" | xargs -r ./node_modules/.bin/eslint ) || return 1
+  # -d '\n' so a staged path containing a SPACE is one argument. Plain `xargs` splits on
+  # whitespace, so "src/views/My View.vue" arrived as two nonexistent paths and eslint failed
+  # with "No files matching the pattern" - a lint error about a file that is not the problem.
+  ( cd "$dir" && printf '%s\n' "$rel" | xargs -r -d '\n' ./node_modules/.bin/eslint ) || return 1
   return 0
 }
 
