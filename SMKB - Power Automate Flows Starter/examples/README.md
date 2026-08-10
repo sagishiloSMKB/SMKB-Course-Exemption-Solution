@@ -17,12 +17,21 @@ deployed, but it is exactly what an external security review raises, and a templ
 to keep it. So:
 
 **Replaced** — the solution schema prefix (now the `sol` placeholder), local connection keys, the tenant
-SharePoint host (now an empty default), the sender address, every real GUID (now `e0000000-…`
-placeholders, consistently mapped so internal cross-references still line up), vendor-named secret
-variables, and the solution's name in prose.
+SharePoint host (now an empty default), every real GUID (now `e0000000-…` placeholders, consistently
+mapped so internal cross-references still line up), vendor-named secret variables, and the solution's
+name in prose.
+
+> **Correction:** this note used to list "the sender address" as replaced. It was not, and it should not
+> be. `noreply@smkb.ac.il` is the **mandated org-wide sender** — the main
+> [README](../README.md) says to always set `emailMessage/From` to it, and the shipped
+> `Workflows/` skeletons carry it too. It belongs in the "deliberately kept" list below, alongside the
+> connection-reference names, not in the scrub list. An audit that flags it is reading an org
+> convention as a leak.
 
 **Deliberately kept:**
 
+- **The sender address** `noreply@smkb.ac.il` — the org-wide no-reply mailbox every SMKB flow sends
+  from (main README → "Always send emails from"). Not a leak, and not per-solution.
 - **The connection-reference logical names** — `msdyn_Dataverse`, `new_sharedoffice365_c3167`,
   `smkb_SMKBApprovals`, `smkb_SMKBSharePointConnectionUser1`. These are environment-level and
   **intentionally shared** across SMKB solutions (root `CLAUDE.md` → Connection References); the main

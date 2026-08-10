@@ -38,8 +38,33 @@ function Write-Text([string]$Path, [string]$Text) {
   $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
   [System.IO.File]::WriteAllText($Path, $Text, $utf8NoBom)
 }
-# Escape a substituted value so literal $ in it is not read as a .NET group ref.
-function Esc([string]$s) { if ($null -eq $s) { '' } else { $s.Replace('$', '$$') } }
+# -- Escaping: the DESTINATION grammar decides, not just the regex ------------
+# Esc used to escape only '$' (the .NET replacement group-ref). That is necessary but not
+# sufficient: these values land in XML attributes, JSON strings and single-quoted TypeScript
+# literals. A solution named "SMKB - Registration & Payments" wrote a raw '&' into three
+# Other/Solution.xml files - malformed XML, pac import fails - and -Check then reported "No
+# drift", because the write itself had succeeded. An apostrophe in documentTitle broke
+# solution.ts the same way. Escape for the target grammar FIRST, then for the replacement
+# grammar (content escaping never introduces a '$', so the order is safe).
+function EscRe([string]$s) { if ($null -eq $s) { '' } else { $s.Replace('$', '$$') } }
+
+# XML: covers both attribute values and element text.
+function EscXml([string]$s) {
+  if ($null -eq $s) { return '' }
+  EscRe ($s.Replace('&', '&amp;').Replace('<', '&lt;').Replace('>', '&gt;').Replace('"', '&quot;'))
+}
+
+# JSON string body.
+function EscJson([string]$s) {
+  if ($null -eq $s) { return '' }
+  EscRe ($s.Replace('\', '\\').Replace('"', '\"'))
+}
+
+# Single-quoted TypeScript/JavaScript literal.
+function EscTs([string]$s) {
+  if ($null -eq $s) { return '' }
+  EscRe ($s.Replace('\', '\\').Replace("'", "\'"))
+}
 
 $script:drift  = @()
 $script:writes = 0
@@ -115,6 +140,34 @@ function Assert-Valid {
       if ($pair[1] -like 'CHANGEME*' -or $pair[1] -eq '') { $errs += "powerPages.$($pair[0]) is unset (still CHANGEME)." }
     }
   }
+  # Values that become FOLDER NAMES must be legal path segments. Without this the run writes
+  # every content change and only then throws at Rename-Item, leaving a half-applied repo whose
+  # symptom is a doc-boundaries failure rather than a config error.
+  foreach ($seg in @(
+      @('solutionDisplayName (folder segment)', $solutionName),
+      @('powerApps.componentName',              $(if ($cfg.activate.powerApps)  { $paComponent } else { '' })),
+      @('powerPages.siteName',                  $(if ($cfg.activate.powerPages) { $ppSite }      else { '' })))) {
+    $name = $seg[0]; $val = "$($seg[1])"
+    if ($val -eq '') { continue }
+    if ($val -match '[\\/:*?"<>|]') { $errs += "$name '$val' contains a character illegal in a folder name (\\ / : * ? "" < > |)." }
+    if ($val -match '\.\s*$')       { $errs += "$name '$val' must not end with a dot - Windows silently strips it." }
+    if ($val -match '^\s|\s$')      { $errs += "$name '$val' must not start or end with whitespace." }
+  }
+
+  # Confusable punctuation is the one charset rule that matters here: Hebrew and other scripts are
+  # fine in a display name (Dataverse XML is UTF-8), but an en/em dash or a smart quote is mangled
+  # by Hebrew-locale Windows-1255 tooling into visible garbage. Reject it at the source, with the
+  # ASCII replacement named, rather than shipping a corrupted display name.
+  foreach ($pair in @(
+      @('solutionDisplayName', $displayName), @('powerApps.appDisplayName', $appDisplay),
+      @('powerPages.appNameHe', $ppHe), @('powerPages.appNameEn', $ppEn),
+      @('powerPages.documentTitle', $ppTitle), @('powerPages.siteName', $ppSite))) {
+    $val = "$($pair[1])"
+    if ($val -match '[\u2013\u2014]')       { $errs += "$($pair[0]) contains an en/em dash - use an ASCII hyphen '-'." }
+    if ($val -match '[\u2018\u2019\u201C\u201D]') { $errs += "$($pair[0]) contains a smart quote - use a plain ' or ""." }
+    if ($val -match '\u00A0')               { $errs += "$($pair[0]) contains a non-breaking space - use a normal space." }
+  }
+
   if ($errs.Count) {
     Write-Host "solution.config.json is not ready:" -ForegroundColor Red
     $errs | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
@@ -125,7 +178,15 @@ function Assert-Valid {
 # -- Keyed-regex op: rewrite value in place; unifies apply / dry-run / check ---
 function Invoke-Op {
   param([string]$Path, [string]$Pattern, [string]$Replacement, [string]$Label)
-  if (-not (Test-Path -LiteralPath $Path)) { return }
+  # A missing target used to return silently in EVERY mode, so -Check reported "No drift" and
+  # exited 0 for an activated starter whose config file had been deleted, moved, or pushed past
+  # MAX_PATH (where Test-Path returns $false rather than throwing). -Check is what the pre-commit
+  # hook and /pre-deploy-verify rely on, so that was a false pass on the load-bearing gate.
+  if (-not (Test-Path -LiteralPath $Path)) {
+    if ($Check) { $script:drift += "$Label  (MISSING FILE: $Path)" }
+    else { Write-Host "  MISSING: $Label - $Path" -ForegroundColor Yellow; $script:warned = $true }
+    return
+  }
   $orig = Read-Text $Path
   $new  = [regex]::Replace($orig, $Pattern, $Replacement)
   $changed = ($new -ne $orig)
@@ -144,7 +205,12 @@ $script:shippedEnvVars = @('EnvironmentName', 'FlowErrorEmails', 'OtpDailyCap', 
 
 function Invoke-AlmToken {
   param([string]$Path, [string]$Label)
-  if (-not (Test-Path -LiteralPath $Path)) { return }
+  # See Invoke-Op: a missing file must be drift under -Check, never a silent pass.
+  if (-not (Test-Path -LiteralPath $Path)) {
+    if ($Check) { $script:drift += "$Label  (MISSING FILE: $Path)" }
+    else { Write-Host "  MISSING: $Label - $Path" -ForegroundColor Yellow; $script:warned = $true }
+    return
+  }
   $orig = Read-Text $Path
   $new  = $orig
   foreach ($v in $script:shippedEnvVars) {
@@ -202,7 +268,15 @@ function Rename-AlmFolder {
   $old = Join-Path $Base $OldName
   $new = Join-Path $Base $NewName
   if ($OldName -eq $NewName) { return }
-  if ($Check)  { if (Test-Path -LiteralPath $old) { $script:drift += "$Label (folder still '$OldName')  ($Base)" }; return }
+  if ($Check) {
+    if (Test-Path -LiteralPath $old) { $script:drift += "$Label (folder still '$OldName')  ($Base)" }
+    # Neither name present is NOT clean: the definition folder vanished (deleted, moved, or past
+    # MAX_PATH) while Other/Solution.xml was already re-prefixed, so the definitions would import
+    # unlinked from the solution. Invoke-StarterRename already treats this as a real condition;
+    # this one used to pass silently.
+    elseif (-not (Test-Path -LiteralPath $new)) { $script:drift += "$Label (MISSING: neither '$OldName' nor '$NewName')  ($Base)" }
+    return
+  }
   if (-not (Test-Path -LiteralPath $old)) {
     # Distinguish "already renamed" from "neither name is there". The latter means the path was
     # unreadable - on Windows PowerShell 5.1 that is almost always MAX_PATH (>260 chars), where
@@ -219,8 +293,19 @@ function Rename-AlmFolder {
     return
   }
   if ($DryRun) { Write-Host "  WOULD RENAME $Label -> $NewName"; return }
-  if (Test-Path -LiteralPath $new) { Remove-Item -LiteralPath $old -Recurse -Force }
-  else { Rename-Item -LiteralPath $old -NewName $NewName }
+  # BOTH names present. This used to Remove-Item the old folder outright, destroying whatever was
+  # in it - including a hand-edited environmentvariabledefinition.xml - with no prompt and no
+  # warning. Invoke-StarterRename warns and refuses for the identical collision; match that.
+  # Deleting data is never the safe default for an ambiguous state.
+  if (Test-Path -LiteralPath $new) {
+    Write-Host "  WARNING: $Label - both '$OldName' and '$NewName' exist under" -ForegroundColor Yellow
+    Write-Host "           $Base" -ForegroundColor Yellow
+    Write-Host "           Refusing to guess. Merge whatever you need out of '$OldName', delete it," -ForegroundColor Yellow
+    Write-Host "           then re-run. (Nothing was changed.)" -ForegroundColor Yellow
+    $script:warned = $true
+    return
+  }
+  Rename-Item -LiteralPath $old -NewName $NewName
   $script:writes++; Write-Host "  renamed: $Label -> $NewName" -ForegroundColor Green
 }
 
@@ -380,7 +465,7 @@ Write-Host ""
 
 # Solution.xml identity (UniqueName + solution display name) - the 3 XML starters.
 $solXmlPattern = '(<SolutionManifest>\s*<UniqueName>)[^<]*(</UniqueName>\s*<LocalizedNames>\s*<LocalizedName description=")[^"]*(")'
-$solXmlRepl    = '${1}' + (Esc $uniqueName) + '${2}' + (Esc $displayName) + '${3}'
+$solXmlRepl    = '${1}' + (EscXml $uniqueName) + '${2}' + (EscXml $displayName) + '${3}'
 foreach ($s in @(
     @{ on = $cfg.activate.dataverseTables;       path = (Join-Path $tbRoot 'Other\Solution.xml'); lbl = 'Tables Solution.xml identity' },
     @{ on = $cfg.activate.environmentVariables;  path = (Join-Path $evRoot 'Other\Solution.xml'); lbl = 'EnvVars Solution.xml identity' },
@@ -391,30 +476,30 @@ foreach ($s in @(
 # Power Apps - deploy.config.json + power.config.json (identity only; appId left to pac code init).
 if ($cfg.activate.powerApps) {
   $dc = Join-Path $paRoot 'deploy.config.json'
-  Invoke-Op -Path $dc -Pattern '("solutionName":\s*)"[^"]*"' -Replacement ('${1}"' + (Esc $uniqueName) + '"') -Label 'PowerApps deploy.config solutionName'
-  Invoke-Op -Path $dc -Pattern '("targetEnv":\s*)"[^"]*"'    -Replacement ('${1}"' + (Esc $targetUrl)  + '"') -Label 'PowerApps deploy.config targetEnv'
-  Invoke-Op -Path $dc -Pattern '("allowedEnvs":\s*)\[[^\]]*\]' -Replacement ('${1}["' + (Esc $targetUrl) + '"]') -Label 'PowerApps deploy.config allowedEnvs'
+  Invoke-Op -Path $dc -Pattern '("solutionName":\s*)"[^"]*"' -Replacement ('${1}"' + (EscJson $uniqueName) + '"') -Label 'PowerApps deploy.config solutionName'
+  Invoke-Op -Path $dc -Pattern '("targetEnv":\s*)"[^"]*"'    -Replacement ('${1}"' + (EscJson $targetUrl)  + '"') -Label 'PowerApps deploy.config targetEnv'
+  Invoke-Op -Path $dc -Pattern '("allowedEnvs":\s*)\[[^\]]*\]' -Replacement ('${1}["' + (EscJson $targetUrl) + '"]') -Label 'PowerApps deploy.config allowedEnvs'
   $pc = Join-Path $paRoot 'power.config.json'
-  Invoke-Op -Path $pc -Pattern '("appDisplayName":\s*)"[^"]*"' -Replacement ('${1}"' + (Esc $appDisplay) + '"') -Label 'PowerApps power.config appDisplayName'
-  Invoke-Op -Path $pc -Pattern '("environmentId":\s*)"[^"]*"'  -Replacement ('${1}"' + (Esc $envId)      + '"') -Label 'PowerApps power.config environmentId'
+  Invoke-Op -Path $pc -Pattern '("appDisplayName":\s*)"[^"]*"' -Replacement ('${1}"' + (EscJson $appDisplay) + '"') -Label 'PowerApps power.config appDisplayName'
+  Invoke-Op -Path $pc -Pattern '("environmentId":\s*)"[^"]*"'  -Replacement ('${1}"' + (EscJson $envId)      + '"') -Label 'PowerApps power.config environmentId'
 }
 
 # Power Pages - src/config/solution.ts + powerpages.config.json.
 if ($cfg.activate.powerPages) {
   $st = Join-Path $ppRoot 'src\config\solution.ts'
-  Invoke-Op -Path $st -Pattern "(prefix:\s*)'[^']*'"        -Replacement ("`${1}'" + (Esc $prefix)  + "'") -Label 'PowerPages solution.ts prefix'
-  Invoke-Op -Path $st -Pattern "(siteName:\s*)'[^']*'"      -Replacement ("`${1}'" + (Esc $ppSite)  + "'") -Label 'PowerPages solution.ts siteName'
-  Invoke-Op -Path $st -Pattern "(appName:\s*\{\s*he:\s*)'[^']*'(,\s*en:\s*)'[^']*'" -Replacement ("`${1}'" + (Esc $ppHe) + "'`${2}'" + (Esc $ppEn) + "'") -Label 'PowerPages solution.ts appName'
-  Invoke-Op -Path $st -Pattern "(documentTitle:\s*)'[^']*'" -Replacement ("`${1}'" + (Esc $ppTitle) + "'") -Label 'PowerPages solution.ts documentTitle'
-  Invoke-Op -Path $st -Pattern "(defaultLanguage:\s*)'[^']*'" -Replacement ("`${1}'" + (Esc $ppLang) + "'") -Label 'PowerPages solution.ts defaultLanguage'
+  Invoke-Op -Path $st -Pattern "(prefix:\s*)'[^']*'"        -Replacement ("`${1}'" + (EscTs $prefix)  + "'") -Label 'PowerPages solution.ts prefix'
+  Invoke-Op -Path $st -Pattern "(siteName:\s*)'[^']*'"      -Replacement ("`${1}'" + (EscTs $ppSite)  + "'") -Label 'PowerPages solution.ts siteName'
+  Invoke-Op -Path $st -Pattern "(appName:\s*\{\s*he:\s*)'[^']*'(,\s*en:\s*)'[^']*'" -Replacement ("`${1}'" + (EscTs $ppHe) + "'`${2}'" + (EscTs $ppEn) + "'") -Label 'PowerPages solution.ts appName'
+  Invoke-Op -Path $st -Pattern "(documentTitle:\s*)'[^']*'" -Replacement ("`${1}'" + (EscTs $ppTitle) + "'") -Label 'PowerPages solution.ts documentTitle'
+  Invoke-Op -Path $st -Pattern "(defaultLanguage:\s*)'[^']*'" -Replacement ("`${1}'" + (EscTs $ppLang) + "'") -Label 'PowerPages solution.ts defaultLanguage'
   # Deploy tooling only (scripts/add-site-to-solution.ps1 reconciles the site's components
   # against this solution on every deploy). The starter cannot learn the name any other way -
   # powerpages.config.json follows a Microsoft schema and must not carry custom keys.
   # NOTE the variable is $uniqueName: PowerShell expands an undefined variable to an empty
   # string, so a typo here would silently write '' and still pass every gate.
-  Invoke-Op -Path $st -Pattern "(SOLUTION_UNIQUE_NAME\s*=\s*)'[^']*'" -Replacement ("`${1}'" + (Esc $uniqueName) + "'") -Label 'PowerPages solution.ts SOLUTION_UNIQUE_NAME'
+  Invoke-Op -Path $st -Pattern "(SOLUTION_UNIQUE_NAME\s*=\s*)'[^']*'" -Replacement ("`${1}'" + (EscTs $uniqueName) + "'") -Label 'PowerPages solution.ts SOLUTION_UNIQUE_NAME'
   $ppc = Join-Path $ppRoot 'powerpages.config.json'
-  Invoke-Op -Path $ppc -Pattern '("siteName":\s*)"[^"]*"' -Replacement ('${1}"' + (Esc $derivedSite) + '"') -Label 'PowerPages powerpages.config siteName'
+  Invoke-Op -Path $ppc -Pattern '("siteName":\s*)"[^"]*"' -Replacement ('${1}"' + (EscJson $derivedSite) + '"') -Label 'PowerPages powerpages.config siteName'
 }
 
 # Shipped env vars - swap the 'sol' segment of every definition this starter ships

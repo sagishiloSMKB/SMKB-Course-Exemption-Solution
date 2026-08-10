@@ -20,6 +20,10 @@ node_modules/
 # ── Environment / secrets ─────────────────────────────────────────────────────
 .env
 .env.*
+# ...but the SHIPPED templates must reach every clone. Without these negations the Code Site's
+# .env.example (the VITE_PORTAL_URL template) was gitignored, so no clone ever received it.
+!.env.example
+!.env.template
 .env.local
 .env.*.local
 

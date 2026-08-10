@@ -32,24 +32,39 @@ Before integrating:
 
 ## 3. Vue client integration
 
-### A. Copy files
+### A. Copy the client from the Code Site starter
 
-Copy the entire `vue-client/` subtree into `client/src/` of the target portal app:
+**There is one client implementation, and it lives in the Power Pages Code Site starter:**
 
 ```
-vue-client/
-  services/authService.ts       → client/src/services/authService.ts
-  composables/useAuth.ts        → client/src/composables/useAuth.ts
-  composables/useI18n.ts        → client/src/composables/useI18n.ts
-  consts/i18n-otp.ts            → client/src/consts/i18n-otp.ts
-  views/OtpLoginPage.vue        → client/src/views/OtpLoginPage.vue
-  utils/emailValidation.ts      → client/src/utils/emailValidation.ts
+SMKB - Power Pages Code Site Starter/src/modules/otp-auth/
+  authService.ts      createOtp / checkOtp / revokeSession, with DEV mocks
+  useAuth.ts          session state, idle timeout, revoke-on-logout
+  invokeAuthFlow.ts   authenticated calls (passes authToken for server re-validation)
+  guard.ts            router guard
+  otpFlows.ts         the flow GUID registry
+  configService.ts    public config (support contact, Turnstile site key)
+  OtpLoginView.vue    the login screen
+  LockedOutView.vue   the lockout screen
+  useTurnstile.ts     re-export of src/composables/useTurnstile.ts
 ```
 
-If the app already has a `useI18n.ts`, `i18n.ts`, or `emailValidation.ts`, merge rather than overwrite:
-- For `useI18n.ts` — the library version is identical to the Events Tickets one; keep whichever exists.
-- For i18n constants — merge `I18N_OTP` keys into your existing constants file (or keep as a separate import).
-- For `emailValidation.ts` — keep whichever copy exists; both are identical.
+In a Code Site the module already ships **dormant** — nothing imports it, so it costs zero bundle
+bytes. Enable it with **`/ppcs-enable-otp-auth`**, which wires the routes, the guard and the CSP
+domains for you. Do not copy these files by hand there.
+
+For a **non-Code-Site** consumer (a Power App, a plain Vue app), copy that folder and replace its one
+dependency — `invokeFlow` from `src/services/cloudFlow.ts` — with however that app calls a flow. Keep
+the **HTTP 200 + `errorCode`** contract: it is what every error path in the module and in the flow
+templates below assumes.
+
+> **This recipe used to ship a second `vue-client/` copy. It was deleted, deliberately.** It had
+> drifted into a *different architecture* (raw `fetch` to Liquid-injected URLs, HTTP status codes for
+> business errors) and had accumulated real bugs: a `login()` that omitted the required `authToken` —
+> so it did not type-check and `getAuthToken()` returned `null` forever — an import of a `config.ts`
+> that did not exist, no captcha token sent despite §8 requiring a server-side check, and a
+> divergent error vocabulary. Two clients meant two sets of bugs and no single source of truth.
+> If you need the old copy for reference, it is in git history.
 
 ### B. Add flow URL globals to config.ts
 
@@ -322,7 +337,7 @@ This ensures the authenticated user can only read and modify their own record, e
 ## 7. Verification checklist
 
 - [ ] **Dev mock works** — `pnpm dev`, navigate to `/login`, enter any email, `123456` logs in
-- [ ] **All `[ADAPT]` markers resolved** — grep for `[ADAPT]` in `vue-client/` → zero matches
+- [ ] **All `[ADAPT]` markers resolved** — grep for `[ADAPT]` in the copied client → zero matches
 - [ ] **All `[IMPLEMENT]` markers resolved** — grep for `[IMPLEMENT]` in flow JSONs → zero matches  
 - [ ] **Route guard works** — unauthenticated access to protected route redirects to `/login`
 - [ ] **SESSION_KEY unique** — `useAuth.ts` `SESSION_KEY` does not clash with other portal apps on the same domain

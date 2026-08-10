@@ -13,10 +13,12 @@
 // the token does not appear. Describe the token in prose instead of writing it (the
 // starter's own comments now say so explicitly).
 //
-// Also checks: no non-ASCII byte in any .ps1 or shipped solution XML. Windows PowerShell
-// 5.1 reads a UTF-8-without-BOM .ps1 as ANSI, so a non-ASCII literal becomes mojibake at
-// parse time - and a `-replace` that then fails to match is indistinguishable from success.
-// The same Windows-1255 corruption garbles XML display names.
+// Also checks two charset rules with deliberately different strictness (see below):
+// .ps1 must be pure ASCII (PowerShell 5.1 reads UTF-8-without-BOM as ANSI, so a non-ASCII
+// literal is mojibake at parse time, and a `-replace` that then fails to match is
+// indistinguishable from success); shipped solution XML may carry any script - Hebrew is
+// first-class here - but not confusable punctuation, which Windows-1255 tooling garbles.
+// Plus: no consumer may depend on the private npm registry.
 //
 // ERROR (exit 1) on any violation. Run standalone, from .githooks/pre-commit, and in CI.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,37 +177,84 @@ for (const abs of collectPackageJsons(repoRoot)) {
   }
 }
 
-// ── ASCII-only: every .ps1, and the solution XML the kit ships ────────────────
+// ── Charset rules: STRICT for .ps1, targeted for shipped XML ─────────────────
+// Two different problems were being solved by one rule, and conflating them broke Hebrew.
+//
+//  .ps1  -> ASCII ONLY. Windows PowerShell 5.1 reads a UTF-8-without-BOM script as ANSI, so ANY
+//           non-ASCII literal becomes mojibake at PARSE time. This is about the parser.
+//
+//  .xml  -> only CONFUSABLE PUNCTUATION is banned. The original failure was a Unicode en dash in
+//           a display name arriving as `ג€"` through Hebrew-locale Windows-1255 tooling - a
+//           punctuation problem, never a "no other scripts" problem. Dataverse solution XML is
+//           UTF-8 and carries Hebrew correctly, and this kit treats Hebrew as first-class
+//           (powerPages.appNameHe). Banning all non-ASCII here meant apply-config.ps1 would write
+//           a Hebrew solutionDisplayName into three Solution.xml files and then this very check
+//           hard-failed every commit, pointing at a line the kit itself had just written.
 const ASCII_TARGETS = []
-function collect(dir, test) {
+const XML_TARGETS = []
+// Characters that look like ASCII punctuation but are not, and that locale-dependent tooling
+// mangles. Each maps to the ASCII form the author almost certainly meant.
+const CONFUSABLES = new Map([
+  ['\u2013', "en dash - use '-'"],
+  ['\u2014', "em dash - use '-'"],
+  ['\u2018', "left single quote - use \"'\""],
+  ['\u2019', "right single quote / apostrophe - use \"'\""],
+  ['\u201C', 'left double quote - use \'"\''],
+  ['\u201D', 'right double quote - use \'"\''],
+  ['\u00A0', 'non-breaking space - use a normal space'],
+])
+function collect(dir, test, into) {
   let entries = []
   try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
   for (const e of entries) {
     if (e.name === 'node_modules' || e.name === '_dist' || e.name === 'dist' || e.name === '.git') continue
     const abs = path.join(dir, e.name)
-    if (e.isDirectory()) collect(abs, test)
-    else if (test(e.name)) ASCII_TARGETS.push(abs)
+    if (e.isDirectory()) collect(abs, test, into)
+    else if (test(e.name)) into.push(abs)
   }
 }
-collect(repoRoot, (n) => n.endsWith('.ps1'))
+collect(repoRoot, (n) => n.endsWith('.ps1'), ASCII_TARGETS)
 for (const starter of [TABLES, ENVVAR, FLOWS]) {
-  collect(path.join(repoRoot, starter), (n) => n.endsWith('.xml'))
+  collect(path.join(repoRoot, starter), (n) => n.endsWith('.xml'), XML_TARGETS)
 }
 
-for (const abs of ASCII_TARGETS) {
+function eachLine(abs, cb) {
   const rel = path.relative(repoRoot, abs).replace(/\\/g, '/')
   const text = fs.readFileSync(abs, 'utf8')
   text.split(/\r?\n/).forEach((line, i) => {
     // Ignore a leading UTF-8 BOM: harmless here, and required by some XML tooling.
-    const probe = i === 0 ? line.replace(/^﻿/, '') : line
+    cb(rel, i === 0 ? line.replace(/^﻿/, '') : line, i, line)
+  })
+}
+
+// .ps1 - any non-ASCII byte is a parse-time hazard.
+for (const abs of ASCII_TARGETS) {
+  eachLine(abs, (rel, probe, i, line) => {
     const bad = [...probe].filter((ch) => ch.codePointAt(0) > 0x7f)
     if (!bad.length) return
     const codes = [...new Set(bad.map((ch) => 'U+' + ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')))]
     errors.push(
-      `${rel}:${i + 1}  non-ASCII ${codes.join(' ')} - Windows PowerShell 5.1 / Windows-1255 corrupt these` +
+      `${rel}:${i + 1}  non-ASCII ${codes.join(' ')} in a .ps1 - PowerShell 5.1 reads UTF-8-without-BOM as ANSI,` +
+      `\n             so this becomes mojibake at parse time` +
       `\n      line:  ${line.trim().slice(0, 100)}` +
-      `\n      fix:   use ASCII (- for dashes, = for rules, <- for arrows), or [char]0xNNNN in a .ps1`
+      `\n      fix:   use ASCII (- for dashes, = for rules, <- for arrows), or [char]0xNNNN`
     )
+  })
+}
+
+// Shipped solution XML - Hebrew and any other script are fine; confusable punctuation is not.
+for (const abs of XML_TARGETS) {
+  eachLine(abs, (rel, probe, i, line) => {
+    const hits = [...new Set([...probe].filter((ch) => CONFUSABLES.has(ch)))]
+    if (!hits.length) return
+    for (const ch of hits) {
+      const cp = 'U+' + ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')
+      errors.push(
+        `${rel}:${i + 1}  ${cp} ${CONFUSABLES.get(ch)}` +
+        `\n             Hebrew-locale Windows-1255 tooling renders these as garbage in Dataverse` +
+        `\n      line:  ${line.trim().slice(0, 100)}`
+      )
+    }
   })
 }
 
@@ -218,7 +267,8 @@ if (errors.length) {
   errors.forEach((e) => console.error('  x ' + e))
   console.error(
     `\n${errors.length} violation(s). A shipped file must never contain a token its own guard ` +
-    `forbids, and .ps1 / solution XML must stay ASCII-only.`
+    `forbids; .ps1 must stay ASCII; shipped XML must avoid confusable punctuation; and no ` +
+    `consumer may depend on the private registry.`
   )
   process.exit(1)
 }

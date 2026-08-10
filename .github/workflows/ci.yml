@@ -31,6 +31,45 @@ jobs:
           node-version: 20
       - run: node scripts/check-template-guards.mjs
 
+  # The two gates CLAUDE.md presents as THE drift guard used to run only in .githooks/pre-commit,
+  # which is an opt-in per clone (`git config core.hooksPath .githooks`). So on any clone that
+  # skipped that one command - and on CI unconditionally - config drift and broken root-doc links
+  # reached main unchecked. Zero-auth, zero-install: no reason not to run them here.
+  root-gates:
+    name: root gates (doc boundaries + config drift)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Doc boundaries
+        run: node scripts/check-doc-boundaries.mjs
+      # -Check exits 0 on the pristine template ("still the uninitialized starter-kit template")
+      # and only compares ACTIVATED starters, so this is safe before and after Init Project.
+      - name: Config drift
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File apply-config.ps1 -Check
+
+  # flow-lint's own self-test, including the rule-coverage gate. It was referenced only in prose,
+  # so a rule could ship with no test and stay green everywhere that mattered.
+  flow-lint-selftest:
+    name: flow-lint self-test (rule coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - shell: bash
+        run: |
+          t=$(find . -path '*/tools/flow-lint/test.mjs' -not -path '*/node_modules/*' | head -1)
+          if [ -z "$t" ]; then
+            echo "::error::flow-lint test.mjs not found - the Cloud Flows starter should always ship it."
+            exit 1
+          fi
+          node "$t"
+
   flow-lint:
     name: flow-lint (cloud flows + solution XML)
     runs-on: ubuntu-latest
@@ -118,7 +157,12 @@ jobs:
         shell: bash
         run: |
           if [ -f pnpm-lock.yaml ]; then
+            # corepack reads the "packageManager" field in package.json, so the pnpm major is
+            # pinned by the repo rather than by whatever the runner image happens to bundle.
+            # Without it a runner defaulting to pnpm 8 fails on lockfileVersion 9.0.
             corepack enable
+            corepack prepare --activate
+            pnpm --version
             pnpm install --frozen-lockfile
           else
             npm ci --no-audit --no-fund
