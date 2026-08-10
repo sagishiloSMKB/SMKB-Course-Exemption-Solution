@@ -199,6 +199,21 @@ if (asJson) {
   }
   console.log(`\nflow-lint: ${flowFiles.length} flows · ${errors.length} error(s) · ${warns.length} warning(s)`)
   if (onlyIds) console.log(`  (--only: ran ${[...onlyIds].join(', ')} - all other rules were skipped)`)
+  // Say so when the blocking findings are in ANOTHER starter. This runs from the Cloud Flows
+  // deploy, so "17 errors" listing files under `<solution> - Dataverse Tables` reads as a Flows
+  // problem unless the report names what is actually happening: the solution-wide XML rules cover
+  // every activated starter, and Critical Rule 4 deploys Tables before Flows anyway - so those
+  // placeholders have to be resolved first regardless of which script reported them.
+  const flowsFolder = cloudFlowsDir ? path.basename(cloudFlowsDir) : ''
+  const foreign = [...new Set(errors
+    .map((f) => String(f.file).split(/[\\/]/)[0])
+    .filter((top) => top && flowsFolder && top !== flowsFolder && top.startsWith('SMKB')))]
+  if (foreign.length) {
+    console.log(`  (note: ${foreign.length} other starter(s) reported placeholders - ${foreign.join(', ')}.`)
+    console.log('   The solution-wide XML rules cover every ACTIVATED starter, so this is not a Cloud')
+    console.log('   Flows fault. Resolve them there first; the deployment order is Tables -> Env Vars')
+    console.log('   -> Flows in any case. See the root CLAUDE.md, Critical Rule 4.)')
+  }
   if (ctx.envVarSchemaNames.size === 0) console.log('  (note: no Environmental Variables folder found — env-var cross-check skipped)')
   // Always print what was NOT scanned. A silent scope reduction reads as a clean pass.
   for (const s of xmlSkipped) console.log(`  (note: XML scan skipped for ${s})`)
