@@ -70,6 +70,35 @@ jobs:
           fi
           node "$t"
 
+      # Template folders carry placeholders BY DESIGN, so they cannot take the full lint - but a
+      # >256-char description in one of them fails flow ACTIVATION (ActionDescriptionTooLong; the
+      # flow stays in Draft) the moment someone copies it into Workflows/. Ten such descriptions
+      # shipped in the OTP templates, unreachable by every existing gate. --only closes that.
+      - name: description-max-length over the template folders
+        shell: bash
+        run: |
+          lint=$(find . -path '*/tools/flow-lint/lint.mjs' -not -path '*/node_modules/*' | head -1)
+          if [ -z "$lint" ]; then
+            echo "::error::flow-lint lint.mjs not found."
+            exit 1
+          fi
+          status=0
+          found=0
+          # `while read` over process substitution, NOT `for d in $(find ...)`: every starter
+          # folder name contains spaces, so command substitution word-splits one path into six
+          # and each fragment is then linted as its own (nonexistent) folder.
+          while IFS= read -r d; do
+            [ -n "$d" ] || continue
+            found=1
+            echo "== $d"
+            node "$lint" --only=description-max-length "$d" || status=1
+          done < <(find . -type d \( -name examples -o -name flow-templates \) \
+                     -not -path '*/node_modules/*' -not -path './.git/*')
+          if [ "$found" = 0 ]; then
+            echo "No examples/ or flow-templates/ folder found - nothing to check."
+          fi
+          exit $status
+
   flow-lint:
     name: flow-lint (cloud flows + solution XML)
     runs-on: ubuntu-latest
@@ -87,8 +116,12 @@ jobs:
       - name: Run flow-lint
         shell: bash
         run: |
-          if [ ! -f solution.config.json ] || grep -q 'YourSolutionName' solution.config.json; then
-            echo "Repo is still the uninitialized starter-kit template — skipping flow-lint."
+          # The ONE initialized predicate (also used by .githooks/pre-commit, and mirrored in
+          # apply-config.ps1). The grep this replaced tested only the unique name, so a
+          # half-filled config ran the placeholder gates against a template.
+          if ! node scripts/is-initialized.mjs; then
+            echo "Not initialized: $(node scripts/is-initialized.mjs --explain || true)"
+            echo "Skipping flow-lint."
             exit 0
           fi
           lint=$(find . -path '*/tools/flow-lint/lint.mjs' -not -path '*/node_modules/*' | head -1)

@@ -35,17 +35,37 @@ function nodesOfType(json, type) {
   return out
 }
 
-const def = (json) => json?.properties?.definition ?? {}
+// The definition, or the document itself when there is no `properties.definition` wrapper.
+// The fallback matters for FRAGMENT files - the OTP recipe's VALIDATE_AUTH_TOKEN_SNIPPET.json is
+// a bare action tree meant to be pasted into a flow. With `?? {}` every rule walked an empty
+// object and reported the fragment clean, including two >256-char descriptions that would fail
+// activation the moment the snippet was pasted in. A real flow always has the wrapper, so this
+// changes nothing for Workflows/.
+const def = (json) => json?.properties?.definition ?? json ?? {}
 const params = (json) => def(json).parameters ?? {}
 const triggers = (json) => def(json).triggers ?? {}
 const connRefs = (json) => json?.properties?.connectionReferences ?? {}
 
 const EMAIL_RE = /[^@\s"]+@[^@\s"]+\.[a-z]{2,}/i
+// Keep this list in step with the $placeholders array in the Flows starter's deploy.ps1 - that
+// is the no-Node backstop for exactly the same invariant. It listed BOTH all-zero sentinels
+// while this one listed only ...0001, so the second shipped example flow (and its
+// <Workflow WorkflowId> / <RootComponent id> entries, which use ...0002) passed every lint
+// while the deploy backstop blocked them: two gates, two answers, and the lint looked green.
 export const PLACEHOLDERS = [
   'YourSolutionName', 'Your Solution Name', 'smkb_sol_',
   'your-default-value-here', '[yourid]', '[REPLACE', '[sol]',
   '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000002',
 ]
+
+/**
+ * The org-wide mandated sender. NOT per-solution data: the Flows README requires every flow to
+ * send from this address, and the shipped Workflows/ skeletons carry it deliberately. Any rule
+ * that flags "a hardcoded email" must exempt it, or its first run is red on correct files -
+ * which is how a rule teaches people to ignore it.
+ */
+export const ORG_SENDER_RE = /^no[_-]?reply@smkb\.ac\.il$/i
 
 export const rules = [
   {
@@ -112,14 +132,28 @@ export const rules = [
   {
     id: 'no-email-in-defaultvalue',
     severity: 'warn',
-    docs: 'Env-var parameter defaults should be blank; a committed email leaks a dev address and is used only if the per-environment value is unset. Set current values per environment instead.',
+    docs: 'Env-var parameter defaults should be blank; a committed email leaks a dev address and is used only if the per-environment value is unset. Set current values per environment instead. A recipient address hardcoded in an action input is the same leak. The org-wide mandated sender is exempt - it is a convention, not per-solution data.',
     check(flow) {
       const out = []
       for (const [key, p] of Object.entries(params(flow.json))) {
-        if (typeof p?.defaultValue === 'string' && EMAIL_RE.test(p.defaultValue)) {
+        if (typeof p?.defaultValue !== 'string') continue
+        const m = p.defaultValue.match(EMAIL_RE)
+        if (m && !ORG_SENDER_RE.test(m[0])) {
           out.push({ location: `parameters['${key}'].defaultValue`, message: `hardcoded email "${p.defaultValue}" in a parameter default` })
         }
       }
+      // Also the recipient/CC/BCC side. A parameter default was only half the surface: an
+      // address typed straight into a Send-an-email action leaks exactly the same way and was
+      // invisible here. Scoped to inputs so a description mentioning an address is not a
+      // finding, and the org sender is exempt - flagging it would make this rule red on every
+      // correct shipped skeleton, which is worse than not having it.
+      walk(def(flow.json), (n, p) => {
+        if (Array.isArray(n) || !n.inputs || typeof n.inputs !== 'object') return
+        for (const m of JSON.stringify(n.inputs).matchAll(new RegExp(EMAIL_RE.source, 'gi'))) {
+          if (ORG_SENDER_RE.test(m[0])) continue
+          out.push({ location: `${p}.inputs`, message: `hardcoded email "${m[0]}" in an action input - use an environment variable` })
+        }
+      })
       return out
     },
   },
@@ -167,15 +201,37 @@ export const rules = [
     docs: 'A Power Pages flow that accepts an authToken must validate it server-side (look up sessionToken) before accessing data.',
     check(flow) {
       const out = []
+      // Title matching, normalized. Keying on the single literal 'authtoken' meant a field
+      // titled "auth token", "authToken " or "sessionToken" - all of which Power Pages maps
+      // identically - silently exempted the flow from an ERROR-severity security rule.
+      const isTokenTitle = (s) =>
+        typeof s === 'string' && /^(auth|session)?token$/.test(s.replace(/[^a-z]/gi, '').toLowerCase())
       let takesAuthToken = false
       for (const t of Object.values(triggers(flow.json))) {
         const props = t?.inputs?.schema?.properties ?? {}
-        for (const p of Object.values(props)) {
-          if (typeof p?.title === 'string' && p.title.trim().toLowerCase() === 'authtoken') takesAuthToken = true
+        for (const [pname, p] of Object.entries(props)) {
+          if (isTokenTitle(p?.title) || isTokenTitle(pname)) takesAuthToken = true
         }
       }
-      if (takesAuthToken && !flow.raw.includes('sessionToken')) {
-        out.push({ location: '(trigger)', message: 'accepts an authToken input but never references sessionToken — token is not validated server-side' })
+      if (!takesAuthToken) return out
+      // Evidence must be a real lookup, not the WORD. `flow.raw.includes('sessionToken')` was
+      // satisfied by any occurrence anywhere in the file - including
+      //   "description": "TODO: validate the sessionToken here"
+      // which is the precise state this rule exists to reject. So look only at action INPUTS
+      // (a $filter, a URI, a parameter value), never at description/metadata prose.
+      // Walk `actions` only, never the whole definition. The TRIGGER's own
+      // inputs.schema holds the field titles, so a field literally titled "sessionToken"
+      // counted as its own validation - the flow accepted a token and proved nothing.
+      let validated = false
+      walk(def(flow.json).actions, (n) => {
+        if (Array.isArray(n) || !n.inputs) return
+        if (JSON.stringify(n.inputs).includes('sessionToken')) validated = true
+      })
+      if (!validated) {
+        out.push({
+          location: '(trigger)',
+          message: 'accepts an auth token input but no ACTION INPUT references sessionToken - the token is not validated server-side (a mention in a description or comment does not count)',
+        })
       }
       return out
     },
@@ -210,7 +266,12 @@ export const rules = [
       if (!known || known.size === 0) return out // no env-var folder discovered; skip
       for (const [key, p] of Object.entries(params(flow.json))) {
         const schema = p?.metadata?.schemaName
-        if (typeof schema === 'string' && schema.startsWith('smkb_') && !known.has(schema)) {
+        // No prefix filter. `metadata.schemaName` on a flow parameter has exactly one meaning -
+        // an environment-variable binding - so every value belongs in the cross-check. Requiring
+        // `smkb_` meant a solution built under any other publisher prefix had this rule silently
+        // switched off, and the kit's own convention (smkb_<prefix>_Name) is not the only shape
+        // a real flow carries.
+        if (typeof schema === 'string' && schema !== '' && !known.has(schema)) {
           out.push({ location: `parameters['${key}'].metadata.schemaName`, message: `env-var "${schema}" has no definition in the Environmental Variables folder (typo or missing/shared var — verify it exists)` })
         }
       }

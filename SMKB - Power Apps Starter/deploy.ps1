@@ -29,13 +29,16 @@ $scriptDir = $PSScriptRoot
 
 # -- Placeholder safety check -------------------------------------------------
 # Blocks deployment if any template placeholders remain unreplaced.
+# LITERAL tokens (see the .Contains note below) - they were regex-escaped for a -match scan,
+# which also meant the violation message printed the escaped form ('your-org\.crm') at a
+# developer who then searched for a backslash that is not in any file.
 $placeholders = @(
     '00000000-0000-0000-0000-000000000000',
     '00000000-0000-0000-0000-000000000001',
-    '\[REPLACE',
+    '[REPLACE',
     'Your App Display Name',
     'sol_exampleflow',
-    'your-org\.crm'
+    'your-org.crm'
 )
 $violations = @()
 $scanFiles = Get-ChildItem $scriptDir -Recurse -File -Include "*.json","*.ts","*.vue" -ErrorAction SilentlyContinue |
@@ -43,7 +46,10 @@ $scanFiles = Get-ChildItem $scriptDir -Recurse -File -Include "*.json","*.ts","*
 foreach ($file in $scanFiles) {
     $c = [System.IO.File]::ReadAllText($file.FullName)
     foreach ($p in $placeholders) {
-        if ($c -match $p) { $violations += "  '$p'  in  $($file.Name)" }
+        # .Contains, not -match: the tokens are literal, and the four starters' lists are meant
+        # to converge. As a regex, '[sol]' (in the Flows list) matches every file and '[REPLACE'
+        # throws on an unterminated character class.
+        if ($c.Contains($p)) { $violations += "  '$p'  in  $($file.Name)" }
     }
 }
 if ($violations) {

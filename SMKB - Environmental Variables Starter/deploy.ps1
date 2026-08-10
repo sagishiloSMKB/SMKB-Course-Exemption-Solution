@@ -29,7 +29,12 @@ $scanFiles = Get-ChildItem $scriptDir -Recurse -File -Include "*.xml" -ErrorActi
 foreach ($file in $scanFiles) {
     $c = [System.IO.File]::ReadAllText($file.FullName)
     foreach ($p in $placeholders) {
-        if ($c -match $p) { $violations += "  '$p'  in  $($file.Name)" }
+        # .Contains, not -match: these are LITERAL tokens, and the four starters' lists are
+        # meant to converge. Flows' list already holds '[sol]' and '[REPLACE' - as a regex the
+        # first is a character class matching s/o/l (every file) and the second throws on an
+        # unterminated class. A guard that fires on everything and a guard that crashes are
+        # both worse than no guard, because the message names the wrong cause.
+        if ($c.Contains($p)) { $violations += "  '$p'  in  $($file.Name)" }
     }
 }
 if ($violations) {

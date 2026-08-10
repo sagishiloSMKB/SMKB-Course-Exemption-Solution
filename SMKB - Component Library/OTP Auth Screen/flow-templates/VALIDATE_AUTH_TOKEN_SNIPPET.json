@@ -10,7 +10,7 @@
 
   "Validate_Auth_Token": {
     "type": "Scope",
-    "description": "Validates the caller's auth token against the Dataverse sessions table. Returns 401 UNAUTHORIZED + Terminate(Succeeded) if the token is missing, unknown, or expired.\n\nROW-LEVEL SECURITY — CRITICAL:\nAfter both If conditions pass, the token is valid. The trusted user identity is:\n  @first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['[IMPLEMENT]:smkb_sol_userid']\n\nAlways use this expression — NOT triggerBody()?['userId'] — for all Dataverse queries and writes.\nThis prevents a caller with a valid token from reading or updating another user's data.\n\nExample: to restrict a ListRecords call to the authenticated user's own row:\n  $filter: \"smkb_sol_userid eq '@{first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['smkb_sol_userid']}'\"\n\nNote: the 401 responses here terminate with runStatus: Succeeded so Handle_Flow_Error does NOT run — an invalid token is an expected condition, not a bug.",
+    "description": "Validates the auth token against the sessions table; returns 200 + UNAUTHORIZED then Terminate(Succeeded) if missing, unknown, or expired. ROW-LEVEL SECURITY: scope every query by the session's user id, never triggerBody. See RECIPE.md 'H1'.",
     "actions": {
       "IMPLEMENT_Get_Auth_Session": {
         "type": "OpenApiConnection",
@@ -69,7 +69,7 @@
       },
       "If_Token_Expired": {
         "type": "If",
-        "description": "Token exists but its expiry timestamp is in the past. Return 200 + UNAUTHORIZED, then Terminate(Succeeded). [IMPLEMENT]: replace smkb_sol_expires_at with your expiry field schema name.\n\nNote: this action only runs when If_Token_Not_Found succeeded — meaning the token WAS found. If it was not found, If_Token_Not_Found terminates the run before reaching here.",
+        "description": "Token exists but its expiry is in the past: 200 + UNAUTHORIZED, then Terminate(Succeeded). [IMPLEMENT] Replace the expiry field with your schema name. Only runs when the token WAS found - If_Token_Not_Found terminates the run otherwise.",
         "expression": "@lessOrEquals(ticks(first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['[IMPLEMENT]:smkb_sol_expires_at']), ticks(utcNow()))",
         "actions": {
           "Respond_token_expired": {

@@ -5,8 +5,14 @@
  * NOTE (starter): `pnpm pa add-flow` REGENERATES this file from the set of wired
  * flows and will DROP the ExampleFlow entries below. When you wire your first real
  * flow, delete the example trio — this ExampleFlow* export, src/generated/models &
- * services/ExampleFlow*, the `sol_exampleflow` entry in .power/…/dataSourcesInfo.ts,
- * and the ExampleFlowService export in src/services/mock/generated.ts.
+ * services/ExampleFlow*, the example flow's dataSourceName entry in
+ * .power/schemas/appschemas/dataSourcesInfo.ts, and the ExampleFlowService export in
+ * src/services/mock/generated.ts.
+ *
+ * (That dataSourceName is deliberately DESCRIBED and not written here: deploy.ps1's
+ * placeholder guard greps every *.ts for it, so spelling it out in this comment would
+ * make the guard fire on its own removal instructions and block a correct deploy.
+ * scripts/check-template-guards.mjs enforces that.)
  */
 
 // Models

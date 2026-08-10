@@ -84,15 +84,41 @@ export async function createOtp(phone: string, turnstileToken = ''): Promise<Cre
  * expired, just revoked), so nothing here can be used to probe token validity.
  */
 export function revokeSession(authToken: string): void {
-  if (!authToken || !OTP_FLOWS.revokeSession) return
-  try {
-    void invokeFlow(OTP_FLOWS.revokeSession, { authToken }).catch(() => {
-      /* Swallowed on purpose - see the doc comment above. */
-    })
-  } catch {
-    /* Never let revocation failure block a logout. */
-  }
+  void revokeSessionAwaitable(authToken)
 }
+
+/**
+ * The awaitable form. Resolves when the flow answers, or after `timeoutMs`, whichever
+ * comes first - it never rejects and never blocks a logout indefinitely.
+ *
+ * Why this exists: logout is normally followed straight away by a navigation, and a
+ * request in flight through `window.shell.ajaxSafePost` has no `keepalive`, so the
+ * navigation can abort it and leave the token valid server-side - the exact failure
+ * revocation exists to prevent. A `fetch(..., { keepalive: true })` beacon would survive
+ * teardown, but it would also mean an ESLint exemption to the flows-only rule inside the
+ * one file most likely to accumulate more of them. Awaiting a bounded promise before
+ * navigating costs a few hundred milliseconds in a click handler and keeps the
+ * architectural invariant intact, so `useAuth.logoutAndRevoke()` does that instead.
+ */
+export function revokeSessionAwaitable(authToken: string, timeoutMs = 1500): Promise<void> {
+  if (!authToken || !OTP_FLOWS.revokeSession) return Promise.resolve()
+  let done: (() => void) | undefined
+  const timer = new Promise<void>((resolve) => {
+    done = resolve
+    setTimeout(resolve, timeoutMs)
+  })
+  try {
+    void invokeFlow(OTP_FLOWS.revokeSession, { authToken })
+      .catch(() => {
+        /* Swallowed on purpose - the absolute expiry is the backstop. */
+      })
+      .finally(() => done?.())
+  } catch {
+    done?.()
+  }
+  return timer
+}
+
 
 export async function checkOtp(phone: string, otp: string): Promise<CheckOtpResult> {
   phone = normalizePhone(phone)

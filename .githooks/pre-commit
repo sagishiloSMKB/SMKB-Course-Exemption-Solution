@@ -20,12 +20,21 @@ status=0
 
 STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
 
-# Is this repo still the uninitialized template? (same signal apply-config.ps1 uses.)
-# While uninitialized, the example flows still carry placeholders on purpose, so the
-# placeholder-blocking flow-lint gate must NOT run at commit time — it runs at deploy time.
-INITIALIZED=1
-if [ ! -f solution.config.json ] || grep -q 'YourSolutionName' solution.config.json; then
-  INITIALIZED=0
+# Is this repo still the uninitialized template? While uninitialized, the example flows still
+# carry placeholders on purpose, so the placeholder-blocking flow-lint gate must NOT run at
+# commit time - it runs at deploy time.
+#
+# Delegated to scripts/is-initialized.mjs so this agrees with CI and with apply-config.ps1. The
+# grep this replaced tested ONLY the unique name, so a config with the name typed and the prefix
+# still "sol" read INITIALIZED here and UNINITIALIZED to apply-config.ps1 -Check. Any answer but
+# a clean exit 0 means "not initialized", which is the safe direction: the gate is skipped.
+INITIALIZED=0
+if command -v node >/dev/null 2>&1 && [ -f scripts/is-initialized.mjs ]; then
+  node scripts/is-initialized.mjs && INITIALIZED=1
+elif [ -f solution.config.json ] && ! grep -q 'YourSolutionName' solution.config.json; then
+  # No Node: fall back to the weaker signal rather than skipping every gate silently.
+  echo "pre-commit: node unavailable - using the weaker initialized check"
+  INITIALIZED=1
 fi
 
 # ── ESLint per code-starter (toolchain-agnostic: call the local eslint binary,

@@ -157,5 +157,19 @@ export async function invokeFlow<T = void>(
   // 202 Accepted = fire-and-forget; flow runs asynchronously with no return value
   if (res.status === 202) return undefined as T
 
-  return unwrapFlowResult<T>(await res.json())
+  // A fire-and-forget flow can also answer 200 with an EMPTY body (no "Return value(s) to
+  // Power Pages" action). res.json() then throws a bare SyntaxError, which is not a FlowError -
+  // so `e instanceof FlowError` never matches, invokeAuthFlow cannot classify it, and the
+  // documented contract ("transport failures arrive as FlowError('ERROR')") is broken by the
+  // success path. Read text first and treat empty as "no value".
+  const body = await res.text()
+  if (body.trim() === '') return undefined as T
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(body)
+  } catch {
+    console.error(`[invokeFlow] 200 with a non-JSON body - guid: ${flowGuid}`, body.slice(0, 200))
+    throw new FlowError('ERROR', body)
+  }
+  return unwrapFlowResult<T>(parsed)
 }

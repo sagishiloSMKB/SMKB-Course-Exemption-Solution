@@ -23,7 +23,12 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // SOLUTION-SPEC.md is a root-owned template that links into the starters, so it gets the same
 // link-integrity check. Its [FILL IN] prompts are prose and trip nothing.
-const DOCS = ['CLAUDE.md', 'README.md', 'INIT_PROJECT.md', 'SOLUTION-SPEC.md']
+// Kept in step with $script:DocFiles in apply-config.ps1, which REWRITES the starter links in
+// these files at rename time. A doc that links into a starter but is absent from that list breaks
+// at Phase 6; a doc absent from THIS list breaks unnoticed. SECURITY-BASELINE.md was missing from
+// both, with five links into template-named folders.
+const DOCS = ['CLAUDE.md', 'README.md', 'INIT_PROJECT.md', 'SOLUTION-SPEC.md',
+              'SECURITY-BASELINE.md', 'TESTING-STRATEGY.md']
 
 // Obsolete tokens from the retired Power Pages Liquid model + old Power Apps
 // direct-Dataverse model. None may appear in root docs.
@@ -67,6 +72,19 @@ function starterDir(templateName, typeSuffix) {
       .map((d) => d.name)
       .sort()
   } catch { /* fall through to the template name */ }
+  // A solution may legitimately hold two Power Apps or two Code Sites. Nothing here supports
+  // that: returning renamed[0] silently guards only the alphabetically first, so the second
+  // folder's naming and links go unchecked and read as passing. Fail loudly instead of quietly
+  // half-checking. (apply-config.ps1 has the same singular assumption - see its $starters table.)
+  if (renamed.length > 1) {
+    console.error(
+      `doc-boundaries: FAILED\n  x more than one "${typeSuffix}" starter folder: ${renamed.join(', ')}` +
+      `\n      This tooling addresses exactly one of each type. The extra folder would be` +
+      `\n      silently unchecked, so this is an error rather than a guess.` +
+      `\n      fix:   keep one per type, or extend starterDir()/apply-config.ps1 to a list.`
+    )
+    process.exit(1)
+  }
   if (renamed.length) return renamed[0]
   return templateName
 }
@@ -92,10 +110,21 @@ const NAMING_ALLOW = [/old naming/i, /sol_exampleflow/]
 
 const errors = []
 const warnings = []
+const skipped = []
 
 function checkDoc(rel) {
   const abs = path.join(repoRoot, rel)
-  if (!fs.existsSync(abs)) { warnings.push(`${rel}: not found (skipped)`); return }
+  // A missing root doc is an ERROR, not a warning. Every entry in DOCS is a file the kit ships
+  // and nothing in Init Project deletes - so "not found" means it was renamed or removed, and
+  // warning-then-passing is how a checker reports OK on a doc it never opened.
+  if (!fs.existsSync(abs)) {
+    errors.push(
+      `${rel}  root doc not found - this checker never opened it` +
+      `\n      cause: renamed, moved, or deleted` +
+      `\n      fix:   restore it, or drop it from DOCS here AND from $script:DocFiles in apply-config.ps1`
+    )
+    return
+  }
   const text = fs.readFileSync(abs, 'utf8')
   const lines = text.split(/\r?\n/)
 
@@ -133,7 +162,15 @@ function checkDoc(rel) {
 
 function checkNaming(rel) {
   const abs = path.join(repoRoot, rel)
-  if (!fs.existsSync(abs)) return
+  // Silent return was the original bug this file's own resolver comment describes: address a
+  // file that is not there and the scan is skipped with no output, which reads as a pass. A
+  // NON-ACTIVATED starter legitimately has no renamed folder, but starterDir() then resolves to
+  // the TEMPLATE name, which does exist - so a genuinely missing target means the layout moved.
+  if (!fs.existsSync(abs)) {
+    warnings.push(`${rel}: not found - naming scan SKIPPED for this file (layout changed?)`)
+    skipped.push(rel)
+    return
+  }
   fs.readFileSync(abs, 'utf8').split(/\r?\n/).forEach((line, i) => {
     if (!RETIRED_NAMING.test(line)) return
     if (NAMING_ALLOW.some((re) => re.test(line))) return
@@ -147,6 +184,11 @@ for (const f of NAMING_FILES) checkNaming(f)
 if (warnings.length) {
   console.log('doc-boundaries: warnings')
   warnings.forEach((w) => console.log('  ! ' + w))
+}
+if (skipped.length) {
+  // Print the skip list separately from the warnings so "OK" is never mistaken for "scanned
+  // everything". This is a report, not a failure: a file can be legitimately absent.
+  console.log(`doc-boundaries: ${skipped.length} naming target(s) not scanned (absent)`)
 }
 if (errors.length) {
   console.error('doc-boundaries: FAILED')

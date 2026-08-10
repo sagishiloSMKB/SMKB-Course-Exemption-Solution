@@ -117,9 +117,15 @@ if ($paComponent -eq '' -or $paComponent -like 'CHANGEME*') {
   $paComponent = (($appDisplay -replace '^\s*SMKB\s*-\s*', '') -replace '\s*-\s*Dev\s*$', '').Trim()
 }
 
+# THE initialized predicate. Mirrored in scripts/is-initialized.mjs for the shell consumers
+# (.githooks/pre-commit and .github/workflows/ci.yml), which used to test only for the string
+# "YourSolutionName" - so a half-filled config (unique name typed, prefix still "sol") read
+# INITIALIZED to CI and UNINITIALIZED here, and CI ran the placeholder gates against a template.
+# check-template-guards.mjs asserts the two implementations name the same sentinels.
+# If you change one, change both.
 function Test-Initialized {
-  return ($uniqueName -ne 'YourSolutionName' -and
-          $displayName -ne 'Your Solution Name' -and
+  return ($uniqueName -ne 'YourSolutionName' -and $uniqueName -ne '' -and
+          $displayName -ne 'Your Solution Name' -and $displayName -ne '' -and
           $prefix -ne 'sol' -and $prefix -ne '')
 }
 
@@ -318,7 +324,12 @@ function Rename-AlmFolder {
 #   * the pre-commit lint dispatch stopped matching any staged file,
 #   * check-doc-boundaries.mjs hard-failed on 21 now-broken links and blocked every commit.
 # Renaming and pointer-fixing are therefore one atomic operation owned by this script.
-$script:DocFiles = @('CLAUDE.md', 'README.md', 'INIT_PROJECT.md')
+# Every root doc that contains a relative link INTO a starter folder must be listed here, or
+# Phase 6's renames leave its links pointing at folders that no longer exist. SECURITY-BASELINE.md
+# (5 such links) and TESTING-STRATEGY.md were in neither this list nor check-doc-boundaries.mjs's
+# DOCS, so they broke silently and nothing looked at them again. Keep the two lists in step.
+$script:DocFiles = @('CLAUDE.md', 'README.md', 'INIT_PROJECT.md', 'SOLUTION-SPEC.md',
+                     'SECURITY-BASELINE.md', 'TESTING-STRATEGY.md')
 $script:renames  = @()
 
 # Resolve a starter to wherever it currently lives: the renamed form once applied, the
@@ -327,6 +338,23 @@ function Get-StarterRoot {
   param([hashtable]$S)
   $t = Join-Path $root $S.Target
   if (Test-Path -LiteralPath $t) { return $t }
+  # A solution may legitimately want two Power Apps or two Code Sites. This script derives exactly
+  # ONE name per type, so a second folder is never written and never drift-checked - it just sits
+  # there with template values while -Check reports "No drift". Detect it and say so; a silent
+  # half-configured starter is worse than a refusal.
+  if ($S.Label) {
+    $same = @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -like 'SMKB - *' -and $_.Name -like "* - $($S.Label)" })
+    if ($same.Count -gt 1) {
+      Write-Host ""
+      Write-Host "More than one '$($S.Label)' starter folder is present:" -ForegroundColor Red
+      $same | ForEach-Object { Write-Host "  - $($_.Name)" -ForegroundColor Red }
+      Write-Host "This script derives one name per type, so the extra folder would be left" -ForegroundColor Yellow
+      Write-Host "unconfigured and invisible to -Check. Keep one per type, or extend the" -ForegroundColor Yellow
+      Write-Host "`$starters table (a components: [] array in solution.config.json is the clean fix)." -ForegroundColor Yellow
+      exit 1
+    }
+  }
   return (Join-Path $root $S.Template)
 }
 

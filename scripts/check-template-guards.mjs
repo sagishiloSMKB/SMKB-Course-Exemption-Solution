@@ -24,6 +24,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -38,10 +39,21 @@ function starterDir(templateName, typeSuffix) {
       .map((d) => d.name)
       .sort()
   } catch { /* fall through to the template name */ }
+  // See the note in check-doc-boundaries.mjs: returning entries[0] with two folders of the same
+  // type silently leaves the second one unguarded, which reads as green.
+  if (entries.length > 1) {
+    console.error(
+      `template-guards: FAILED\n  x more than one "${typeSuffix}" starter folder: ${entries.join(', ')}` +
+      `\n      Only one per type is supported; the extra would go unguarded.` +
+      `\n      fix:   keep one per type, or extend starterDir()/apply-config.ps1 to a list.`
+    )
+    process.exit(1)
+  }
   if (entries.length) return entries[0]
   return templateName
 }
 
+const POWERAPP = starterDir('SMKB - Power Apps Starter', 'Power App')
 const TABLES = starterDir('SMKB - Dataverse Tables Starter', 'Dataverse Tables')
 const ENVVAR = starterDir('SMKB - Environmental Variables Starter', 'Environmental Variables')
 const FLOWS = starterDir('SMKB - Power Automate Flows Starter', 'Cloud Flows')
@@ -86,18 +98,126 @@ const GUARD_RULES = [
   },
 ]
 
+// ── Directory-wide guard scan ────────────────────────────────────────────────
+// GUARD_RULES above pairs ONE file with ONE token, which left most of the surface unchecked: the
+// Tables starter had no rule at all, Power Apps had none, and each deploy.ps1 actually scans its
+// whole tree - so any shipped .xml/.ts/.vue comment that mentions a guarded token blocks a
+// correct deploy. That is the exact failure this file exists to prevent, on four more starters.
+//
+// The token lists are READ OUT OF each deploy.ps1's own $placeholders array rather than copied
+// here. A copy drifts the moment a starter adds a token, and the drift is invisible - the check
+// keeps passing while guarding less. Failing to parse the array is an ERROR for the same reason.
+//
+// Semantics: a token INSIDE a comment is an error (the guard would fire on prose). A token in
+// real configuration is fine - guards are supposed to fire on those until the developer renames
+// them. Files with no comment syntax (.json) are skipped: they cannot hold prose.
+function readGuardTokens(deployRel) {
+  const abs = path.join(repoRoot, deployRel)
+  if (!fs.existsSync(abs)) return { tokens: null, why: 'deploy.ps1 not found' }
+  const text = fs.readFileSync(abs, 'utf8')
+  const m = text.match(/\$placeholders\s*=\s*@\(([\s\S]*?)\)/)
+  if (!m) return { tokens: null, why: 'no $placeholders = @( ... ) array found' }
+  const tokens = [...m[1].matchAll(/'((?:[^']|'')*)'/g)].map((x) => x[1].replace(/''/g, "'"))
+  if (!tokens.length) return { tokens: null, why: '$placeholders array parsed as empty' }
+  return { tokens, why: '' }
+}
+
+const COMMENT_KIND = { '.xml': 'xml', '.ts': 'js', '.vue': 'js', '.mjs': 'js' }
+
+const DIR_GUARD_RULES = [
+  { starter: TABLES, deploy: `${TABLES}/deploy.ps1`, roots: [TABLES], exts: ['.xml'] },
+  { starter: ENVVAR, deploy: `${ENVVAR}/deploy.ps1`, roots: [ENVVAR], exts: ['.xml'] },
+  { starter: FLOWS, deploy: `${FLOWS}/deploy.ps1`, roots: [`${FLOWS}/Other`, `${FLOWS}/Workflows`], exts: ['.xml', '.json'] },
+  { starter: POWERAPP, deploy: `${POWERAPP}/deploy.ps1`, roots: [POWERAPP], exts: ['.json', '.ts', '.vue'] },
+]
+
+// Is this starter present at all? A solution may legitimately delete a starter it never
+// activated, and every check below must then be a recorded SKIP - not a failure. But a starter
+// folder that IS present and has lost a file the checker addresses is a real problem, and the
+// distinction is the whole difference between a warning that means nothing and one that means
+// something. Every "not found" path below decides between the two on this predicate.
+const starterPresent = (name) => fs.existsSync(path.join(repoRoot, name))
+const skipped = []
+
 // Strip comments so a token described in prose is not confused with real configuration.
+//
+// LINE-PRESERVING on purpose. Every caller compares `lines[i]` against `strippedLines[i]` to
+// decide "comment or real config", so deleting a comment outright shifts every line after it and
+// the two arrays stop describing the same line. A multi-line `<!-- ... -->` near the top of a
+// solution XML made this checker report real <RootComponent> and <optionset> elements as comments
+// - 20 false positives that all read like genuine violations. Blanking the comment's characters
+// while keeping its newlines makes the index meaningful again.
+const blankOut = (s) => s.replace(/[^\n]/g, ' ')
 function stripComments(text, kind) {
-  if (kind === 'xml') return text.replace(/<!--[\s\S]*?-->/g, '')
-  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+  if (kind === 'xml') return text.replace(/<!--[\s\S]*?-->/g, blankOut)
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, blankOut)
+    // The [^:] guard keeps `https://` from reading as a line comment.
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + blankOut(m.slice(p1.length)))
 }
 
 const errors = []
 const warnings = []
 
+for (const rule of DIR_GUARD_RULES) {
+  if (!starterPresent(rule.starter)) { skipped.push(`${rule.starter} (starter folder absent)`); continue }
+  const { tokens, why } = readGuardTokens(rule.deploy)
+  if (!tokens) {
+    // Not a warning. The starter IS here, so a guard whose token list cannot be read is a guard
+    // this checker silently stopped checking - and printing OK afterwards is how that gap stays
+    // invisible for as long as it takes someone to trip over it in a real deploy.
+    errors.push(
+      `${rule.deploy}  cannot read its $placeholders guard list - ${why}` +
+      `\n      effect: the shipped files it guards are NOT checked for the tokens it forbids` +
+      `\n      fix:    restore the array, or drop this entry from DIR_GUARD_RULES here`
+    )
+    continue
+  }
+  const files = []
+  for (const r of rule.roots) {
+    collectGuardFiles(path.join(repoRoot, r), rule.exts, files)
+  }
+  for (const abs of files) {
+    const kind = COMMENT_KIND[path.extname(abs).toLowerCase()]
+    if (!kind) continue // .json and friends: no comment syntax, so no prose to fire on
+    const rel = path.relative(repoRoot, abs).replace(/\\/g, '/')
+    const text = fs.readFileSync(abs, 'utf8')
+    if (!tokens.some((t) => text.includes(t))) continue
+    const lines = text.split(/\r?\n/)
+    const strippedLines = stripComments(text, kind).split(/\r?\n/)
+    lines.forEach((line, i) => {
+      for (const token of tokens) {
+        if (!line.includes(token)) continue
+        if ((strippedLines[i] || '').includes(token)) continue // real config, fine
+        errors.push(
+          `${rel}:${i + 1}  a COMMENT writes "${token}", a token its own guard forbids` +
+          `\n      guard: ${rule.deploy} placeholder scan (whole tree, *${rule.exts.join(' *')})` +
+          `\n      line:  ${line.trim().slice(0, 100)}` +
+          `\n      fix:   describe the token in prose instead of writing it literally`
+        )
+      }
+    })
+  }
+}
+
 for (const rule of GUARD_RULES) {
   const abs = path.join(repoRoot, rule.file)
-  if (!fs.existsSync(abs)) { warnings.push(`${rule.file}: not found (skipped)`); continue }
+  if (!fs.existsSync(abs)) {
+    // "not found (skipped)" as a warning was indistinguishable from a pass, which is the same
+    // silent-skip class of bug the resolvers above exist to prevent. Split it: a whole starter
+    // that is gone is a legitimate skip; a file gone from a starter that is still here is an error.
+    const starter = rule.file.split('/')[0]
+    if (starterPresent(starter)) {
+      errors.push(
+        `${rule.file}  not found, but "${starter}" is present - this guard was NOT checked` +
+        `\n      guard: ${rule.guard}` +
+        `\n      fix:   restore the file, or drop this rule from GUARD_RULES`
+      )
+    } else {
+      skipped.push(`${rule.file} (starter folder absent)`)
+    }
+    continue
+  }
   const text = fs.readFileSync(abs, 'utf8')
   if (!text.includes(rule.token)) continue
 
@@ -150,7 +270,20 @@ for (const abs of collectPackageJsons(repoRoot)) {
   const rel = path.relative(repoRoot, abs).replace(/\\/g, '/')
   let pkg
   try { pkg = JSON.parse(fs.readFileSync(abs, 'utf8')) } catch { continue }
-  for (const field of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+  // overrides / resolutions / pnpm.overrides can each reintroduce a registry spec for the private
+  // scope, and peerDependencies is declared alongside them. Checking only the three obvious fields
+  // left four ways to regress past this gate.
+  const FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies',
+                  'overrides', 'resolutions']
+  const nested = [pkg.pnpm?.overrides, pkg.pnpm?.peerDependencyRules?.allowedVersions]
+  for (const extra of nested) {
+    for (const [name, spec] of Object.entries(extra ?? {})) {
+      if (name.startsWith(PRIVATE_SCOPE) && typeof spec === 'string' && !spec.startsWith('file:')) {
+        errors.push(`${rel}  pnpm override ${name} is "${spec}" - a registry spec for a PRIVATE package`)
+      }
+    }
+  }
+  for (const field of FIELDS) {
     for (const [name, spec] of Object.entries(pkg[field] ?? {})) {
       if (!name.startsWith(PRIVATE_SCOPE)) continue
       if (typeof spec !== 'string') continue
@@ -165,6 +298,24 @@ for (const abs of collectPackageJsons(repoRoot)) {
       // A file: spec pointing at a missing tarball fails at install time with a confusing
       // error, so catch it here where the message can say what actually happened.
       const target = path.resolve(path.dirname(abs), spec.slice('file:'.length))
+      // Tracked-ness, not just existence. The message below names "never committed" as the likely
+      // cause, yet checking the filesystem is precisely what CANNOT detect it: vendor the tarball,
+      // forget `git add`, and this passed locally while CI failed on a file that was not there.
+      if (fs.existsSync(target)) {
+        const relTarget = path.relative(repoRoot, target).replace(/\\/g, '/')
+        const r = spawnSync('git', ['ls-files', '--error-unmatch', '--', relTarget],
+                            { cwd: repoRoot, encoding: 'utf8' })
+        // status 0 = tracked. A non-zero status with git present means untracked; if git itself is
+        // unavailable (r.error), stay silent rather than inventing a failure.
+        if (!r.error && r.status !== 0) {
+          errors.push(
+            `${rel}  ${field}.${name} points at a tarball that exists but is NOT git-tracked` +
+            `\n      path:   ${relTarget}` +
+            `\n      effect: it works on this machine and fails on every clone and in CI` +
+            `\n      fix:    git add the tarball (check .gitignore), then commit it with the lockfile`
+          )
+        }
+      }
       if (!fs.existsSync(target)) {
         errors.push(
           `${rel}  ${field}.${name} points at a tarball that does not exist` +
@@ -172,6 +323,40 @@ for (const abs of collectPackageJsons(repoRoot)) {
           `\n      cause:   it was never committed (check .gitignore) or the version changed` +
           `\n      fix:     powershell -File scripts/vendor-design-ui.ps1`
         )
+      }
+    }
+  }
+}
+
+// ── The initialized predicate must not fork ──────────────────────────────────
+// scripts/is-initialized.mjs is the implementation for the shell consumers; apply-config.ps1
+// keeps a PowerShell mirror because it must run with no Node present. Two implementations means
+// they can drift, and the drift is silent: the hook and CI ran the placeholder gates against a
+// half-filled template while `-Check` skipped drift enforcement on the same repo. So assert
+// mechanically that both name the same sentinel values.
+{
+  const isInitAbs = path.join(repoRoot, 'scripts/is-initialized.mjs')
+  const applyAbs = path.join(repoRoot, 'apply-config.ps1')
+  if (!fs.existsSync(isInitAbs)) {
+    errors.push('scripts/is-initialized.mjs is missing - .githooks/pre-commit and CI depend on it')
+  } else if (fs.existsSync(applyAbs)) {
+    const isInit = fs.readFileSync(isInitAbs, 'utf8')
+    const apply = fs.readFileSync(applyAbs, 'utf8')
+    const sentinels = [...isInit.matchAll(/^\s*(\w+):\s*'([^']*)',/gm)].map((m) => m[2])
+    const predicate = apply.match(/function Test-Initialized \{([\s\S]*?)\n\}/)
+    if (!sentinels.length) {
+      errors.push('scripts/is-initialized.mjs  could not parse its SENTINELS table')
+    } else if (!predicate) {
+      errors.push('apply-config.ps1  Test-Initialized not found - the mirrored predicate is gone')
+    } else {
+      for (const s of sentinels) {
+        if (!predicate[1].includes(`'${s}'`)) {
+          errors.push(
+            `apply-config.ps1  Test-Initialized does not test the sentinel "${s}"` +
+            `\n      effect: this repo reads INITIALIZED to one checker and not the other` +
+            `\n      fix:    keep Test-Initialized in step with SENTINELS in scripts/is-initialized.mjs`
+          )
+        }
       }
     }
   }
@@ -203,6 +388,19 @@ const CONFUSABLES = new Map([
   ['\u201D', 'right double quote - use \'"\''],
   ['\u00A0', 'non-breaking space - use a normal space'],
 ])
+// Walk a guarded tree, honouring the same exclusions the deploy scripts use.
+function collectGuardFiles(dir, exts, out) {
+  let entries = []
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return out }
+  for (const e of entries) {
+    if (['node_modules', 'dist', '_dist', '.git', 'vendor'].includes(e.name)) continue
+    const abs = path.join(dir, e.name)
+    if (e.isDirectory()) collectGuardFiles(abs, exts, out)
+    else if (exts.includes(path.extname(e.name).toLowerCase())) out.push(abs)
+  }
+  return out
+}
+
 function collect(dir, test, into) {
   let entries = []
   try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
@@ -261,6 +459,11 @@ for (const abs of XML_TARGETS) {
 if (warnings.length) {
   console.log('template-guards: warnings')
   warnings.forEach((w) => console.log('  ! ' + w))
+}
+if (skipped.length) {
+  // Printed separately, and always, so "OK" is never read as "checked everything".
+  console.log(`template-guards: ${skipped.length} check(s) skipped - nothing to scan`)
+  skipped.forEach((s) => console.log('  - ' + s))
 }
 if (errors.length) {
   console.error('template-guards: FAILED')

@@ -71,7 +71,13 @@ deployment-settings.json
 *_unpacked/
 
 # ── Local state / scratch ─────────────────────────────────────────────────────
-# guid-freshen marker (Tables + Code Site) — prevents an accidental second run
-**/.guid-freshened
+# guid-freshen marker (Tables + Code Site) - prevents an accidental second run.
+# COMMITTED on purpose. It records a fact about the SOLUTION ("fresh GUIDs are live in
+# Dataverse"), not about one developer's machine, and apply-config.ps1 -> Test-PrefixGuard
+# reads it as a hard gate on re-mapping shortPrefix. While it was ignored, that gate was
+# inert on every clone except the one where the freshen happened to run - so a second
+# developer could re-map the prefix and silently break the deployed forms and views.
+# Both writers keep the content machine-independent for exactly this reason.
+!**/.guid-freshened
 # Scratch notes
 **/SECURITY-TODO.md

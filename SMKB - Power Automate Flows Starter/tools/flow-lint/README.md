@@ -23,10 +23,30 @@ node tools/flow-lint/lint.mjs            # lint all flows + solution XML (errors
 node tools/flow-lint/lint.mjs --strict   # also fail on warnings
 node tools/flow-lint/lint.mjs --json     # machine-readable output
 node tools/flow-lint/test.mjs            # self-test: prove each rule fires on bad input
+
+# One rule over a folder that legitimately fails the others (a template folder still holds
+# placeholders by design), e.g. the OTP recipe's flow templates:
+node tools/flow-lint/lint.mjs --only=description-max-length "<path>/flow-templates"
 ```
 
-Exit code: `0` clean, `1` errors (or warnings with `--strict`), `2` no flows found. Folders are
-auto-discovered (`* Cloud Flows/Workflows`, `* Environmental Variables/environmentvariabledefinitions`).
+Exit code: `0` clean, `1` errors (or warnings with `--strict`), `2` no flows found. A positional
+argument overrides the flows folder; otherwise it is auto-discovered.
+
+### Which folders' XML is scanned
+
+`xml-no-placeholders` / `xml-ascii-hyphen-only` cover the **Cloud Flows**, **Environmental
+Variables** and **Dataverse Tables** starters - but only the ones that are **activated**, read the
+way the root `CLAUDE.md` prescribes: a folder still named `SMKB - <X> Starter` has not been
+activated and is skipped, with a printed note saying so.
+
+That scoping is not cosmetic. A solution that activates Cloud Flows but not Environmental
+Variables used to have its **Flows** deploy blocked by placeholders in a pristine Env Vars
+template it is required to leave untouched - naming a file the developer had never opened. The
+Tables starter, meanwhile, was never scanned at all despite this README claiming it was.
+
+A **fragment** file (an action tree with no `properties.definition` wrapper, like the OTP recipe's
+`VALIDATE_AUTH_TOKEN_SNIPPET.json`) is walked as-is, so its actions are linted rather than
+silently reported clean.
 
 ## Rules
 
@@ -34,19 +54,19 @@ auto-discovered (`* Cloud Flows/Workflows`, `* Environmental Variables/environme
 
 | id | sev | catches |
 |----|-----|---------|
-| `flow-valid-json` | error | JSON that won't parse (BOM-tolerant) |
+| `flow-valid-json` | error | JSON that won't parse (BOM-tolerant). **Not a rule object** - `lint.mjs` emits this id from its `JSON.parse` catch, so it has no entry in `rules.mjs` and the self-test cannot exercise it |
 | `description-max-length` | error | any trigger/action `description` > 256 chars |
 | `connection-runtime-embedded` | error | a connection with `runtimeSource` ≠ `embedded` (invoker → recurring 403) |
 | `no-placeholders` | error | unreplaced starter placeholders |
 | `no-secret-param-default` | error | a password/secret/token-named parameter with a committed default |
 | `http-uri-encodes-client-input` | error | `triggerBody()` interpolated into an HTTP URI without `encodeUriComponent` |
-| `authenticated-flow-validates-token` | error | an `authToken` trigger input with no `sessionToken` validation |
+| `authenticated-flow-validates-token` | error | a token-titled trigger input (`authToken`, `auth token`, `sessionToken`, `token` - matched after normalizing case and separators) with no `sessionToken` reference in any **action input**. A mention in a `description` does not satisfy it |
 | `securedata-only-on-connector-actions` | error | `secureData` anywhere other than an `OpenApiConnection`/`Http` **action** — imports fine, then fails activation and stays in **Draft** |
 | `keyvault-secret-read-is-secured` | error | a Secret env-var read that doesn't mark its **outputs** secure (secret lands in run history) |
 | `connection-reference-complete` | warn | connection reference missing logical/api name |
-| `no-email-in-defaultvalue` | warn | an email committed in a parameter `defaultValue` (set per-environment instead) |
+| `no-email-in-defaultvalue` | warn | an email committed in a parameter `defaultValue`, or hardcoded in an **action input** (set per-environment instead). The org-wide mandated sender is exempt - it is a convention every flow must use, not per-solution data |
 | `powerpages-trigger-fields-have-title` | warn | Power Pages trigger field missing a `title` (eventData maps by title) |
-| `env-var-param-defined` | warn | a `metadata.schemaName` with no matching Environmental Variables definition |
+| `env-var-param-defined` | warn | any `metadata.schemaName` with no matching Environmental Variables definition (no publisher-prefix filter - that field has exactly one meaning) |
 | `no-unused-trigger-inputs` | warn | a Power Pages trigger input the flow never reads — dead surface a reviewer can't distinguish from a record selector |
 
 ### Whole-solution (global)
@@ -77,9 +97,12 @@ Useful in-module helpers: `walk(node, cb, path)` (exported) and the private `nod
 `properties.definition` itself.
 
 Then add a bad-input and good-input assertion in [`test.mjs`](./test.mjs) and run it. This is
-**enforced, not just asked for**: the self-test fails if a registered rule has no test, or if every
-assertion for it expects zero findings (a rule that never fires in its own tests is untested). Before
-that gate existed, a rule could ship with no tests at all and the suite stayed green.
+**enforced, not just asked for**: the self-test fails unless a registered rule has **both** a
+firing assertion (expects >0 findings) and a silent one (expects 0). Before that gate existed a
+rule could ship with no tests at all and the suite stayed green; before it required both
+directions, a rule with no silent test - no evidence it can be satisfied at all - was still
+reported as fully covered, which is the half that catches a rule broad enough to flag correct
+files.
 
 ## Wiring
 
@@ -90,5 +113,8 @@ that gate existed, a rule could ship with no tests at all and the suite stayed g
 - **Pre-commit**: the repo-root `.githooks/pre-commit` runs flow-lint on staged cloud-flow JSON / XML
   **once the solution is initialized** — it skips while the template placeholders are still present, so
   the initial template commit is not blocked (deploy.ps1 is the placeholder gate).
-- **CI**: not shipped in this starter — the monorepo root owns git/CI. A copy-paste CI job is in the
-  Flows starter README under "Wiring flow-lint beyond deploy".
+- **CI**: the monorepo root owns git/CI. Root's `.github/workflows/ci.yml` runs the self-test
+  (`flow-lint-selftest`, always), the full lint (`flow-lint`, once the solution is initialized), and
+  a `--only=description-max-length` pass over `examples/` and the OTP `flow-templates/` — folders
+  that carry placeholders by design and so cannot take the full lint, but whose over-long
+  descriptions would fail flow **activation** the moment someone copies one into `Workflows/`.

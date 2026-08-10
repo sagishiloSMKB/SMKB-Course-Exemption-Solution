@@ -109,9 +109,26 @@ if ($replaced -eq 0) {
     }
 }
 
-# Write marker so this script cannot run again against a deployed solution
-[System.IO.File]::WriteAllText($markerPath, "Freshened: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`nProject directory: $scriptDir`n")
-Write-Host ""
-Write-Host "  Marker written: .guid-freshened (prevents accidental second run)" -ForegroundColor Cyan
+# Write the marker ONLY if real GUID work happened.
+#
+# The marker means "fresh GUIDs are live in Dataverse, so re-randomizing them is destructive",
+# and apply-config.ps1 -> Test-PrefixGuard treats it as a hard gate on re-mapping shortPrefix.
+# Writing it after a run that replaced NOTHING armed that gate for free: a developer who ran
+# this before renaming anything (or whose tables were cloned with fresh GUIDs by /dvt-add-table,
+# the documented normal case) could no longer change the prefix without -Force. A second run
+# with no sentinels left is a no-op anyway, so there is nothing to protect against.
+#
+# The content is deliberately machine-independent - the marker is committed (see .gitignore),
+# so an absolute local path here would be per-developer churn in a shared file.
+if ($replaced -gt 0) {
+    [System.IO.File]::WriteAllText($markerPath,
+        "Freshened: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`n$replaced of $($guidMap.Count) sentinel GUID(s) replaced`n")
+    Write-Host ""
+    Write-Host "  Marker written: .guid-freshened (prevents accidental second run)" -ForegroundColor Cyan
+    Write-Host "  COMMIT IT - it records that live GUIDs exist, for every clone of this repo." -ForegroundColor Cyan
+} else {
+    Write-Host ""
+    Write-Host "  No marker written (nothing was replaced), so this stays re-runnable." -ForegroundColor Cyan
+}
 Write-Host ""
 Write-Host "Next step: run deploy.ps1 to import the solution into SMKB-Apps-Dev." -ForegroundColor Cyan

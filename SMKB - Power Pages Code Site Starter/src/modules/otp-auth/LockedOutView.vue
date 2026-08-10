@@ -28,16 +28,19 @@ import { getPortalConfig, type PortalConfig } from './configService'
 import { OTP_AUTH_CONFIG } from './otpAuthConfig'
 
 const router = useRouter()
-const { logout } = useAuth()
+const { logoutAndRevoke } = useAuth()
 const config = ref<PortalConfig | null>(null)
 
 onMounted(async () => {
   config.value = await getPortalConfig()
 })
 
-function handleLogout() {
-  logout()
-  router.push(OTP_AUTH_CONFIG.loginPath)
+// Awaited on purpose: this handler navigates, and window.shell.ajaxSafePost has no
+// keepalive, so navigating first can abort the in-flight revoke and leave the token
+// valid server-side. logoutAndRevoke() bounds its own wait, so this cannot hang.
+async function handleLogout() {
+  await logoutAndRevoke()
+  await router.push(OTP_AUTH_CONFIG.loginPath)
 }
 </script>
 

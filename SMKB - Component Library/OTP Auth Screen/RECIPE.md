@@ -217,6 +217,112 @@ CheckOTP error:
 { "errorCode": "INVALID_CODE|LOCKED", "attemptsRemaining": 3 }
 ```
 
+### H1. Action-by-action guidance
+
+**Why this lives here and not in the templates.** A Power Automate trigger or action
+`description` longer than **256 characters** imports without complaint and then fails
+**activation** — `ActionDescriptionTooLong` — leaving the flow in **Draft**, so every portal
+call to it fails. The templates carried ten descriptions between 260 and 2,879 characters, i.e.
+a flow that could not be turned on. Each of those now holds a short summary and points here.
+Keep it that way: `flow-lint`'s `description-max-length` rule is an **error**, and it is the
+gate that catches a reintroduced essay before a deploy does.
+
+#### The `Main_Flow` scope (both flows)
+
+Wrap all logic in one scope so `Handle_Flow_Error` can target it for **unexpected technical**
+failures. **Business** errors — `INVALID_CODE`, `LOCKED`, `RATE_LIMITED`, `OTP_SEND_FAILED` —
+are expected conditions: answer with `Response` then `Terminate(runStatus: Succeeded)` *inside*
+the scope, which ends the run cleanly so `Handle_Flow_Error` does **not** run and no error email
+is sent. Only genuine bugs (a Dataverse failure, a null reference) should be left to throw.
+
+**Response contract — every `Response` returns HTTP 200**, success and error alike. Power Pages
+**discards the body of any non-2xx** flow response and substitutes a generic `IncorrectPayload`
+envelope, so a 400/401/429/500 cannot carry an `errorCode` to the portal — the client would only
+ever see a generic platform failure. The error signal is the `errorCode` field inside a 200 body.
+
+#### `CreateOtp` → `IMPLEMENT_PLACEHOLDER`
+
+Replace the `Compose` with:
+
+1. Generate a 6-digit OTP with `rand(100000, 999999)` — never sequential or timestamp-based.
+2. Create the Dataverse OTP row: `{ email, otp_code, expires_at: addMinutes(utcNow(), 10), attempts: 0 }`.
+3. Send the code by SMS or email.
+4. Build a `channels` array: `[{ type: 'sms'|'email_college'|'email_personal', maskedValue: '...' }]`.
+5. Pass `channels` to `Respond_to_PowerPages`.
+
+Hashing the OTP is **not** required for 6-digit codes — the 5-attempt lockout in the check flow
+is the primary protection (see *What at-rest protection actually means here*). On a **send**
+failure return a business error rather than letting the scope throw: a failed send is an expected
+condition, not a bug.
+
+#### `CreateOtp` → rate limiting
+
+`IMPLEMENT_List_Recent_OTP_Requests` counts how many OTPs this identifier has requested in the
+last 10 minutes. Replace `entityName` with your OTP table's plural logical name and the email
+field in `$filter` with yours; the built-in `createdon` field is always available and accurate.
+`If_Rate_Limited` blocks at 3 or more: 200 + `RATE_LIMITED`, then `Terminate(Succeeded)`.
+
+Count attempts **per submitted identifier, whether or not it exists** — otherwise `RATE_LIMITED`
+only ever appears for real accounts and becomes an account-existence oracle.
+
+#### `CheckOtp` → `IMPLEMENT_PLACEHOLDER`
+
+Replace the `Compose` with, in this order, inside `Main_Flow` after `If_Account_Locked`:
+
+1. **Expiry first.** Compare the stored expiry to `utcNow()`. If expired → respond
+   `{ errorCode: 'INVALID_CODE' }` + `Terminate(Succeeded)`. Use the **same generic code** as a
+   wrong code: "this code expired" confirms a code was issued for this email. An expired code
+   must **not** increment the attempts counter.
+2. **Compare.** If the stored code differs from `triggerBody()?['otp']`:
+   a. increment `attempts` on the OTP row (`UpdateRecord`);
+   b. compute `attemptsRemaining = 5 - attempts`;
+   c. respond `{ errorCode: 'INVALID_CODE', attemptsRemaining: N }` + `Terminate(Succeeded)`.
+3. **On match:**
+   a. **delete the OTP row** (`DeleteRecord`) — one-time use; leaving it enables replay;
+   b. retrieve the user row from your main user table;
+   c. expose the user record id for `IMPLEMENT_Create_Auth_Session` (a `Compose` or a variable).
+
+Every failure path above returns the **same** generic `INVALID_CODE`. Do not reintroduce distinct
+codes for not-found / expired / wrong — each one tells an unauthenticated caller something about
+whether the email is registered. Which branch ran *is* recorded in run history, which only flow
+owners and environment admins can read. `If_OTP_Not_Found` exists for that reason and must keep
+answering `INVALID_CODE`.
+
+#### `CheckOtp` → create the auth session
+
+`IMPLEMENT_Create_Auth_Session` writes the session row. Replace `entityName` with your session
+table's plural name, replace the four placeholder field names (token, email, expiry, user id)
+with your schema names, and set the user id from `IMPLEMENT_PLACEHOLDER`.
+
+**Session cleanup** (recommended): before creating the new session, delete any previous session
+rows for this identifier — `ListRecords` filtered by the email field → `Apply_to_each` →
+`DeleteRecord` — so valid tokens for one user cannot accumulate. A daily scheduled flow that
+deletes expired rows is also worth having.
+
+#### The auth-token snippet (`VALIDATE_AUTH_TOKEN_SNIPPET.json`)
+
+`Validate_Auth_Token` checks the caller's token against the sessions table and answers 200 +
+`UNAUTHORIZED` + `Terminate(Succeeded)` when it is missing, unknown, or expired — an invalid
+token is an expected condition, not a bug, which is why it terminates *succeeded* and never
+reaches `Handle_Flow_Error`. `If_Token_Expired` only runs when the token **was** found;
+`If_Token_Not_Found` terminates the run before it otherwise. Replace the expiry field name.
+
+**Row-level security — the point of the whole snippet.** Once both conditions pass, the trusted
+identity is the user id **on the session row**:
+
+```
+@first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['<your user id field>']
+```
+
+Use that for every Dataverse query and write — **never `triggerBody()?['userId']`**, which the
+caller controls. Scoping a read to the authenticated user looks like:
+
+```
+$filter: "<user id field> eq '@{first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['<your user id field>']}'"
+```
+
+Without this, a caller holding one valid token can read and update any other user's data.
+
 ---
 
 ## 5. Power Pages portal patches

@@ -8,10 +8,17 @@ const globalById = Object.fromEntries(globalRules.map((r) => [r.id, r]))
 let pass = 0, fail = 0
 const results = []
 
-// Every rule id an assertion below actually exercised, and whether it was asserted to
-// FIRE (>0 findings) at least once. Checked at the end - see "Coverage".
+// Per rule id: did an assertion below expect it to FIRE (>0 findings), and did one expect it
+// to stay SILENT (0 findings)? Both are required - see "Coverage" at the end. Tracking only
+// "fired at least once" let a rule ship with no evidence that it can be satisfied, which is the
+// half that catches a rule so broad it flags correct files.
 const exercised = new Map()
-const note = (id, expected) => exercised.set(id, (exercised.get(id) ?? false) || expected > 0)
+const note = (id, expected) => {
+  const e = exercised.get(id) ?? { fired: false, silent: false }
+  if (expected > 0) e.fired = true
+  else e.silent = true
+  exercised.set(id, e)
+}
 
 /** Assert `rule(flow, ctx)` returns exactly `expected` findings. */
 function expect(id, label, flow, ctx, expected) {
@@ -65,6 +72,15 @@ expect('no-email-in-defaultvalue', 'bad: email default',
   flow({ parameters: { P: { defaultValue: 'dev@smkb.ac.il', type: 'String' } } }), {}, 1)
 expect('no-email-in-defaultvalue', 'good: blank default',
   flow({ parameters: { P: { defaultValue: '', type: 'String' } } }), {}, 0)
+expect('no-email-in-defaultvalue', 'bad: recipient hardcoded in an action input',
+  flow({ actions: { Mail: { type: 'OpenApiConnection', inputs: { parameters: { 'emailMessage/To': 'someone@smkb.ac.il' } } } } }), {}, 1)
+// The org-wide mandated sender is a CONVENTION, not per-solution data - the Flows README requires
+// it and every shipped skeleton carries it. A rule that flags it would be red on correct files on
+// its very first run, which is how a rule teaches people to bypass the linter.
+expect('no-email-in-defaultvalue', 'good: the org sender is exempt',
+  flow({ actions: { Mail: { type: 'OpenApiConnection', inputs: { parameters: { 'emailMessage/From': 'NoReply@smkb.ac.il' } } } } }), {}, 0)
+expect('no-email-in-defaultvalue', 'good: an address mentioned in a description is not a leak',
+  flow({ actions: { C: { type: 'Compose', description: 'see dev@smkb.ac.il for help', inputs: 'x' } } }), {}, 0)
 
 // no-secret-param-default
 expect('no-secret-param-default', 'bad: password param with default',
@@ -80,14 +96,27 @@ expect('http-uri-encodes-client-input', 'good: encoded triggerBody',
 expect('http-uri-encodes-client-input', 'good: no client input',
   flow({ actions: { H: { type: 'Http', inputs: { uri: 'https://static.example' } } } }), {}, 0)
 
-// authenticated-flow-validates-token (raw-based session check)
-const authTrigger = { triggers: { manual: { kind: 'PowerPages', inputs: { schema: { properties: { text: { title: 'authToken', type: 'string' } } } } } } }
+// authenticated-flow-validates-token
+// The evidence must be a real lookup in an ACTION INPUT. It used to be `raw.includes`, which any
+// occurrence anywhere satisfied - including a "TODO: check the sessionToken" description, i.e.
+// precisely the unvalidated state this ERROR-severity rule exists to reject.
+const authTrigger = (title = 'authToken') => ({
+  triggers: { manual: { kind: 'PowerPages', inputs: { schema: { properties: { text: { title, type: 'string' } } } } } },
+})
+const lookup = { actions: { Q: { type: 'OpenApiConnection', inputs: { parameters: { $filter: "sessionToken eq 'x'" } } } } }
 expect('authenticated-flow-validates-token', 'bad: authToken input, no session lookup',
-  flow(authTrigger, {}, 'no session ref here'), {}, 1)
-expect('authenticated-flow-validates-token', 'good: authToken input + sessionToken',
-  flow(authTrigger, {}, "$filter: sessionToken eq '...'"), {}, 0)
-expect('authenticated-flow-validates-token', 'good: public flow (no authToken)',
-  flow({ triggers: { manual: { kind: 'PowerPages', inputs: { schema: { properties: { text: { title: 'bankCode' } } } } } } }, {}, ''), {}, 0)
+  flow(authTrigger()), {}, 1)
+expect('authenticated-flow-validates-token', 'bad: sessionToken only in a description (a TODO does not validate anything)',
+  flow({ ...authTrigger(), actions: { C: { type: 'Compose', description: 'TODO: validate the sessionToken here', inputs: 'x' } } }), {}, 1)
+expect('authenticated-flow-validates-token', 'good: authToken input + sessionToken in an action input',
+  flow({ ...authTrigger(), ...lookup }), {}, 0)
+// Title normalization: Power Pages maps all of these identically, so all must be caught.
+expect('authenticated-flow-validates-token', 'bad: title "auth token" (space) still requires validation',
+  flow(authTrigger('auth token')), {}, 1)
+expect('authenticated-flow-validates-token', 'bad: title "sessionToken" still requires validation',
+  flow(authTrigger('sessionToken')), {}, 1)
+expect('authenticated-flow-validates-token', 'good: public flow (no token input)',
+  flow(authTrigger('bankCode')), {}, 0)
 
 // powerpages-trigger-fields-have-title
 expect('powerpages-trigger-fields-have-title', 'bad: field without title',
@@ -187,16 +216,26 @@ expectGlobal('xml-ascii-hyphen-only', 'good: ascii hyphen',
 // before this gate existed, a rule could ship with NO tests and the suite stayed green,
 // so "the self-test covers every rule" was believed rather than true.
 //
-// 'flow-valid-json' is excluded deliberately: it is a synthetic id emitted from
-// lint.mjs's JSON.parse catch and has no rule object, so it cannot be unit-tested here.
-const SYNTHETIC_IDS = new Set(['flow-valid-json'])
+// 'flow-valid-json' is a synthetic id emitted from lint.mjs's JSON.parse catch. It has no rule
+// object, so the loop below never sees it and the exclusion set that used to name it was dead
+// code that read like a real carve-out. The check that matters is the reverse one further down:
+// a tested id that is not a registered rule fails, which is what would catch a typo'd id.
 for (const r of [...rules, ...globalRules]) {
-  if (SYNTHETIC_IDS.has(r.id)) continue
-  if (!exercised.has(r.id)) {
+  const e = exercised.get(r.id)
+  if (!e) {
     results.push(`FAIL ${r.id} :: coverage :: rule has no test - add a bad-input and a good-input assertion`)
     fail++
-  } else if (!exercised.get(r.id)) {
-    results.push(`FAIL ${r.id} :: coverage :: every assertion expects 0 findings - add a bad input that makes it FIRE`)
+    continue
+  }
+  // BOTH directions. The old gate required only a firing assertion, while the summary line
+  // claimed "every one with a firing test and a silent test" - so a rule with no silent test
+  // (i.e. no evidence it can be satisfied at all) was reported as fully covered.
+  if (!e.fired) {
+    results.push(`FAIL ${r.id} :: coverage :: no assertion expects a finding - add a bad input that makes it FIRE`)
+    fail++
+  }
+  if (!e.silent) {
+    results.push(`FAIL ${r.id} :: coverage :: no assertion expects 0 findings - add a good input it must stay SILENT on`)
     fail++
   }
 }

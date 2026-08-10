@@ -80,7 +80,7 @@
       "actions": {
         "Main_Flow": {
           "type": "Scope",
-          "description": "All main flow logic. Business errors (INVALID_CODE, LOCKED — expected conditions) use Response + Terminate(Succeeded) inside this scope and do NOT reach Handle_Flow_Error. Only unexpected technical failures bubble up. RESPONSE CONTRACT: every Response here returns HTTP 200 - success and error alike. Power Pages DISCARDS the body of any non-2xx flow response and substitutes a generic IncorrectPayload envelope, so a 400/401/429/500 cannot carry an errorCode to the portal and the client would only ever see a generic platform failure. The error signal is the errorCode field inside a 200 body.",
+          "description": "All main flow logic. Business errors (INVALID_CODE, LOCKED) use Response + Terminate(Succeeded) here and never reach Handle_Flow_Error; only technical failures bubble up. Every Response returns HTTP 200 - see RECIPE.md 'H1'.",
           "actions": {
             "Validate_Input": {
               "type": "If",
@@ -139,7 +139,7 @@
             },
             "If_OTP_Not_Found": {
               "type": "If",
-              "description": "No OTP record found for this email — the user never sent a code, or it was already consumed. Returns the SAME generic INVALID_CODE as a wrong code, deliberately: an unauthenticated caller must not be able to tell 'this email has no pending code' from 'this code is wrong', because the first answer confirms whether an email is registered. Which branch ran is recorded in run history, which only flow owners and environment admins can read. Do NOT split this back into a distinct NOT_FOUND.",
+              "description": "No OTP record for this email. Returns the SAME generic INVALID_CODE as a wrong code, on purpose: a distinct code confirms whether the email is registered. Do NOT split this back into NOT_FOUND. See RECIPE.md 'H1'.",
               "expression": "@equals(length(body('IMPLEMENT_Get_OTP_Record')?['value']), 0)",
               "actions": {
                 "Respond_not_found": {
@@ -213,7 +213,7 @@
             },
             "IMPLEMENT_PLACEHOLDER": {
               "type": "Compose",
-              "description": "[IMPLEMENT — BUSINESS LOGIC]: Replace this Compose action with your actual OTP validation actions.\n\nWhat to build (run in this order inside Main_Flow after If_Account_Locked):\n  1. Check expiry: compare stored expires_at to utcNow(). If expired → Respond({ code: 'INVALID_CODE' }) + Terminate(Succeeded). Use the SAME generic code as a wrong code — 'this code expired' confirms a code was issued for this email.\n  2. Compare OTPs: if stored otp_code != triggerBody()?['otp']:\n       a. Increment attempts counter on the OTP record (UpdateRecord).\n       b. Compute attemptsRemaining = 5 - new_attempts_value.\n       c. Respond_invalid_code({ code: 'INVALID_CODE', attemptsRemaining: N }) + Terminate(Succeeded).\n  3. On match:\n       a. Delete the OTP record (DeleteRecord) — one-time use; leaving it enables replay attacks.\n       b. Retrieve the user record from your main user table.\n       c. Expose the user record ID for IMPLEMENT_Create_Auth_Session below (e.g. via a Compose or variable).\n\nSecurity notes:\n  - Always delete the OTP row on success — replay attacks are trivially prevented this way.\n  - Expiry check MUST run before the comparison; expired codes should NOT increment the attempts counter.\n  - Comparing plaintext 6-digit codes is acceptable here, and hashing them would add little: a 6-digit code has only 10^6 possible values, so an unsalted fast hash is reversible by exhaustive search in negligible time. The controls that actually matter are the 5-attempt lockout, the short expiry, deleting the row on use, and restricting the OTP/session tables to the service account. Power Automate has no native hash expression in any case (see RECIPE.md, 'What at-rest protection actually means here'). The SESSION TOKEN is the value where hashing would genuinely help, and it has the same platform limitation.\n  - Every failure path above returns the SAME generic INVALID_CODE. Do not reintroduce distinct codes for not-found / expired / wrong: each one tells an unauthenticated caller something about whether the email is registered.\n\nSession cleanup (optional but recommended):\n  - Before creating the new auth session, delete any previous session rows for this email:\n    ListRecords(smkb_sol_sessions, $filter: smkb_sol_email eq '...') → Apply_to_each → DeleteRecord.\n    This prevents accumulation of valid tokens for the same user.\n  - A scheduled cleanup flow running daily to delete expired rows is also recommended.\n\nCRITICAL — two error categories:\n\n(A) BUSINESS ERRORS (INVALID_CODE, LOCKED — expected, do NOT send error email):\n    Pattern: Response(4xx) → Terminate(runStatus: Succeeded)\n    Terminate(Succeeded) ends the run cleanly. Handle_Flow_Error does NOT run.\n\n(B) TECHNICAL ERRORS (Dataverse failure, null reference — unexpected bugs):\n    Let them throw unhandled. The scope fails → Handle_Flow_Error runs → error email sent → 500 returned.",
+              "description": "[IMPLEMENT - BUSINESS LOGIC] Replace this Compose with the real OTP validation: expiry check, compare, increment attempts, delete the row on success, look up the user. Every step and the security rules: RECIPE.md 'H1'.",
               "inputs": "[IMPLEMENT]",
               "runAfter": {
                 "If_Account_Locked": ["Succeeded"]
@@ -229,7 +229,7 @@
             },
             "IMPLEMENT_Create_Auth_Session": {
               "type": "OpenApiConnection",
-              "description": "Create a session record in the Dataverse sessions table. [IMPLEMENT]: (1) replace entityName with your session table plural name (e.g. smkb_sol_sessions). (2) replace smkb_sol_token/smkb_sol_email/smkb_sol_expires_at/smkb_sol_userid with your actual field schema names. (3) set item/smkb_sol_userid to the user record ID from IMPLEMENT_PLACEHOLDER.",
+              "description": "Create a session row in the Dataverse sessions table. [IMPLEMENT] Replace entityName with your session table's plural name and the four placeholder field names with yours; set the user id from IMPLEMENT_PLACEHOLDER. See RECIPE.md 'H1'.",
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps_[yourid]",

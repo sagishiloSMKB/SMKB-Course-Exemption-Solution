@@ -100,7 +100,7 @@
       "actions": {
         "Main_Flow": {
           "type": "Scope",
-          "description": "All main flow logic. Wrap here so Handle_Flow_Error can target this scope on unexpected technical failures. Business errors (RATE_LIMITED, OTP_SEND_FAILED) must use Response + Terminate(Succeeded) inside this scope RESPONSE CONTRACT: every Response here returns HTTP 200 - success and error alike. Power Pages DISCARDS the body of any non-2xx flow response and substitutes a generic IncorrectPayload envelope, so a 400/401/429/500 cannot carry an errorCode to the portal and the client would only ever see a generic platform failure. The error signal is the errorCode field inside a 200 body. — they do NOT bubble up to Handle_Flow_Error.",
+          "description": "All main flow logic; Handle_Flow_Error targets this scope on unexpected technical failures. Business errors (RATE_LIMITED, OTP_SEND_FAILED) use Response + Terminate(Succeeded) here and do NOT bubble up. Every Response is HTTP 200 - see RECIPE.md 'H1'.",
           "actions": {
             "Validate_Input": {
               "type": "If",
@@ -244,7 +244,7 @@
             },
             "IMPLEMENT_List_Recent_OTP_Requests": {
               "type": "OpenApiConnection",
-              "description": "Rate limiting: count how many OTP requests this email has sent in the last 10 minutes. [IMPLEMENT]: (1) replace entityName with your OTP table plural logical name (e.g. smkb_sol_otprequests). (2) replace smkb_sol_email in $filter with your email field name. The createdon built-in field is always available and accurate.",
+              "description": "Rate limiting: count OTP requests for this email in the last 10 minutes. [IMPLEMENT] Replace entityName with your OTP table's plural logical name and the email field in $filter with yours. createdon is always available. See RECIPE.md 'H1'.",
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps_[yourid]",
@@ -266,7 +266,7 @@
             },
             "If_Rate_Limited": {
               "type": "If",
-              "description": "Block if 3 or more OTPs have been sent for this email in the last 10 minutes. 200 + RATE_LIMITED, then Terminate(Succeeded) — no error email. Count attempts per SUBMITTED identifier whether or not it exists, or RATE_LIMITED becomes an account-existence oracle.",
+              "description": "Block if 3 or more OTPs were sent for this email in the last 10 minutes: 200 + RATE_LIMITED, then Terminate(Succeeded), no error email. Count per SUBMITTED identifier whether or not it exists, or RATE_LIMITED becomes an account-existence oracle.",
               "expression": "@greaterOrEquals(length(body('IMPLEMENT_List_Recent_OTP_Requests')?['value']), 3)",
               "actions": {
                 "Respond_rate_limited": {
@@ -350,7 +350,7 @@
             },
             "IMPLEMENT_PLACEHOLDER": {
               "type": "Compose",
-              "description": "[IMPLEMENT — BUSINESS LOGIC]: Replace this Compose action with your actual OTP generation and send actions.\n\nWhat to build:\n  1. Generate 6-digit OTP: use rand(100000, 999999) — never sequential or timestamp-based.\n  2. Create a Dataverse OTP record: { email, otp_code, expires_at: addMinutes(utcNow(), 10), attempts: 0 }.\n  3. Send OTP via SMS or email to the user.\n  4. Build a 'channels' array: [{ type: 'sms'|'email_college'|'email_personal', maskedValue: '...' }].\n  5. Pass channels to Respond_to_PowerPages.\n\nSecurity notes:\n  - Hashing the OTP is NOT required for 6-digit codes — the 5-attempt lockout in smkb_sol_CheckOtp is the primary protection.\n  - On any send failure, return a business error (see pattern below) rather than letting the scope throw — send failures are expected conditions, not bugs.\n\nCRITICAL — two error categories:\n\n(A) BUSINESS ERRORS (NOT_FOUND, OTP_SEND_FAILED — expected, do NOT send error email):\n    Pattern: Response(4xx) → Terminate(runStatus: Succeeded)\n    Terminate(Succeeded) ends the run cleanly. Handle_Flow_Error does NOT run.\n    Example:\n      Respond_not_found  → { statusCode: 400, body: { code: 'NOT_FOUND' } }\n      Terminate_not_found → { runStatus: 'Succeeded' }\n\n(B) TECHNICAL ERRORS (Dataverse connection failure, null reference — unexpected bugs):\n    Let them throw unhandled. The scope fails → Handle_Flow_Error runs → error email sent → 500 returned to caller.",
+              "description": "[IMPLEMENT - BUSINESS LOGIC] Replace this Compose with the real generate-and-send: rand(100000,999999), create the OTP row, send by SMS or email, build the masked channels array. Full steps and the two error categories: RECIPE.md 'H1'.",
               "inputs": "[IMPLEMENT]",
               "runAfter": {
                 "If_Global_Cap_Exceeded": [

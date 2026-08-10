@@ -260,6 +260,9 @@ onMounted(async () => {
 onUnmounted(() => {
   stopWebOtp()
   if (cooldownTimer) clearInterval(cooldownTimer)
+  // retryTimer was created but never cleared: navigate away within its 3s window and it fires
+  // against a torn-down scope.
+  if (retryTimer) clearTimeout(retryTimer)
 })
 
 function onStepEnter() {
@@ -316,6 +319,12 @@ async function sendCode() {
 
 async function verify() {
   if (otpValue.value.length < 6) return
+  // Re-entrancy guard. Six paths can call this - button, Enter, the 6th character arriving,
+  // paste, the iOS relay, and WebOTP - so paste-then-Enter used to send TWO checkOtp calls for
+  // one code. The server decrements its attempt counter per call, so a legitimate user could
+  // burn attempts and hit LOCKED on a correct code. `loading` is already the in-flight flag;
+  // it just was not being read here.
+  if (loading.value) return
   loading.value = true
   errorCode.value = null
   const result = await checkOtp(phone.value.trim(), otpValue.value)
