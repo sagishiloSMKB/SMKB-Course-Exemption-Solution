@@ -149,7 +149,9 @@ function Assert-Valid {
       @('powerPages.siteName',                  $(if ($cfg.activate.powerPages) { $ppSite }      else { '' })))) {
     $name = $seg[0]; $val = "$($seg[1])"
     if ($val -eq '') { continue }
-    if ($val -match '[\\/:*?"<>|]') { $errs += "$name '$val' contains a character illegal in a folder name (\\ / : * ? "" < > |)." }
+    if ($val -match '[\\/:*?"<>|]') { $errs += "$name '$val' contains a character illegal in a folder name: one of \ / : * ? "" < > |" }
+    if ($val -match '[\x00-\x1f]') { $errs += "$name contains a control character (codepoint below 0x20) - remove it." }
+    if ($val -match '^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\\.|$)') { $errs += "$name '$val' is a reserved Windows device name." }
     if ($val -match '\.\s*$')       { $errs += "$name '$val' must not end with a dot - Windows silently strips it." }
     if ($val -match '^\s|\s$')      { $errs += "$name '$val' must not start or end with whitespace." }
   }
