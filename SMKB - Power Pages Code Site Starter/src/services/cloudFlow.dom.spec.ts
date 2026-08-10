@@ -92,7 +92,6 @@ describe('invokeFlow (portal shell path)', () => {
 
   it('unwraps a shell success through the same errorCode contract', async () => {
     const done = (res: unknown) => ({
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       done(fn: (r: unknown) => void) { fn(res); return this },
       fail() { return this },
     })

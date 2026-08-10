@@ -7,11 +7,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // The revoke goes over the network. Stub the whole service so nothing here needs a flow, and so
 // the tests can assert WHICH revoke path a logout took.
-const revokeSession = vi.fn()
-const revokeSessionAwaitable = vi.fn(() => Promise.resolve())
+// Explicit signatures, not `vi.fn()` + a spread forward: an implementation-less `vi.fn()` is typed
+// with an EMPTY argument tuple, so `(...a: unknown[]) => mock(...a)` fails to compile (TS2556) -
+// and `npm run build` type-checks src/**, specs included.
+const revokeSession = vi.fn<(token: string) => void>()
+const revokeSessionAwaitable = vi.fn<(token: string, timeoutMs?: number) => Promise<void>>(
+  () => Promise.resolve(),
+)
 vi.mock('./authService', () => ({
-  revokeSession: (...a: unknown[]) => revokeSession(...a),
-  revokeSessionAwaitable: (...a: unknown[]) => revokeSessionAwaitable(...a),
+  revokeSession: (token: string) => revokeSession(token),
+  revokeSessionAwaitable: (token: string, timeoutMs?: number) => revokeSessionAwaitable(token, timeoutMs),
 }))
 
 // Imported, not hardcoded: the key derives from SOLUTION.prefix, so a literal here would go
@@ -155,10 +160,10 @@ describe('useAuth', () => {
   it('logoutAndRevoke() awaits the bounded revoke before clearing state', async () => {
     let resolveRevoke: (() => void) | undefined
     let tokenAtRevoke: unknown
-    revokeSessionAwaitable.mockImplementation(((token: string) => {
+    revokeSessionAwaitable.mockImplementation((token: string) => {
       tokenAtRevoke = token
       return new Promise<void>((r) => { resolveRevoke = r })
-    }) as never)
+    })
 
     const auth = await freshAuth()
     auth.login(makeUser() as never)
