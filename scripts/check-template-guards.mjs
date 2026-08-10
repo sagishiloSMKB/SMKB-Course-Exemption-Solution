@@ -298,22 +298,42 @@ for (const abs of collectPackageJsons(repoRoot)) {
       // A file: spec pointing at a missing tarball fails at install time with a confusing
       // error, so catch it here where the message can say what actually happened.
       const target = path.resolve(path.dirname(abs), spec.slice('file:'.length))
-      // Tracked-ness, not just existence. The message below names "never committed" as the likely
-      // cause, yet checking the filesystem is precisely what CANNOT detect it: vendor the tarball,
-      // forget `git add`, and this passed locally while CI failed on a file that was not there.
+      // Existence is not enough: the message below names "never committed" as the likely cause,
+      // and checking the filesystem is precisely what CANNOT detect that. But the check has to
+      // distinguish two very different situations, or it deadlocks the repo.
+      //
+      //   IGNORED     -> ERROR. The tarball can never be committed, so every clone and every CI
+      //                  run will be missing it. Permanent and fatal.
+      //   not tracked -> WARNING. Usually transient and legitimate: right after apply-config
+      //                  renames a starter folder, the tarball's path has changed and the rename
+      //                  is not committed yet, so `git ls-files` reports the NEW path as unknown
+      //                  while the file is perfectly tracked under the old one. Erroring here made
+      //                  this checker fail on a correctly-applied solution - and because the
+      //                  pre-commit hook runs it, the rename could not be committed either.
       if (fs.existsSync(target)) {
         const relTarget = path.relative(repoRoot, target).replace(/\\/g, '/')
-        const r = spawnSync('git', ['ls-files', '--error-unmatch', '--', relTarget],
-                            { cwd: repoRoot, encoding: 'utf8' })
-        // status 0 = tracked. A non-zero status with git present means untracked; if git itself is
-        // unavailable (r.error), stay silent rather than inventing a failure.
-        if (!r.error && r.status !== 0) {
-          errors.push(
-            `${rel}  ${field}.${name} points at a tarball that exists but is NOT git-tracked` +
-            `\n      path:   ${relTarget}` +
-            `\n      effect: it works on this machine and fails on every clone and in CI` +
-            `\n      fix:    git add the tarball (check .gitignore), then commit it with the lockfile`
-          )
+        const tracked = spawnSync('git', ['ls-files', '--error-unmatch', '--', relTarget],
+                                  { cwd: repoRoot, encoding: 'utf8' })
+        // git absent (.error) -> say nothing rather than invent a failure.
+        if (!tracked.error && tracked.status !== 0) {
+          // Untracked. Is it untracked because it CANNOT be committed? `--no-index` is required:
+          // without it check-ignore refuses to report on a tracked path, which is fine here but
+          // makes the flag the difference between a real answer and a silent 1.
+          const ignored = spawnSync('git', ['check-ignore', '-q', '--no-index', '--', relTarget],
+                                    { cwd: repoRoot, encoding: 'utf8' })
+          if (!ignored.error && ignored.status === 0) {
+            errors.push(
+              `${rel}  ${field}.${name} points at a tarball that is GITIGNORED and untracked` +
+              `\n      path:   ${relTarget}` +
+              `\n      effect: it can never be committed, so every clone and every CI run installs nothing` +
+              `\n      fix:    un-ignore it in .gitignore (a vendored tarball is source), then commit it`
+            )
+          } else {
+            warnings.push(
+              `${relTarget} is not git-tracked yet - commit it with the lockfile.` +
+              ` (Expected right after a starter-folder rename, which moves it; a problem if it persists.)`
+            )
+          }
         }
       }
       if (!fs.existsSync(target)) {

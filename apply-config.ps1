@@ -61,6 +61,12 @@ function EscJson([string]$s) {
 }
 
 # Single-quoted TypeScript/JavaScript literal.
+# The two quoted-literal shapes the finders use, paired with EscTs / EscJson above. Escape-aware
+# on purpose: an escaper that emits a backslash needs a finder that understands one, or the match
+# stops mid-value. See the note at the write sites.
+$script:tsLit   = "'(?:[^'\\]|\\.)*'"
+$script:jsonLit = '"(?:[^"\\]|\\.)*"'
+
 function EscTs([string]$s) {
   if ($null -eq $s) { return '' }
   EscRe ($s.Replace('\', '\\').Replace("'", "\'"))
@@ -546,31 +552,37 @@ foreach ($s in @(
 # Power Apps - deploy.config.json + power.config.json (identity only; appId left to pac code init).
 if ($cfg.activate.powerApps) {
   $dc = Join-Path $paRoot 'deploy.config.json'
-  Invoke-Op -Path $dc -Pattern '("solutionName":\s*)"[^"]*"' -Replacement ('${1}"' + (EscJson $uniqueName) + '"') -Label 'PowerApps deploy.config solutionName'
-  Invoke-Op -Path $dc -Pattern '("targetEnv":\s*)"[^"]*"'    -Replacement ('${1}"' + (EscJson $targetUrl)  + '"') -Label 'PowerApps deploy.config targetEnv'
+  Invoke-Op -Path $dc -Pattern ('("solutionName":\s*)' + $jsonLit) -Replacement ('${1}"' + (EscJson $uniqueName) + '"') -Label 'PowerApps deploy.config solutionName'
+  Invoke-Op -Path $dc -Pattern ('("targetEnv":\s*)' + $jsonLit)    -Replacement ('${1}"' + (EscJson $targetUrl)  + '"') -Label 'PowerApps deploy.config targetEnv'
   Invoke-Op -Path $dc -Pattern '("allowedEnvs":\s*)\[[^\]]*\]' -Replacement ('${1}["' + (EscJson $targetUrl) + '"]') -Label 'PowerApps deploy.config allowedEnvs'
   $pc = Join-Path $paRoot 'power.config.json'
-  Invoke-Op -Path $pc -Pattern '("appDisplayName":\s*)"[^"]*"' -Replacement ('${1}"' + (EscJson $appDisplay) + '"') -Label 'PowerApps power.config appDisplayName'
-  Invoke-Op -Path $pc -Pattern '("environmentId":\s*)"[^"]*"'  -Replacement ('${1}"' + (EscJson $envId)      + '"') -Label 'PowerApps power.config environmentId'
-  Invoke-Op -Path $pc -Pattern '("region":\s*)"[^"]*"'         -Replacement ('${1}"' + (EscJson $paRegion)   + '"') -Label 'PowerApps power.config region'
+  Invoke-Op -Path $pc -Pattern ('("appDisplayName":\s*)' + $jsonLit) -Replacement ('${1}"' + (EscJson $appDisplay) + '"') -Label 'PowerApps power.config appDisplayName'
+  Invoke-Op -Path $pc -Pattern ('("environmentId":\s*)' + $jsonLit)  -Replacement ('${1}"' + (EscJson $envId)      + '"') -Label 'PowerApps power.config environmentId'
+  Invoke-Op -Path $pc -Pattern ('("region":\s*)' + $jsonLit)         -Replacement ('${1}"' + (EscJson $paRegion)   + '"') -Label 'PowerApps power.config region'
 }
 
 # Power Pages - src/config/solution.ts + powerpages.config.json.
 if ($cfg.activate.powerPages) {
   $st = Join-Path $ppRoot 'src\config\solution.ts'
-  Invoke-Op -Path $st -Pattern "(prefix:\s*)'[^']*'"        -Replacement ("`${1}'" + (EscTs $prefix)  + "'") -Label 'PowerPages solution.ts prefix'
-  Invoke-Op -Path $st -Pattern "(siteName:\s*)'[^']*'"      -Replacement ("`${1}'" + (EscTs $ppSite)  + "'") -Label 'PowerPages solution.ts siteName'
-  Invoke-Op -Path $st -Pattern "(appName:\s*\{\s*he:\s*)'[^']*'(,\s*en:\s*)'[^']*'" -Replacement ("`${1}'" + (EscTs $ppHe) + "'`${2}'" + (EscTs $ppEn) + "'") -Label 'PowerPages solution.ts appName'
-  Invoke-Op -Path $st -Pattern "(documentTitle:\s*)'[^']*'" -Replacement ("`${1}'" + (EscTs $ppTitle) + "'") -Label 'PowerPages solution.ts documentTitle'
-  Invoke-Op -Path $st -Pattern "(defaultLanguage:\s*)'[^']*'" -Replacement ("`${1}'" + (EscTs $ppLang) + "'") -Label 'PowerPages solution.ts defaultLanguage'
+  # Quoted-literal patterns here use $tsLit / $jsonLit (escape-aware) rather than [^']* /
+  # [^"]*, so a value containing an ESCAPED quote is matched whole. With [^']* the pattern
+  # stopped at the backslash in  'Student's Portal'  (which EscTs had correctly written):
+  # -Check then reported permanent drift, and a SECOND apply rewrote the partial match into
+  # 'Student's Portal's Portal', corrupting a correct file. Any escaper that can emit a
+  # backslash needs a finder that understands one.
+  Invoke-Op -Path $st -Pattern "(prefix:\s*)$tsLit"        -Replacement ("`${1}'" + (EscTs $prefix)  + "'") -Label 'PowerPages solution.ts prefix'
+  Invoke-Op -Path $st -Pattern "(siteName:\s*)$tsLit"      -Replacement ("`${1}'" + (EscTs $ppSite)  + "'") -Label 'PowerPages solution.ts siteName'
+  Invoke-Op -Path $st -Pattern "(appName:\s*\{\s*he:\s*)$tsLit(,\s*en:\s*)$tsLit" -Replacement ("`${1}'" + (EscTs $ppHe) + "'`${2}'" + (EscTs $ppEn) + "'") -Label 'PowerPages solution.ts appName'
+  Invoke-Op -Path $st -Pattern "(documentTitle:\s*)$tsLit" -Replacement ("`${1}'" + (EscTs $ppTitle) + "'") -Label 'PowerPages solution.ts documentTitle'
+  Invoke-Op -Path $st -Pattern "(defaultLanguage:\s*)$tsLit" -Replacement ("`${1}'" + (EscTs $ppLang) + "'") -Label 'PowerPages solution.ts defaultLanguage'
   # Deploy tooling only (scripts/add-site-to-solution.ps1 reconciles the site's components
   # against this solution on every deploy). The starter cannot learn the name any other way -
   # powerpages.config.json follows a Microsoft schema and must not carry custom keys.
   # NOTE the variable is $uniqueName: PowerShell expands an undefined variable to an empty
   # string, so a typo here would silently write '' and still pass every gate.
-  Invoke-Op -Path $st -Pattern "(SOLUTION_UNIQUE_NAME\s*=\s*)'[^']*'" -Replacement ("`${1}'" + (EscTs $uniqueName) + "'") -Label 'PowerPages solution.ts SOLUTION_UNIQUE_NAME'
+  Invoke-Op -Path $st -Pattern "(SOLUTION_UNIQUE_NAME\s*=\s*)$tsLit" -Replacement ("`${1}'" + (EscTs $uniqueName) + "'") -Label 'PowerPages solution.ts SOLUTION_UNIQUE_NAME'
   $ppc = Join-Path $ppRoot 'powerpages.config.json'
-  Invoke-Op -Path $ppc -Pattern '("siteName":\s*)"[^"]*"' -Replacement ('${1}"' + (EscJson $derivedSite) + '"') -Label 'PowerPages powerpages.config siteName'
+  Invoke-Op -Path $ppc -Pattern ('("siteName":\s*)' + $jsonLit) -Replacement ('${1}"' + (EscJson $derivedSite) + '"') -Label 'PowerPages powerpages.config siteName'
 }
 
 # Shipped env vars - swap the 'sol' segment of every definition this starter ships
