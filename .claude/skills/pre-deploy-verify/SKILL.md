@@ -16,6 +16,10 @@ Before any deploy, three separate gates must pass — each with its own exit sem
 three and reports a single pass/fail so "is this safe to ship?" is one call. It is **read-only** (it changes
 nothing). See [INIT_PROJECT.md](../../../INIT_PROJECT.md) Phase 8.1.
 
+**8.1a's pass A removals are a sibling step, not part of this gate.** This skill never deletes anything —
+it is what *proves* a removal was clean, and a step cannot be its own post-condition. Run
+`/cleanup-audit A` for the removals, then re-run this.
+
 ## Steps
 
 1. **Config drift** — the root config vs every activated starter's committed config:

@@ -7,7 +7,7 @@ description: >-
   TEMPLATE callout.
 when_to_use: >-
   User says "document the solution", "fill in the docs", "write the docs", "generate
-  documentation", or is at Init Project Phase 10.
+  documentation", or is at Init Project Phase 12.
 allowed-tools: Read Edit Grep Glob
 ---
 
@@ -19,7 +19,7 @@ files: README + `00`–`09`). They are deliberately **not** scanned by any deplo
 the agent has full build context exactly once (at the end of Init Project). This skill captures that:
 replace every `[FILL IN: …]` with the solution's real detail, **cite the source file** for each non-obvious
 fact (the docs' own rule: the code is authoritative, the doc points at it), and remove template scaffolding.
-See [INIT_PROJECT.md](../../../INIT_PROJECT.md) Phase 10.
+See [INIT_PROJECT.md](../../../INIT_PROJECT.md) Phase 12.
 
 ## Steps
 
@@ -50,4 +50,6 @@ See [INIT_PROJECT.md](../../../INIT_PROJECT.md) Phase 10.
 ## Notes
 
 - Keep the docs' citation discipline: every non-obvious control/data claim points at its source file.
-- Re-run this whenever the solution changes materially. Pre-go-live reviews are `/security-audit` and `/ux-audit`.
+- Re-run this whenever the solution changes materially. Pre-go-live reviews are `/cleanup-audit`, `/security-audit` and `/ux-audit`. All three run **before**
+  this skill (Phases 9–10 vs 12), so the docs never describe a component that was removed — read the
+  dated cleanup report before filling in the tech-stack and architecture pages.

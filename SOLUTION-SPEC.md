@@ -169,4 +169,10 @@ Anything not yet answered. Each one is a real gap — do not silently assume a d
 | [FILL IN: Power App / Code Site] | [FILL IN] | [FILL IN: which §6 function statement it came from] |
 
 **Deliberately not activated:** [FILL IN: and why — an explicit "no flows are needed because …" is worth
-more later than silence.]
+more later than silence. **These starter folders are deleted from this repo at the Phase 9 cleanup audit,
+so this line becomes the only surviving record of the decision** — name each one. A folder is recoverable
+later from the Phase 3.4 baseline commit: `git checkout <baseline> -- "<folder>"`.]
+
+**Removed at the cleanup audit:** [FILL IN: after Phase 9, the dated `audit/cleanup-audit-*.md` report is
+the detail; name the headline removals here so this file stays the one place the architecture is
+explained.]

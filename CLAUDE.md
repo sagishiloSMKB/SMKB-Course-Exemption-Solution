@@ -25,6 +25,10 @@ doubt about where a fact belongs, use this.
 - Solution-level documentation & review templates — the root `docs/` set (a per-solution artifact, drafted
   at the end of Init Project), `TESTING-STRATEGY.md`, and the `audit/` templates. (Distinct from a starter's
   *own* `docs/`, which documents that starter's mechanics.)
+- The **cleanup audit** — `scripts/cleanup-audit.mjs`, `audit/TEMPLATE-cleanup-audit.md` and
+  `/cleanup-audit`. It decides what a solution stops carrying, and its keep-list spans every starter, so
+  it is root's. A starter documents its *own* removal recipe (e.g. the Power Apps "Removing the example"
+  section, `/ppcs-remove-design-ui`); root owns which of them a given solution runs, and when.
 - The solution specification — `SOLUTION-SPEC.md`. Captured at Init Project Phase 4, it is the **input**
   artifact (what the solution must do, in the developer's words) as against `docs/`, the **output** artifact
   drafted at the end. It is also what the starter-activation decision is derived from, so it is root's.
@@ -68,7 +72,7 @@ that owns it:
 | Solution documentation (architecture, security, privacy, ALM …) — templates, filled per solution at init | [docs/](docs/README.md) |
 | Testing strategy — the layered testing method | [TESTING-STRATEGY.md](TESTING-STRATEGY.md) |
 | **Security baseline** — shipped defaults, enforced invariants, accepted trade-offs (read before any security review) | [SECURITY-BASELINE.md](SECURITY-BASELINE.md) |
-| Pre-go-live security / UX audit templates | [audit/](audit/README.md) |
+| Pre-go-live review templates — cleanup, security, UX | [audit/](audit/README.md) |
 
 ## Skills
 
@@ -81,7 +85,7 @@ over doing the task by hand.
 
 | Owner | Skills |
 |-------|--------|
-| Root (`.claude/skills/`) | `/solution-config` (identity → apply-config) · `/pre-deploy-verify` · `/deploy-solution` (ordered deploy) · `/document-solution` (fill `docs/`) · `/security-audit` · `/ux-audit` · `/create-skill` |
+| Root (`.claude/skills/`) | `/solution-config` (identity → apply-config) · `/pre-deploy-verify` · `/deploy-solution` (ordered deploy) · `/cleanup-audit` (remove what the solution does not use) · `/security-audit` · `/ux-audit` · `/document-solution` (fill `docs/`) · `/create-skill` |
 | Dataverse Tables | `/dvt-add-table` · `/dvt-add-lookup` · `/dvt-deploy` |
 | Environment Variables | `/env-add-var` |
 | Cloud Flows | `/flow-add` · `/flow-deploy` |
@@ -114,7 +118,9 @@ tarball, not built here) and the `onboarding SMKB Apps Development` learning app
 
 Monorepo — one Git root; each starter manages its own `node_modules` / lock file and is not linked at
 build time. Each starter is an independent, reusable template. Not every solution uses all starters;
-starters you don't activate stay untouched with their template names.
+starters you don't activate stay untouched with their template names **until the Phase 9 cleanup audit
+removes them from a solution repo**. In the starter kit itself they stay as templates for the next
+solution — which is the whole reason a solution repo can safely drop them.
 
 ---
 
@@ -176,10 +182,13 @@ Never run a deploy without confirming the auth target. If the wrong profile is a
 - OR the pre-session check above finds the starter kit remote (proactively offer to run Init Project)
 
 **When triggered:** follow [`INIT_PROJECT.md`](INIT_PROJECT.md) phase by phase.
-- **Do not confirm every step.** The flow has exactly **three decision points** — confirm the derived
-  identity (Phase 2), approve the plan (Phase 5), authorise the first deploy (Phase 8.2) — plus the guided
-  handoffs the user must physically perform. Everything else you decide and proceed with. Asking after each
-  step is the behaviour this flow was restructured to remove.
+- **Do not confirm every step.** The flow has **three decisions and two authorisations**, and nothing
+  else. The decisions: confirm the derived identity (Phase 2), give the specifications (Phase 4), approve
+  the plan (Phase 5). The authorisations: the first deploy to shared Dev **together with the one-way
+  removal list** (Phase 8.2), and the cleanup removal list (Phase 9.3) — each one yes to a list you have
+  already prepared, never an item-by-item confirmation. Plus the guided handoffs the user must physically
+  perform. Everything else you decide and proceed with. Asking after each step is the behaviour this flow
+  was restructured to remove.
 - **Do not skip a phase or run one out of order.** The ordering carries real dependencies: identity is
   recorded before the baseline commit, the specs are written down before the restart that would otherwise
   lose them, and nothing that *acts* on the architecture (config flags, folder renames, installs) may run
@@ -250,11 +259,23 @@ Deriving activation from a generic checklist *before* understanding the solution
 activations (activating Flows before confirming any flow is needed), and the component names are
 **functional** names that only the specs can supply.
 
-**The safety property is unchanged and absolute:** a starter you did not activate must be left **completely
-untouched** — do not rename its folder, modify its files, or deploy it. Unused starters keep their
-placeholder names and are templates for future solutions. Record the ones you deliberately did *not*
-activate, and why, in `SOLUTION-SPEC.md` §12 — an explicit "no flows are needed because …" is worth more
-later than silence.
+**The safety property is unchanged and absolute, with one scheduled exception.** A starter you did not
+activate has exactly **two legal states: pristine or absent.** Through Phases 6–8 it must be left
+**completely untouched** — do not rename its folder, modify its files, or deploy it; while it sits there
+pristine it is still a template. At the **cleanup audit ([`INIT_PROJECT.md`](INIT_PROJECT.md) Phase 9)**,
+once the developer has approved the removal list, a non-activated starter is deleted **whole** from *this
+solution's* repo: the starter kit keeps the template, and a solution repo has no use for a component it
+never built.
+
+What is never allowed is the third state — renaming it, filling in part of its config, deleting some of
+its files. A partly-configured starter is neither a template nor a component, and **nothing in the kit
+guards it**: every `apply-config.ps1` write is gated on its `activate` flag, so `-Check` reports no drift,
+and `check-template-guards.mjs` records it as a skip.
+
+Record the starters you deliberately did *not* activate, and why, in `SOLUTION-SPEC.md` §12 — after Phase 9
+that record is the **only surviving trace** of the decision, so an explicit "no flows are needed because …"
+is worth more than ever. Any deleted folder is recoverable from the Phase 3.4 baseline commit:
+`git checkout <baseline> -- "<folder>"`.
 
 ---
 

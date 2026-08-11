@@ -64,7 +64,14 @@ This guide covers the **one-time setup** required when you clone this starter ki
 | **2. The specifications** | 4 | What the solution must do — data, rules, screens, audiences, design, any existing artifacts. In your own words; the agent asks and writes it down. |
 | **3. Approve the plan** | 5 | The agent states the architecture it derived, **which starters it will activate and why**, the component names, and the build sequence. You confirm it matches what you had in mind. |
 
-Then one more: **authorising the first deploy** to the shared Dev environment (Phase 8.2). After that, the agent deploys every starter in order without asking again.
+Then **two authorisations while it ships**. Each is one yes to a list the agent has already prepared — never an item-by-item confirmation, and never asked twice:
+
+| Your authorisation | Phase | What you are saying yes to |
+|---|---|---|
+| **The first deploy — and the one-way removal list with it** | 8.2 (H5) | the deploy to shared Dev, **plus** removing the components this import would otherwise make **permanent** in the environment. One question, because it is one consequence. |
+| **The cleanup removal list** | 9.3 (H14) | deleting from the repo what the solution turned out not to use, now that the deploy is proven. |
+
+Neither is a design question, and both are recoverable from the Phase 3.4 baseline commit. After the deploy authorisation the agent deploys every starter in order without asking again.
 
 **Everything else the agent decides and does.** Which starters to activate is *not* a menu you pick from —
 it is derived from your specs and stated to you. See CLAUDE.md → Critical Rule 1.
@@ -91,17 +98,19 @@ The verification half is the point. Where a check is genuinely impossible from h
 | **H2** | Create the private GitHub repo | 3.3 | browser | `git ls-remote` succeeds and returns nothing (empty repo) |
 | **H3** | `pnpm install` / `npm install` | 6.4 | blocked in agent settings | `node_modules` exists; `npm run lint` runs |
 | **H4** | **Restart Claude Code** after the folder renames | 6.3 | session-level | directory-scoped skills resolve to the new paths |
-| **H5** | Authorise the first deploy to shared Dev | 8.2 | the deploy gate | — this is the approval itself |
+| **H5** | Authorise the first deploy to shared Dev — **and with it the pass A removal list** | 8.2 | the deploy gate; this deploy is what makes those components permanent | — this is the approval itself. The agent then applies the removals and **re-runs 8.1's three checks** before the first `deploy.ps1`, so the gate proves the removals broke nothing |
 | **H6** | `pac code init` — create the Power App record | 8.6 | must run locally before the first push | `power.config.json` exists (`appId` null is expected) |
 | **H7** | Set environment-variable **values** in the Maker portal | 8.4 | portal-only data entry | agent lists every definition and confirms each with you |
 | **H8** | Confirm flow connection references and **turn each flow on** | 8.5 | portal-only | flows import **disabled** — agent re-checks published state |
 | **H9** | Power Pages provisioning / reactivation + typing the web URL slug | 8.7 | browser | `pac pages list` shows the site; slug matches `powerPages.webUrlSlug` |
 | **H10** | **Convert the site to Production** | 8.7 | admin role + portal | `pac pages list -v` no longer reports `Trial` |
-| **H11** | Run the Power Platform Pipeline for Stage / Prod | 9 | portal-only by policy | **cannot be verified from here** — the agent lists what to check in the target |
-| **H12** | Review the drafted `docs/` | 10 | business intent | — |
-| **H13** | Approve the final commit and push | 11 | approval | `git status` reviewed before staging |
+| **H11** | Run the Power Platform Pipeline for Stage / Prod | 11 | portal-only by policy | **cannot be verified from here** — the agent lists what to check in the target |
+| **H12** | Review the drafted `docs/` | 12 | business intent | — |
+| **H13** | Approve the final commit and push | 13 | approval | `git status` reviewed before staging |
+| **H14** | Approve the cleanup removal list | 9.3 | deleting a starter or a component is a judgement about what this solution *is*, not a fact the repo holds | the cleanup commit succeeds with the hooks enabled — `check-doc-boundaries.mjs` exit 0 (every root-doc link still resolves), `check-template-guards.mjs` naming each removed starter in its skip list, `apply-config.ps1 -Check` no drift |
+| **H15** | Annotate the audit findings | 10.3 | accepting a residual risk and declining a UX suggestion are owner decisions; no check can tell whether a risk is *truly* accepted | no finding is left at its default — no `SUGGESTED` rows remain in the UX report, and every security row is `FIXED` / `FIXED [needs deploy]` / `Documented` (rationale non-empty) / `Accepted` / `False positive` |
 
-**Everything not in that table is the agent's**: filling `solution.config.json`, running `apply-config.ps1` (identity, folder renames, doc pointers), writing `SOLUTION-SPEC.md`, authoring every table / flow / env var / screen, running the deploy scripts once authorised, running the verification gates, and drafting `docs/`.
+**Everything not in that table is the agent's**: filling `solution.config.json`, running `apply-config.ps1` (identity, folder renames, doc pointers), writing `SOLUTION-SPEC.md`, authoring every table / flow / env var / screen, running the deploy scripts once authorised, running the verification gates, running the cleanup reporter and proposing the removal list, applying the approved removals and re-pointing the root docs, running the security and UX audits and writing their reports, and drafting `docs/`.
 
 Optional paths use the same block format when they come up: the Blocked-Attachments fix in PPAC (a 403 on `.js` upload) and `/ppcs-enable-web-api` table permissions.
 
@@ -349,7 +358,7 @@ From `SOLUTION-SPEC.md`, work out the architecture: does this need custom tables
 | Staff/admin-facing interface inside Power Apps | Power Apps Starter |
 | Public-facing or internal web portal | Power Pages Code Site Starter |
 
-Starters that are **not** activated must remain completely untouched — do not rename them, modify their files, or deploy them. They are templates for future solutions.
+Starters that are **not** activated must remain completely untouched **through Phases 6–8** — do not rename them, modify their files, or deploy them. **Two states are legal and no others: pristine, or absent.** While a starter is pristine it is still a template; at the **Phase 9 cleanup audit** it is deleted whole from this solution's repo. What is never allowed is the third state — renaming it, filling in part of its config, deleting some of its files. A partly-configured starter is neither a template nor a component, and **nothing in the kit guards it**: every `apply-config.ps1` write is gated on its `activate` flag, so `-Check` reports no drift and `check-template-guards.mjs` records it as a skip.
 
 Each activated starter's folder becomes `SMKB - [Component Name] - [Type Label]`:
 
@@ -428,7 +437,7 @@ powershell -ExecutionPolicy Bypass -File apply-config.ps1
 `apply-config.ps1` does **three** things, in this order:
 
 1. **Writes identity** — solution name, display names, short prefix, environment, Power Apps app display name, Power Pages site name/titles + `SOLUTION_UNIQUE_NAME`, and the ALM env-var schema names (the shipped placeholder-prefixed names become `smkb_<prefix>_…`).
-2. **Renames the activated starter folders** — non-activated starters keep their template names, untouched.
+2. **Renames the activated starter folders** — non-activated starters keep their template names, untouched, until the **Phase 9** cleanup audit deletes them whole. `apply-config.ps1` has **no concept of a removed starter**: it rewrites starter links in the root docs on a *rename* (its `$script:DocFiles` list), never on a removal — which is why Phase 9's doc repair is a gated manual step and not a re-run of this script.
 3. **Fixes the starter links in the root docs** so `check-doc-boundaries.mjs` still passes.
 
 Renames run **last**, after every content write has addressed each starter at its pre-rename path. `-DryRun` lists the renames and pointer updates before anything moves, and `-Check` reports a pending rename or a stale doc pointer as drift — so the fix is always "run apply-config".
@@ -490,13 +499,49 @@ node scripts/check-doc-boundaries.mjs
 
 Then, for each activated starter, its own `deploy.ps1` (or deploy flow) runs a placeholder guard that blocks deploy while its platform placeholders remain (app IDs, workflow GUIDs, table/flow scaffold names, site-setting GUIDs). Do not bypass those guards — resolve the placeholders instead. The exact tokens and how to resolve them are documented in each starter's own README.
 
+These three checks are **read-only and stay that way**. The removals live in 8.1a below, and these
+same checks are what proves them clean afterwards — a step cannot be its own post-condition, which is
+why `/pre-deploy-verify` never deletes anything.
+
+### 8.1a Cleanup audit, pass A — the one-way removals
+
+Run **`/cleanup-audit A`**. It reports; it does not delete. The yes is 8.2.
+
+**8.1a covers only what an import makes permanent.** An unmanaged solution import is an **upsert**:
+removing a component from the repo afterwards does *not* remove it from the environment, `pac solution`
+has `add-solution-component` and **no remove counterpart**, and one real solution therefore shipped two
+unused bank connectors permanently — removable only by hand in the Maker portal. Anything that is merely
+repo clutter waits for **Phase 9**, where deleting it is free. One question settles which kind an item
+is: *would this exist in Dataverse after the import?*
+
+Candidate kinds, and which of them any gate already catches:
+
+| Candidate | Already blocked by a guard? |
+|---|---|
+| Example tables and their `RootComponent` rows | **Yes** — the Tables guard blocks on the placeholder segment *and* the display name |
+| The example env-var definition and its row | **Yes** — the Env Vars guard blocks on the placeholder segment |
+| An unused flow skeleton, its `<Workflow>` block and its row | **Yes** — the Flows guard blocks on the all-zero sentinel GUIDs |
+| `OtpDailyCap` / `SecurityAlertEmails` when no rate-sensitive send path exists | **No — invisible to every gate.** `apply-config.ps1` renames these to your real prefix, *past* the guard, so they deploy silently and become permanent definitions nothing reads |
+| `<connectionreference>` entries no workflow references | **No — invisible to every gate**, and the case the Flows README documents in bold |
+
+The last two rows are why this step exists. The first three would stop a deploy anyway; those two would
+not, and they are the ones that cost a Maker-portal cleanup later. Dropping a shipped env-var definition
+takes **three edits or none** — the folder, its `RootComponent` row, and its name in
+`$script:shippedEnvVars` in `apply-config.ps1` — or `-Check` goes permanently red.
+
+Present the list with the deploy request in 8.2, not before: it is one consequence, so it is one
+question.
+
 ## 8.2 Authorise the deploy
 
 > **YOUR TURN — H5: authorise the first deploy**
 > (this is a deploy to the shared SMKB-Apps-Dev environment)
 >  1. Confirm the plan is still what you want, and that `pac auth list` shows the Dev profile active.
->  2. Say "deploy".
-> **Then:** the agent deploys every activated starter in Critical Rule 4 order without asking again, stopping only for the portal handoffs below.
+>  2. **Read the pass A removal list from 8.1a, printed with this request.** These components arrive
+>     **permanently** if we deploy as-is — an unmanaged import is an upsert, so removing them afterwards
+>     leaves them in the environment.
+>  3. Say "deploy".
+> **Then:** the agent applies the approved removals, **re-runs 8.1's three checks** to prove they broke nothing, and only then deploys every activated starter in Critical Rule 4 order — without asking again, stopping only for the portal handoffs below.
 
 After each starter, the agent **must** log the outcome. Deploy one starter at a time and confirm each is working before the next.
 
@@ -646,9 +691,117 @@ The Code Site provisions and deploys through its own skills — the agent drives
 
 ---
 
-# Phase 9 — Promote through ALM (Stage / Prod)
+# Phase 9 — Cleanup audit (pass B)
+
+The deploy is proven. Now remove what the solution turned out not to need — **repo-only** this time;
+the one-way removals were pass A at 8.1a, and the two halves are one audit with one scope filter
+(*would this exist in Dataverse after an import?*), not two different jobs.
+
+## 9.1 Run the reporter
+
+```powershell
+node scripts/cleanup-audit.mjs
+```
+
+It reports and never deletes. Read all eight sections — particularly **§C**, the keep-list, and
+**§D**, which names what each removal leaves importer-less *and why those files stay*.
+
+> **Why this is a classifier and not "delete what nothing imports".** In the Code Site starter the
+> demo home view is the **only** production importer of `src/config/flows.ts`, `useFlowErrorToast.ts`,
+> `flowErrors.ts` and — apart from the dormant OTP module — `cloudFlow.ts`. In the Power Apps starter
+> the example service is the only importer of `unwrap.ts`. Remove the demo views, as nearly every
+> solution should, and a reachability sweep then proposes deleting the flows-only transport layer and
+> the flow-result contract. Removals come from an explicit manifest; anything unlisted is **kept**.
+
+## 9.2 The agent decides
+
+Reconcile every candidate against [`SOLUTION-SPEC.md`](SOLUTION-SPEC.md) before proposing it — a
+dormant module the spec promises for a later phase is *kept, conditionally*, not removed. Then draft
+`audit/cleanup-audit-YYYY-MM-DD.md` from [the template](audit/TEMPLATE-cleanup-audit.md).
+
+**Non-activated starters are deleted here**, whole. In the starter kit they are templates for the next
+solution; in *this* repo they are a component the solution never built. `SOLUTION-SPEC.md` §12 becomes
+the only surviving record of that decision, so name each one there.
+
+## 9.3 Approve the removal list
+
+> **YOUR TURN — H14: approve the cleanup removal list**
+> (the agent cannot do this: deleting a starter or a component is a judgement about what this solution
+> *is*, not a fact the repo holds)
+>  1. Read the list. §C shows what is deliberately **not** on it.
+>  2. Say "remove" — one yes for the whole list.
+> **Then:** anything added to the list after this point carries its own approval.
+> **Agent verifies:** the cleanup commit succeeds with the hooks enabled — `check-doc-boundaries.mjs`
+> exit 0, `check-template-guards.mjs` naming each removed starter in its skip list, and
+> `apply-config.ps1 -Check` reporting no drift.
+> **What that does *not* prove:** that the list was *right*. Over-deletion passes every gate. The
+> defence is the Phase 3.4 baseline commit — `git checkout <baseline> -- "<folder>"` restores anything,
+> permanently.
+
+## 9.4 Remove, re-point the docs, prove it
+
+Run **`/cleanup-audit B`**. It uses `git rm`, one commit per category, and puts each removal's wiring
+edits in the **same commit** as its deletions. Two rules that are not style preferences:
+
+- **A starter deletion and its root-doc link repairs are one commit.** `check-doc-boundaries.mjs` is a
+  pre-commit gate, so a commit that deletes the folder without the doc edits cannot be made at all. The
+  reporter's §F gives the exact `doc:line` list. Prune the row or the link; **never rewrite the
+  surrounding prose, and leave the Critical Rules whole** — delete the code, keep the rules.
+- **Never annotate a removal with the token you removed.** Naming a removed schema name in an XML or
+  `.ts` comment makes that starter's own guard *and* `check-template-guards.mjs` fire on the
+  explanation, and the pre-commit hook runs the latter. Describe it instead.
+
+Then §G: the prose no gate ever link-checks — skills and READMEs that mention a folder that is now gone.
+
+---
+
+# Phase 10 — Pre-go-live audits
+
+`audit/README.md` has always named "before promoting to Stage/Prod" as the trigger for these, and the
+flow never invoked them. It does now, **after** the cleanup, so no finding is written about a file that
+was about to be deleted and the security audit's coverage section describes the code that actually ships.
+
+## 10.1 Security audit
+
+Run **`/security-audit <component>`** for **every activated component**, one report each, plus a short
+`AUDIT-SUMMARY.md` when there is more than one. Read [`SECURITY-BASELINE.md`](SECURITY-BASELINE.md)
+first: it says what already ships hardened, so the audit records a *weakened* control as a finding
+rather than re-deriving the baseline.
+
+## 10.2 UX audit
+
+Run **`/ux-audit <app>`** — **only for components with a UI** (the Power App, the Code Site). Tables,
+Env Vars and Flows have no UX, and inviting a heuristic review of a flow folder produces a fabricated
+one. Suggestions only; this audit never changes code.
+
+**If there is nothing to audit, say so and move on.** A Tables-plus-Env-Vars solution has no SPA and no
+flow logic; writing an empty report to satisfy a phase is worse than skipping it, so record the
+"nothing to audit" conclusion in the log instead.
+
+## 10.3 Owner decisions
+
+> **YOUR TURN — H15: annotate the audit findings**
+> (the agent cannot do this: accepting a residual risk and declining a UX suggestion are your calls —
+> no check can tell whether a risk is *truly* accepted)
+>  1. Read each report and set a decision on every finding.
+> **Then:** say "annotated".
+> **Agent verifies:** no finding is left at its default — no `SUGGESTED` rows remain in the UX report,
+> and every security row reads `FIXED` / `FIXED [needs deploy]` / `Documented` (with a non-empty
+> rationale) / `Accepted` / `False positive`.
+
+**Deferral is allowed to Stage, never to Prod.** Stated here so the phase is not something to work
+around: an unresolved HIGH may travel to Stage with a recorded decision; it may not reach Production.
+
+> These phases are the **first** run of a recurring review, not an init-only step. Re-run all three
+> before every promotion — see "After Init Project" at the end of this file.
+
+---
+
+# Phase 11 — Promote through ALM (Stage / Prod)
 
 Everything deployed above went to **SMKB-Apps-Dev only**. Stage and Production are reached through **Power Platform Pipeline**, never a deploy script.
+
+**Phase 10's audits must be green, or their residual risks accepted in writing, before this phase** — that is `audit/README.md`'s stated trigger, and now the flow enforces the order rather than hoping for it.
 
 - **Tables, Env Vars, Flows, Power Apps** travel in the solution — ensure their components are in it (env var `RootComponents`, flow `RootComponents`, the Code App's linked solution) and run the pipeline from the Maker portal.
 - **Power Pages Code Site** promotes on its own two-track model: run **`/ppcs-promote-to-env`** and follow the [Code Site ALM guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/ALM-CODE-SITES.md). Flow GUIDs are environment-specific, so re-register them (`/ppcs-register-flow`) in each target environment after promotion.
@@ -663,7 +816,7 @@ There is no manual "add ~200 portal components to the solution" step in the Code
 
 ---
 
-# Phase 10 — Document the solution
+# Phase 12 — Document the solution
 
 The kit ships a [`docs/`](docs/README.md) folder of solution-documentation **templates**. Now — with the solution built and deployed — populate them. Run **`/document-solution`**.
 
@@ -678,7 +831,8 @@ The kit ships a [`docs/`](docs/README.md) folder of solution-documentation **tem
 - Delete any section or row for a starter this solution did **not** activate.
 - Keep component-name examples on the `smkb_<prefix>_<PascalName>` / `PREFIX - Name` convention.
 - Where `SOLUTION-SPEC.md` and the built solution disagree, that is a **finding** — surface it, don't paper over it.
-- The docs are **not** scanned by the deploy guards or `check-doc-boundaries.mjs`, so `[FILL IN]` placeholders never block a deploy — but a half-filled doc set is a review smell; complete them before promoting to Production.
+- The docs are **not** scanned by the deploy guards or `check-doc-boundaries.mjs`, so `[FILL IN]` placeholders never block a deploy — but a half-filled doc set is a review smell. **Phase 11 promotes to Stage; do not run the Production stage of the pipeline until these are complete** — that is the one ordering this phase's position after Phase 11 does not enforce for you.
+- **Read the Phase 9 cleanup report first.** It records what was removed and why, so the docs describe what actually ships — the "delete any section for a starter this solution did not activate" rule above is the same decision, and the two must not disagree. If the cleanup removed a dependency (Pinia, the design system), the tech-stack page changes with it.
 
 > **YOUR TURN — H12: review the drafted docs**
 > (the agent cannot do this: business intent, retention decisions, approver identities)
@@ -690,7 +844,7 @@ The kit ships a [`docs/`](docs/README.md) folder of solution-documentation **tem
 
 ---
 
-# Phase 11 — Commit the initialized state
+# Phase 13 — Commit the initialized state
 
 ```powershell
 git status                       # review what will be staged
@@ -701,7 +855,9 @@ git push
 
 > **YOUR TURN — H13: approve the commit**
 > (the agent cannot do this: pushing is outward-facing, so it needs your explicit go-ahead)
->  1. Review `git status` and the staged paths.
+>  1. Review `git status` and the staged paths — **including the deletions.** The Phase 9 cleanup
+>     commits are already local and unpushed; this is where they leave the machine.
+>  2. Check the `audit/` reports are staged too — they are the decision record.
 >  2. Say "commit" / "push".
 > **Agent verifies:** it stages **specific paths** rather than `git add -A`, to avoid committing `.env`/credential files created during setup.
 
@@ -749,6 +905,6 @@ From this point on, every new Claude session is a **regular session start**:
 - Claude will NOT offer to run Init Project again (the remote no longer points to the starter kit)
 - Development and deployment follow each starter's own README; solution-wide identity changes go through `solution.config.json` + `apply-config.ps1`
 - Keep [`SOLUTION-SPEC.md`](SOLUTION-SPEC.md) current as requirements change, and [`docs/`](docs/README.md) current as the solution evolves
-- Run the [audit templates](audit/README.md) and re-read [SECURITY-BASELINE.md](SECURITY-BASELINE.md) before promoting to Stage/Prod
+- Re-run the pre-go-live reviews — **`/cleanup-audit`, `/security-audit`, `/ux-audit`** (the [audit templates](audit/README.md)) — and re-read [SECURITY-BASELINE.md](SECURITY-BASELINE.md) before **every** promotion to Stage/Prod. Phases 9–10 were the *first* run of a recurring review, not an init-only step
 
 See [CLAUDE.md](CLAUDE.md) for the complete rules governing regular sessions.

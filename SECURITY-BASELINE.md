@@ -159,8 +159,19 @@ Each of these cost a debugging cycle in a real deployment. Several fail **silent
   carried in an `errorCode` field. A 400 with a perfect error code reaches nobody.
 - **`pac` exits 0 on failure.** Confirmed for a failed solution import, a rejected component type, and a
   failed push. Parse stdout; never gate on the exit code alone.
-- **A late-added site setting keeps its placeholder GUID** unless the freshen script is re-run, and the
-  placeholder scan is case-sensitive — an uppercase placeholder is silently skipped.
+- **An unmanaged import is an UPSERT, so removing a component from the repo does not remove it from the
+  environment.** `pac solution` has `add-solution-component` and **no remove counterpart**, so the cleanup
+  cannot be scripted after the fact. One real solution permanently shipped two unused bank connectors
+  (Approvals and SharePoint), removable only by hand in the Maker portal. Anything the solution will not
+  use — example tables, unused env-var definitions, spare connection references — must be deleted
+  **before the first deploy**: Init Project **8.1a**, which is the whole reason the cleanup audit has two
+  passes. Note the two feature-scoped env vars (`OtpDailyCap`, `SecurityAlertEmails`) are *invisible* to
+  every guard, because `apply-config.ps1` renames them to the real prefix past it.
+- **A late-added site setting keeps its placeholder GUID** unless the freshen script is re-run. (Its
+  placeholder scan is case-**in**sensitive — `(?i)`, and the matched value is lowercased before it becomes
+  a map key. An earlier version of this line, and of the Code Site `CLAUDE.md`, claimed the opposite;
+  a reader who trusted it would have hand-lowercased placeholders for no reason, or assumed an uppercase
+  one was safely ignored.)
 - **`.ps1` and shipped solution XML must be ASCII-only** (or BOM'd). Windows PowerShell 5.1 reads a
   BOM-less UTF-8 script as ANSI, and Windows-1255 mangles an en dash in an XML display name.
 - **Never ship another solution's artifacts in the kit.** Reference material must be genericized —
@@ -179,5 +190,6 @@ Each of these cost a debugging cycle in a real deployment. Several fail **silent
 | Bot protection: client, CSP, and the fail-closed server gate | [`/ppcs-add-turnstile`](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/.claude/skills/ppcs-add-turnstile/SKILL.md) |
 | Abuse-threshold env vars | [Env Vars README](SMKB%20-%20Environmental%20Variables%20Starter/README.md) → Security Baseline Variables |
 | Per-solution security record | [docs/07-security.md](docs/07-security.md) · [docs/06-data-privacy.md](docs/06-data-privacy.md) |
-| Pre-go-live audit | [audit/](audit/README.md) · [`/security-audit`](.claude/skills/security-audit/SKILL.md) |
+| Pre-go-live audit | [audit/](audit/README.md) · [`/security-audit`](.claude/skills/security-audit/SKILL.md) · Init Project Phases 9–10 |
+| Removing what the solution does not use | [`/cleanup-audit`](.claude/skills/cleanup-audit/SKILL.md) · [cleanup template](audit/TEMPLATE-cleanup-audit.md) |
 | Testing method | [TESTING-STRATEGY.md](TESTING-STRATEGY.md) |

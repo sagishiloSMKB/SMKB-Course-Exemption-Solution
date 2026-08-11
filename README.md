@@ -111,7 +111,7 @@ SMKB - Power Platform Solution Starter Kit/
 ├── .gitattributes                            <- Pins the hook + *.mjs to LF (Windows-clone safe)
 ├── docs/                                      <- Solution-documentation TEMPLATES (filled per solution at init)
 ├── TESTING-STRATEGY.md                        <- The layered testing method (house standard)
-├── audit/                                     <- Pre-go-live security / UX audit templates
+├── audit/                                     <- Pre-go-live review templates: cleanup, security, UX
 ├── STARTER_AGENT_FEEDBACK_AND_NOTES.md        <- Append-only log during Init Project
 │
 ├── SMKB - Dataverse Tables Starter/          <- Custom table schemas (README, deploy.ps1, Entities/, Other/)
