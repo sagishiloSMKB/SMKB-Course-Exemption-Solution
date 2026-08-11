@@ -159,6 +159,41 @@ export const rules = [
   },
 
   {
+    // Critical Rule 6: Dataverse is the data platform. SharePoint is a legacy interoperability path,
+    // used only when the data already lives in a list and cannot move — and then it is DECLARED in
+    // SOLUTION-SPEC.md §7 as the constraint it is.
+    //
+    // A warning, not an error, and deliberately so: a legacy dependency is legitimate, and a rule that
+    // blocked the deploy would be bypassed by the first solution that genuinely needs a list. What it
+    // buys is that an UNDECLARED SharePoint write is visible in review. The kit needed this because the
+    // rule went unwritten and drifted exactly where it cost most: the worked examples under
+    // `examples/` were genericized from a real SharePoint-backed solution, so for a while the most-
+    // copied artefacts in the kit taught the legacy pattern — and the CheckOtp example contradicted the
+    // Dataverse recipe it was supposed to illustrate.
+    id: 'sharepoint-data-action',
+    severity: 'warn',
+    docs: 'Dataverse is the data platform (CLAUDE.md Critical Rule 6). A SharePoint action is a legacy interoperability path, allowed only when the data already lives in a list and cannot move - and then SOLUTION-SPEC.md §7 must declare it. Undeclared SharePoint data access is reported so it is visible in review rather than discovered later.',
+    check(flow, ctx) {
+      const out = []
+      // Declared in §7? Then this solution has a real legacy dependency and the rule stands down
+      // entirely - it has nothing further to say about how that data is reached.
+      if (ctx?.sharePointDeclared) return out
+      walk(def(flow.json).actions, (n, p) => {
+        if (Array.isArray(n) || !n.inputs || typeof n.inputs !== 'object') return
+        const host = n.inputs.host
+        if (!host || typeof host !== 'object') return
+        const ref = `${host.apiId ?? ''} ${host.connectionName ?? ''}`
+        if (!/shared_sharepointonline/i.test(ref)) return
+        out.push({
+          location: p,
+          message: `SharePoint action "${host.operationId ?? 'unknown'}" but SOLUTION-SPEC.md §7 declares no SharePoint dependency. Dataverse is the data platform (Critical Rule 6) - use ListRecords / CreateRecord / UpdateRecord. If the data genuinely already lives in a list and cannot move, declare it in §7 and this warning stops.`,
+        })
+      })
+      return out
+    },
+  },
+
+  {
     id: 'no-secret-param-default',
     severity: 'error',
     docs: 'A parameter whose name implies a secret must not carry a committed default; secrets belong in a Secret-type env var read via RetrieveEnvironmentVariableSecretValue.',
@@ -222,10 +257,22 @@ export const rules = [
       // Walk `actions` only, never the whole definition. The TRIGGER's own
       // inputs.schema holds the field titles, so a field literally titled "sessionToken"
       // counted as its own validation - the flow accepted a token and proved nothing.
+      //
+      // PLATFORM-NEUTRAL EVIDENCE. This used to require the literal string `sessionToken`, which is a
+      // SharePoint COLUMN NAME from the solution the reference flows were genericized from - not a
+      // convention of this kit. Dataverse sessions tables use `smkb_<prefix>_Token` (see the OTP
+      // recipe), so a correct Dataverse implementation FAILED this error-severity rule: the kit's own
+      // RevokeSession template did. Same drift as the examples themselves, one layer deeper.
+      //
+      // What actually constitutes evidence: an action INPUT that carries the caller's token into a
+      // lookup. So either the legacy literal, or a token-shaped column name used together with a
+      // reference to the trigger body - both halves required, so a passing mention cannot fake it.
       let validated = false
       walk(def(flow.json).actions, (n) => {
         if (Array.isArray(n) || !n.inputs) return
-        if (JSON.stringify(n.inputs).includes('sessionToken')) validated = true
+        const inputs = JSON.stringify(n.inputs)
+        if (inputs.includes('sessionToken')) { validated = true; return }
+        if (/(_token|authtoken)/i.test(inputs) && inputs.includes('triggerBody(')) validated = true
       })
       if (!validated) {
         out.push({
@@ -334,6 +381,72 @@ export const rules = [
   },
 
   {
+    id: 'openapi-action-has-authentication',
+    severity: 'error',
+    docs: "Every OpenApiConnection action in a solution-aware flow must pass `authentication: @parameters('$authentication')`, or the action does not bind the solution's connection reference at runtime. Author-time it looks fine and the flow imports. Evidence for the convention: across the kit's harvested production flows all 30 such actions carry it and none omit it — the only omissions were in hand-typed JSON, including two in a shipped template.",
+    check(flow) {
+      const WANT = "@parameters('$authentication')"
+      const out = []
+      walk(def(flow.json), (n, p) => {
+        if (Array.isArray(n) || n.type !== 'OpenApiConnection') return
+        if (!n.inputs || typeof n.inputs !== 'object' || Array.isArray(n.inputs)) return
+        const a = n.inputs.authentication
+        if (a === undefined) {
+          out.push({ location: `${p}.inputs`, message: `OpenApiConnection action has no "authentication" — add "authentication": "${WANT}" or the action will not bind the solution's connection reference at runtime` })
+        } else if (a !== WANT) {
+          out.push({ location: `${p}.inputs.authentication`, message: `authentication is ${JSON.stringify(a)}, expected "${WANT}"` })
+        }
+      })
+      return out
+    },
+  },
+
+  {
+    id: 'no-undeclared-trigger-reference',
+    severity: 'error',
+    docs: 'An action reading a trigger input the trigger schema does not declare. This is the failure mode with no symptom: `triggerBody()?[\'text_1\']` for an undeclared `text_1` does not error — it evaluates to null, so the row is written with an empty column and the run is marked Succeeded. It is the mirror of no-unused-trigger-inputs, which only catches the harmless direction (declared, never read). Found by writing a wrong flow by hand: a generated Dataverse example read text_1 while the schema declared text_2..text_6, and every other rule passed it.',
+    check(flow) {
+      const declared = new Set()
+      let schemaCount = 0
+      for (const t of Object.values(triggers(flow.json))) {
+        const props = t?.inputs?.schema?.properties
+        if (!props || typeof props !== 'object' || Array.isArray(props)) continue
+        schemaCount++
+        for (const k of Object.keys(props)) declared.add(k)
+      }
+      // No declared input schema at all (e.g. a Recurrence or raw Request trigger) means
+      // there is nothing to contradict — a triggerBody() read cannot be judged. Skip.
+      if (!schemaCount) return []
+
+      // Both quote forms occur in real flows: the plain `?['name']`, and `?[''name'']`
+      // inside an OData $filter where the quotes have been doubled. Capturing the doubled
+      // form as `'name'` would report a phantom undeclared input, so normalize both.
+      const REF = /triggerBody\(\)\s*\?\s*\[\s*'{1,2}([^'\]]+)'{1,2}\s*\]/g
+      const out = []
+      const reported = new Set()
+      // Only strings the RUNTIME evaluates count. `description` is documentation, and this
+      // kit's templates deliberately quote expressions in prose to explain them — the first
+      // version of this rule flagged its own explanatory note about the bug it had just
+      // found. `metadata` is likewise designer bookkeeping.
+      const DOC_ONLY = new Set(['description', 'metadata'])
+      walk(def(flow.json), (n, p) => {
+        if (/(^|\.)metadata(\.|\[|$)/.test(p)) return
+        const vals = Array.isArray(n) ? n : Object.entries(n).filter(([k]) => !DOC_ONLY.has(k)).map(([, v]) => v)
+        for (const v of vals) {
+          if (typeof v !== 'string') continue
+          for (const m of v.matchAll(REF)) {
+            const name = m[1]
+            if (declared.has(name) || reported.has(name)) continue
+            reported.add(name)
+            out.push({ location: p, message: `reads trigger input "${name}", which the trigger schema does not declare — this evaluates to null at runtime with no error, so the value silently lands empty. Declare it, or reference the input that exists (declared: ${[...declared].sort().join(', ') || 'none'}).` })
+          }
+        }
+      })
+      return out
+    },
+  },
+
+  {
     id: 'no-unused-trigger-inputs',
     severity: 'warn',
     docs: 'A Power Pages trigger input the flow never references is dead surface: the SPA can send it, nothing validates it, and a reviewer cannot tell whether it was meant to select a record. Remove it, or consume it. (The control that actually prevents IDOR is resolving the target record from the session row — see FLOW_SNIPPETS.md.)',
@@ -374,6 +487,32 @@ export const rules = [
 
 /** Workflow GUIDs, normalized to lowercase with braces stripped, from any XML id attribute. */
 const normalizeGuid = (s) => String(s).replace(/[{}]/g, '').toLowerCase()
+
+/**
+ * Does SOLUTION-SPEC.md §7 declare a SharePoint dependency? Pure function so the self-test can pin it.
+ *
+ * Two bugs found the moment this was tested, both worth remembering:
+ *
+ * 1. The first version anchored the section with `(?=^##\s|\Z)`. **`\Z` is not an anchor in JavaScript** —
+ *    it is an identity escape matching a literal "Z". It only appeared to work because §7 happens to be
+ *    followed by §8; had §7 been the last section the match would have failed and every declaration
+ *    would have been missed. Sections are split on headings now, no end anchor needed.
+ *
+ * 2. Worse: the shipped template's own §7 carries a blockquote explaining this rule, and that note
+ *    contains the word SharePoint — so a naive "does §7 mention it" check was satisfied by the TEMPLATE,
+ *    on every solution, from the moment it was cloned. The rule would have been silent forever. So
+ *    blockquote lines are excluded: guidance lives in `>` quotes, a real declaration is a table row.
+ */
+export function specDeclaresSharePoint(specText) {
+  if (!specText) return false
+  const lines = String(specText).split(/\r?\n/)
+  let inSeven = false
+  for (const line of lines) {
+    if (/^##\s/.test(line)) inSeven = /^##\s*7\./.test(line)
+    else if (inSeven && !/^\s*>/.test(line) && /sharepoint/i.test(line)) return true
+  }
+  return false
+}
 
 /** Is this actually a GUID, or prose that happens to sit in an id attribute? */
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/

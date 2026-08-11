@@ -444,6 +444,40 @@ The Flows starter ships a named SMKB connection-reference bank and documents how
 
 ---
 
+## CRITICAL RULE 6 — Dataverse Is the Data Platform
+
+**Every new solution stores its data in Dataverse.** Custom tables in the Dataverse Tables starter,
+read and written by flows through the Dataverse connector — `ListRecords`, `CreateRecord`,
+`UpdateRecord`, `DeleteRecord`. That is the model, and it is not a preference: it is what the table
+starter, the security baseline's row-level ownership scaffold, the env-var Secret path
+(`RetrieveEnvironmentVariableSecretValue` is a Dataverse unbound action) and every flow snippet are
+built around.
+
+**SharePoint is a legacy interoperability path, not a storage choice.** Use it only when the solution
+must read or write data that **already lives** in a SharePoint list and cannot be moved — a list another
+department owns, or a system of record predating the solution. Then:
+
+- Record it in [`SOLUTION-SPEC.md`](SOLUTION-SPEC.md) **§7 External systems** as the constraint it is,
+  naming the list and why the data cannot move. A SharePoint dependency is a fact about the environment,
+  so it belongs where the other external systems are declared.
+- `flow-lint`'s `sharepoint-data-action` rule warns on every SharePoint data action until that
+  declaration exists. The warning is the point: it makes an undeclared SharePoint write visible in
+  review instead of a year later.
+- Add the SharePoint connection reference from the shipped bank. It ships by default so a legacy
+  solution needs no lookup — but see Critical Rule 5 and the Flows README: an unmanaged import is an
+  upsert, so a connection reference you deploy and later stop using **cannot be removed by
+  re-importing**. Trim the bank before the first deploy (Init Project **8.1a**), not after.
+
+**Why this rule is written down.** It was the house model all along and it was never stated, so it
+drifted exactly where it costs most. `FLOW_SNIPPETS.md` is Dataverse-primary and treats SharePoint as a
+variant; the Component Library's OTP templates are pure Dataverse; but the worked flows under the Flows
+starter's `examples/` were genericized from a real SharePoint-backed solution, so for a while the kit's
+most-copied artefacts taught the legacy pattern — and `examples/smkb_sol_CheckOtp` contradicted the very
+recipe it illustrated. The Dataverse examples now live in `examples/`; the SharePoint ones are under
+`examples/legacy-sharepoint/`, labelled for what they are. An unstated rule is not a rule.
+
+---
+
 ## Deployment Method Reference
 
 Each starter deploys itself; run its own steps (see "Where To Find X"). High-level methods:

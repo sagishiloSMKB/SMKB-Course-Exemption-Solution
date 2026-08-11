@@ -1,14 +1,14 @@
 {
   "properties": {
     "connectionReferences": {
-      "shared_sharepointonline_sol": {
-        "runtimeSource": "embedded",
+      "shared_commondataserviceforapps": {
         "connection": {
-          "connectionReferenceLogicalName": "smkb_SMKBSharePointConnectionUser1"
+          "connectionReferenceLogicalName": "msdyn_Dataverse"
         },
         "api": {
-          "name": "shared_sharepointonline"
-        }
+          "name": "shared_commondataserviceforapps"
+        },
+        "runtimeSource": "embedded"
       },
       "shared_office365_sol": {
         "runtimeSource": "embedded",
@@ -66,7 +66,7 @@
               "properties": {
                 "id": {
                   "type": "integer",
-                  "description": "REPLACE: example input - e.g. a SharePoint item ID sent by the Code App"
+                  "description": "REPLACE: example input - e.g. a Dataverse row id sent by the Code App"
                 }
               }
             }
@@ -76,21 +76,20 @@
       "actions": {
         "Main_Flow": {
           "type": "Scope",
-          "description": "Wrap ALL business logic in this Scope so Handle_Flow_Error can catch failures via runAfter. Replace Get_items with your logic; keep a final Response.",
+          "description": "Wrap ALL business logic in this Scope so Handle_Flow_Error can catch failures via runAfter. Replace List_records with your logic; keep a final Response.",
           "actions": {
-            "Get_items": {
+            "List_records": {
               "type": "OpenApiConnection",
-              "description": "REPLACE: read from your SharePoint list. dataset = site URL, table = list display name or GUID. Whitelist fields with a Select before responding to keep the payload lean.",
+              "description": "Read rows from Dataverse. entityName is the table PLURAL LOGICAL name (lowercase) - e.g. a table smkb_prc_Placement has the set smkb_prc_placements. Dataverse is the data platform; see CLAUDE.md Critical Rule 6.",
               "inputs": {
                 "host": {
-                  "connectionName": "shared_sharepointonline_sol",
-                  "operationId": "GetItems",
-                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
                 },
                 "parameters": {
-                  "dataset": "[REPLACE: https://your-tenant.sharepoint.com/sites/YourSite]",
-                  "table": "[REPLACE: Your List Name]",
-                  "$top": 500
+                  "entityName": "[REPLACE-WITH-YOUR-TABLE-PLURAL-LOGICAL-NAME]",
+                  "$top": 10
                 },
                 "authentication": "@parameters('$authentication')"
               },
@@ -105,11 +104,11 @@
                   "Content-Type": "application/json"
                 },
                 "body": {
-                  "items": "@body('Get_items')?['value']"
+                  "items": "@body('List_records')?['value']"
                 }
               },
               "runAfter": {
-                "Get_items": [
+                "List_records": [
                   "Succeeded"
                 ]
               }

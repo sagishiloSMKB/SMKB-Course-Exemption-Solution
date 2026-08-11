@@ -1,11 +1,29 @@
 # Example Flows — Reference Only (NOT deployed)
 
-These are **structurally faithful, genericized** copies of working flows from a live SMKB solution. They
-exist so you can see the conventions in `../README.md` and `../FLOW_SNIPPETS.md` applied end to end.
+Worked flows showing the conventions in `../README.md` and `../FLOW_SNIPPETS.md` applied end to end.
 Read them; copy the *patterns* into your own flows under `../Workflows/`.
+
+> **Dataverse is the data platform** — root `CLAUDE.md` → **Critical Rule 6**. The examples in *this*
+> folder read and write Dataverse, because that is what a new solution does. SharePoint is a legacy
+> interoperability path for data that already lives in a list and cannot move; those examples are in
+> [`legacy-sharepoint/`](legacy-sharepoint/README.md), kept because they teach patterns nothing else
+> demonstrates, and labelled so nobody copies the storage choice along with the pattern.
 
 > **They are never deployed by this starter.** `deploy.ps1` only packs `../Workflows/*.json`. Nothing
 > in this folder is zipped or imported. Leave it as-is, or delete it once you no longer need it.
+
+## Provenance — which of these has actually run
+
+This matters more than it sounds, because people copy examples verbatim.
+
+| File | Provenance |
+|---|---|
+| `smkb_sol_GetBankList-*` | **Harvested.** A genericized copy of a flow that ran in production. It touches no data store at all, so it needed no conversion. |
+| `smkb_sol_ListMyLoanRequests-*` · `smkb_sol_CreateLoanRequest-*` | **Derived, never run.** Structurally converted from the SharePoint originals now in `legacy-sharepoint/`: every proven part is unchanged — the `Main_Flow` / `Handle_Flow_Error` scaffold, the HTTP-200 response contract, the auth-token validation order, the terminate-succeeded business-error pattern — and only the data actions were rewritten for Dataverse, against the shapes the Component Library's OTP templates already use. They pass the security subset of flow-lint. They have **not** been imported into an environment. Treat the *patterns* as reference and the *field names* as illustration. |
+
+Converting rather than authoring from scratch was deliberate: 300 lines of hand-written flow JSON is a
+lot of surface for a subtle mistake, and a subtly-wrong Dataverse example would be worse than the
+right-but-legacy SharePoint one it replaced.
 
 ## What was genericized, and what was not
 
@@ -56,12 +74,19 @@ logical names documented in the main README:
 | File | Trigger | Connectors (bank) | Patterns to learn |
 |---|---|---|---|
 | `smkb_sol_GetBankList-*.json` | PowerPages | Outlook | **Simplest full flow.** External `Http` GET → `ParseJson` → `Select`/`Query` whitelist + cap → 200 payload. Public (no auth). `Main_Flow` + `Handle_Flow_Error`. Snippet 8. |
-| `smkb_sol_GetVoucherList-*.json` | PowerPages | Outlook, SharePoint | SharePoint `GetItems` list read; **authToken → sessionToken** validation before returning data (flow-lint `authenticated-flow-validates-token`). |
-| `smkb_sol_CreateVoucherRecord-*.json` | PowerPages | Outlook, SharePoint | Record **creation** with `item/` fields (Snippet 3); authToken validation. |
-| `smkb_sol_CheckOtp-*.json` | PowerPages | Outlook, SharePoint | Session-token validation, SharePoint `PatchItem`, **clearing fields with `"@null"`** (Pitfall 10), business-error `200` + `errorCode` vocabulary (Snippet 8). |
-| `smkb_sol_UpdateBankAccount-*.json` | PowerPages | Outlook, SharePoint, **Approvals** | Approvals connector as an **`embedded`** connection (Pitfalls 9d/9g — invoker → recurring 403), SharePoint patch, authToken validation. |
-| `smkb_sol_CreateOtp-*.json` | PowerPages | Outlook, SharePoint, **Dataverse** | **Secret / Azure Key Vault env vars** via `RetrieveEnvironmentVariableSecretValue` (Snippet 11), outbound SMS `Http` with **`encodeUriComponent`** on client input (flow-lint `http-uri-encodes-client-input`), Turnstile gate on a non-secret key. The richest example. |
-| `smkb_sol_ManagerGetLecturers-*.json` | **PowerAppV2** | Outlook, SharePoint | The **Code App** trigger path (Snippet 6) — internal/staff flow wired via `pnpm pa add-flow`, not Power Pages Studio. |
+| `smkb_sol_ListMyLoanRequests-*.json` | PowerPages | Outlook, **Dataverse** | **The row-level ownership pattern, end to end.** `ListRecords` to resolve the session from the caller's token, then a second `ListRecords` whose `$filter` scopes to the owner **taken from the session row** — never from the request. Quote-doubling in `$filter`, `$orderby`, and a `$top` cap. Snippets 12 + 15. This is the one to read first. |
+| `smkb_sol_CreateLoanRequest-*.json` | PowerPages | Outlook, **Dataverse** | **`CreateRecord` with `item/` fields** (Snippet 3), with the owner written from the session and the status set server-side. A create is where ownership is easiest to get wrong, because there is no existing row to check against. |
+
+For the patterns these do not cover — `UpdateRecord`, `DeleteRecord`, the Approvals connector, file
+attachments, the PowerAppV2 trigger, Key Vault secret reads, Turnstile — see:
+
+- **`UpdateRecord` / `DeleteRecord` on Dataverse**: the Component Library's OTP flow templates
+  (`../../SMKB - Component Library/OTP Auth Screen/flow-templates/`) are pure Dataverse and are the
+  hardened, externally-audited versions. `RevokeSession-TEMPLATE.json` is the smallest `UpdateRecord`.
+- **Secret / Key Vault reads, Turnstile, outbound SMS**: `CreateOtp-TEMPLATE.json`, same folder.
+- **Approvals, attachments, the PowerAppV2 trigger**: [`legacy-sharepoint/`](legacy-sharepoint/README.md).
+  The connector and trigger mechanics there are correct and platform-independent — only the data
+  actions are legacy.
 
 ## How to use one
 
@@ -70,7 +95,9 @@ logical names documented in the main README:
 3. Swap the env-var params for your solution's (`smkb_<prefix>_EnvironmentName`, etc. — see the main
    README's env-var section), or keep a shared org-wide var if that is what your solution uses.
 4. Keep the connection-reference **local keys** the flow already uses, or rename their suffix to your
-   prefix — the **logical names** (the bank) stay exactly as they are.
+   prefix — the **logical names** (the bank) stay exactly as they are. For a Dataverse flow that means
+   `msdyn_Dataverse`; you should not need the SharePoint reference at all unless Critical Rule 6's
+   legacy carve-out applies, in which case declare it in `SOLUTION-SPEC.md` §7 first.
 
 ## Why this folder is not in the lint gate
 

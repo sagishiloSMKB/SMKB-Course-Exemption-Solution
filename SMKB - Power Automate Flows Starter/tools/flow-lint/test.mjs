@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 // Self-test for the flow-lint rules: each rule must FIRE on a crafted bad input and
 // stay silent on a good one. Run: node tools/flow-lint/test.mjs   (exit 0 = all pass)
-import { rules, globalRules } from './rules.mjs'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { rules, globalRules, specDeclaresSharePoint } from './rules.mjs'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const byId = Object.fromEntries(rules.map((r) => [r.id, r]))
 const globalById = Object.fromEntries(globalRules.map((r) => [r.id, r]))
@@ -82,6 +87,61 @@ expect('no-email-in-defaultvalue', 'good: the org sender is exempt',
 expect('no-email-in-defaultvalue', 'good: an address mentioned in a description is not a leak',
   flow({ actions: { C: { type: 'Compose', description: 'see dev@smkb.ac.il for help', inputs: 'x' } } }), {}, 0)
 
+// sharepoint-data-action — Critical Rule 6. Dataverse is the data platform; SharePoint is a declared
+// legacy path. The rule exists because that rule went unwritten and the worked examples drifted to
+// SharePoint, teaching the legacy pattern from the most-copied artefacts in the kit.
+const spAction = (op) => ({
+  actions: { Read: { type: 'OpenApiConnection', inputs: { host: {
+    connectionName: 'shared_sharepointonline_sol', operationId: op,
+    apiId: '/providers/Microsoft.PowerApps/apis/shared_sharepointonline' } } } },
+})
+const dvAction = {
+  actions: { Read: { type: 'OpenApiConnection', inputs: { host: {
+    connectionName: 'shared_commondataserviceforapps', operationId: 'ListRecords',
+    apiId: '/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps' } } } },
+}
+expect('sharepoint-data-action', 'bad: SharePoint read with no §7 declaration',
+  flow(spAction('GetItems')), { sharePointDeclared: false }, 1)
+expect('sharepoint-data-action', 'bad: SharePoint write with no §7 declaration',
+  flow(spAction('PatchItem')), {}, 1)
+// The legacy path is legitimate WHEN DECLARED — otherwise the first solution that genuinely needs a
+// list would learn to ignore the linter, which is worse than not having the rule.
+expect('sharepoint-data-action', 'good: declared in SOLUTION-SPEC §7',
+  flow(spAction('GetItems')), { sharePointDeclared: true }, 0)
+expect('sharepoint-data-action', 'good: Dataverse is never reported',
+  flow(dvAction), { sharePointDeclared: false }, 0)
+
+// ── specDeclaresSharePoint — the gate the rule above keys on ──
+// Pinned directly, because every bug it had was in the PARSING, not the rule: an anchor that
+// isn't an anchor (`\Z`), and the template's own explanatory blockquote counting as a
+// declaration, which silenced the rule for every solution that never touched §7.
+const expectSpec = (label, text, want) => {
+  const got = specDeclaresSharePoint(text)
+  if (got === want) { results.push(`ok   specDeclaresSharePoint :: ${label} (${got})`); pass++ }
+  else { results.push(`FAIL specDeclaresSharePoint :: ${label} :: expected ${want}, got ${got}`); fail++ }
+}
+const spec = (body) => `# Spec\n\n## 6. Interfaces\n\nnothing here\n\n${body}\n\n## 8. Design\n\nSharePoint is mentioned here too\n`
+expectSpec('empty input is not a declaration', '', false)
+expectSpec('null input is not a declaration', null, false)
+expectSpec('a real §7 declaration', spec('## 7. External systems\n\n| Legacy HR list (SharePoint) | in | staff rows | Entra |'), true)
+// THE regression. The shipped template's §7 carries a blockquote explaining the SharePoint
+// carve-out. Reading that as a declaration made every solution exempt by default — the exact
+// inverse of the rule's purpose, and invisible because the rule simply never fired.
+expectSpec('the template blockquote alone is NOT a declaration', spec('## 7. External systems\n\n> **Reading or writing an existing SharePoint list? Declare it here.** Dataverse is this solution\'s\n> platform; SharePoint is a legacy interoperability path.'), false)
+expectSpec('a mention outside §7 does not count', spec('## 7. External systems\n\n| [FILL IN] | in | rows | key |'), false)
+expectSpec('a declaration after the blockquote still counts', spec('## 7. External systems\n\n> **Reading a SharePoint list? Declare it here.**\n\n| Payroll list on SharePoint | out | payments | key |'), true)
+
+// And against the REAL shipped file, so the template can never drift into exempting itself.
+{
+  const specPath = path.resolve(__dirname, '..', '..', '..', 'SOLUTION-SPEC.md')
+  if (fs.existsSync(specPath)) {
+    expectSpec('the shipped SOLUTION-SPEC.md template does not exempt itself',
+      fs.readFileSync(specPath, 'utf8'), false)
+  } else {
+    results.push('ok   specDeclaresSharePoint :: shipped template not present (skipped)'); pass++
+  }
+}
+
 // no-secret-param-default
 expect('no-secret-param-default', 'bad: password param with default',
   flow({ parameters: { 'SMS Password (smkb_Pw)': { defaultValue: 'hunter2', type: 'String' } } }), {}, 1)
@@ -110,6 +170,18 @@ expect('authenticated-flow-validates-token', 'bad: sessionToken only in a descri
   flow({ ...authTrigger(), actions: { C: { type: 'Compose', description: 'TODO: validate the sessionToken here', inputs: 'x' } } }), {}, 1)
 expect('authenticated-flow-validates-token', 'good: authToken input + sessionToken in an action input',
   flow({ ...authTrigger(), ...lookup }), {}, 0)
+// THE DATAVERSE SHAPE. `sessionToken` is a SharePoint column name from the solution the reference
+// flows came from; this kit's Dataverse sessions table uses `smkb_<prefix>_Token`. Requiring the
+// literal made a correct Dataverse implementation fail an ERROR rule - the kit's own RevokeSession
+// template did exactly that. Evidence is now the token-shaped column PLUS a trigger-body reference.
+const dvLookup = { actions: { Q: { type: 'OpenApiConnection', inputs: { parameters: {
+  entityName: 'smkb_sol_sessions',
+  $filter: "smkb_sol_token eq '@{triggerBody()?['authToken']}'" } } } } }
+expect('authenticated-flow-validates-token', 'good: Dataverse session lookup (smkb_*_token + triggerBody)',
+  flow({ ...authTrigger(), ...dvLookup }), {}, 0)
+// Both halves required, so a bare mention still cannot satisfy it.
+expect('authenticated-flow-validates-token', 'bad: a token-shaped name with no trigger-body reference',
+  flow({ ...authTrigger(), actions: { Q: { type: 'Compose', inputs: 'smkb_sol_token' } } }), {}, 1)
 // Title normalization: Power Pages maps all of these identically, so all must be caught.
 expect('authenticated-flow-validates-token', 'bad: title "auth token" (space) still requires validation',
   flow(authTrigger('auth token')), {}, 1)
@@ -183,6 +255,49 @@ expect('no-unused-trigger-inputs', 'good: every input consumed',
     actions: { A: { type: 'Compose', inputs: "@concat(triggerBody()?['text'], triggerBody()?['text_1'])" } } }), {}, 0)
 expect('no-unused-trigger-inputs', 'good: not a Power Pages trigger',
   flow({ triggers: { manual: { kind: 'Button', inputs: { schema: { properties: { text_9: { title: 'x' } } } } } } }), {}, 0)
+
+// openapi-action-has-authentication — binds the solution's connection reference. Omitting it
+// imports fine and fails at runtime. Found by auditing the whole kit: all 30 such actions in the
+// harvested production flows carry it; the 7 omissions were all hand-typed, 2 in a shipped template.
+const AUTH = "@parameters('$authentication')"
+const conn = (inputs) => flow({ actions: { A: { type: 'OpenApiConnection', inputs } } })
+expect('openapi-action-has-authentication', 'bad: no authentication key',
+  conn({ host: { operationId: 'ListRecords' }, parameters: { entityName: 't' } }), {}, 1)
+expect('openapi-action-has-authentication', 'bad: wrong authentication value',
+  conn({ host: { operationId: 'ListRecords' }, authentication: '@parameters($conn)' }), {}, 1)
+expect('openapi-action-has-authentication', 'good: the canonical value',
+  conn({ host: { operationId: 'ListRecords' }, authentication: AUTH }), {}, 0)
+expect('openapi-action-has-authentication', 'good: a non-connector action needs none',
+  flow({ actions: { A: { type: 'Compose', inputs: 'x' } } }), {}, 0)
+
+// no-undeclared-trigger-reference — the mirror direction, and the dangerous one.
+// The regression that produced this rule: a hand-converted Dataverse example wrote
+// item/smkb_name from text_1 while the schema declared text_2..text_6. Every other rule
+// passed it, and at runtime the column would just be written empty.
+expect('no-undeclared-trigger-reference', 'bad: reads an input the schema never declares',
+  flow({ ...ppTrigger({ text: { title: 'authToken' }, text_2: { title: 'faculty' } }),
+    actions: { A: { type: 'OpenApiConnection', inputs: { parameters: { 'item/smkb_name': "@triggerBody()?['text_1']" } } } } }), {}, 1)
+expect('no-undeclared-trigger-reference', 'bad: reported once per name, not per occurrence',
+  flow({ ...ppTrigger({ text: { title: 'authToken' } }),
+    actions: { A: { type: 'Compose', inputs: "@triggerBody()?['ghost']" },
+      B: { type: 'Compose', inputs: "@concat(triggerBody()?['ghost'], triggerBody()?['ghost'])" } } }), {}, 1)
+expect('no-undeclared-trigger-reference', 'good: every read is declared',
+  flow({ ...ppTrigger({ text: { title: 'authToken' }, text_2: { title: 'faculty' } }),
+    actions: { A: { type: 'Compose', inputs: "@concat(triggerBody()?['text'], triggerBody()?['text_2'])" } } }), {}, 0)
+// The doubled-quote form appears inside OData $filter strings in real flows. Capturing it
+// naively yields the name "'email'", which is declared nowhere — a phantom finding.
+expect('no-undeclared-trigger-reference', "good: doubled-quote OData form is normalized, not read as \"'email'\"",
+  flow({ ...ppTrigger({ email: { title: 'email' } }),
+    actions: { A: { type: 'OpenApiConnection', inputs: { parameters: { $filter: "smkb_email eq '@{triggerBody()?[''email'']}'" } } } } }), {}, 0)
+// Documentation is not evaluated at runtime. The first version of this rule flagged the
+// very note that was written to explain the bug it had just found in RevokeSession.
+expect('no-undeclared-trigger-reference', 'good: an expression quoted in a description is prose, not a read',
+  flow({ ...ppTrigger({ authToken: { title: 'authToken' } }),
+    actions: { A: { type: 'Compose', description: "was reading an undeclared triggerBody()?['email'] that always rendered '(unknown)'", inputs: "@triggerBody()?['authToken']" } } }), {}, 0)
+// A trigger with no declared schema (Recurrence, raw Request) cannot contradict a read.
+expect('no-undeclared-trigger-reference', 'good: no input schema means nothing to contradict',
+  flow({ triggers: { Recurrence: { type: 'Recurrence' } },
+    actions: { A: { type: 'Compose', inputs: "@triggerBody()?['whatever']" } } }), {}, 0)
 
 // ── Global rules ──
 // workflow-json-matches-customizations

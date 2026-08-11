@@ -1,0 +1,369 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "connection": {
+          "connectionReferenceLogicalName": "msdyn_Dataverse"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        },
+        "runtimeSource": "embedded"
+      },
+      "shared_office365_sol": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedoffice365_c3167"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "ENVIRONMENT_NAME (smkb_sol_EnvironmentName)": {
+          "defaultValue": "dev",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_sol_EnvironmentName",
+            "description": "Logical environment name."
+          }
+        },
+        "ERROR_EMAILS (smkb_sol_FlowErrorEmails)": {
+          "defaultValue": "",
+          "type": "String",
+          "metadata": {
+            "schemaName": "smkb_sol_FlowErrorEmails",
+            "description": "Semicolon-separated error email addresses."
+          }
+        }
+      },
+      "triggers": {
+        "manual": {
+          "metadata": {
+            "operationMetadataId": "e0000000-0040-4000-8000-000000000040"
+          },
+          "type": "Request",
+          "kind": "PowerPages",
+          "description": "Creates a new loan request record in LoanRequests-loan requestDetails. Snapshots all lecturer info at time of creation (Contract A). Returns { loan requestId }.",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "authToken",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_2": {
+                  "title": "faculty",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_3": {
+                  "title": "department",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_4": {
+                  "title": "activityType",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_5": {
+                  "title": "courseName",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Please enter your input",
+                  "x-ms-content-hint": "TEXT"
+                }
+              },
+              "required": [
+                "text",
+                "text_4",
+                "text_5"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Main_Flow": {
+          "type": "Scope",
+          "description": "Creates a loan request row with a full snapshot of lecturer data (Contract A in spec §8).",
+          "actions": {
+            "Validate_Input": {
+              "type": "If",
+              "expression": "@or(empty(coalesce(triggerBody()?['text'], '')), empty(coalesce(triggerBody()?['text_4'], '')), empty(coalesce(triggerBody()?['text_5'], '')))",
+              "actions": {
+                "Respond_invalid_input": {
+                  "type": "Response",
+                  "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "errorCode": "INVALID_INPUT"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Terminate_after_invalid_input": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {
+                    "Respond_invalid_input": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Validate_Auth_Token": {
+              "type": "Scope",
+              "actions": {
+                "Get_Auth_Session": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "smkb_sol_sessions",
+                      "$filter": "smkb_sol_token eq '@{replace(triggerBody()?['text'], '''', '''''')}'",
+                      "$top": 1
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {},
+                  "description": "Resolve the session row from the caller token. The doubled quotes in $filter are mandatory - see FLOW_SNIPPETS section 15 step 4."
+                },
+                "If_Token_Not_Found": {
+                  "type": "If",
+                  "expression": "@equals(length(body('Get_Auth_Session')?['value']), 0)",
+                  "actions": {
+                    "Respond_unauthorized": {
+                      "type": "Response",
+                      "kind": "PowerPages",
+                      "inputs": {
+                        "statusCode": 200,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "errorCode": "UNAUTHORIZED"
+                        }
+                      },
+                      "runAfter": {}
+                    },
+                    "Terminate_unauthorized": {
+                      "type": "Terminate",
+                      "inputs": {
+                        "runStatus": "Succeeded"
+                      },
+                      "runAfter": {
+                        "Respond_unauthorized": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  },
+                  "runAfter": {
+                    "Get_Auth_Session": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "If_Token_Expired": {
+                  "type": "If",
+                  "expression": "@lessOrEquals(ticks(first(body('Get_Auth_Session')?['value'])?['sessionExpiresAt']), ticks(utcNow()))",
+                  "actions": {
+                    "Respond_token_expired": {
+                      "type": "Response",
+                      "kind": "PowerPages",
+                      "inputs": {
+                        "statusCode": 200,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "errorCode": "UNAUTHORIZED"
+                        }
+                      },
+                      "runAfter": {}
+                    },
+                    "Terminate_token_expired": {
+                      "type": "Terminate",
+                      "inputs": {
+                        "runStatus": "Succeeded"
+                      },
+                      "runAfter": {
+                        "Respond_token_expired": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  },
+                  "runAfter": {
+                    "If_Token_Not_Found": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "runAfter": {
+                "Validate_Input": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Respond_to_PowerPages": {
+              "type": "Response",
+              "kind": "PowerPages",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "loan requestId": "@string(body('Create_Loan_Request')?['ID'])"
+                }
+              },
+              "runAfter": {
+                "Create_Loan_Request": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Create_Loan_Request": {
+              "type": "OpenApiConnection",
+              "description": "Owner AND display name come from the session, never the request - a caller who could set borrowerid would create rows owned by someone else. Status is server-set so the caller cannot self-approve. Optional inputs coalesce to '' (Dataverse rejects null).",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "smkb_sol_loanrequests",
+                  "item/smkb_name": "@first(body('Get_Auth_Session')?['value'])?['smkb_sol_displayname']",
+                  "item/smkb_sol_borrowerid": "@first(body('Get_Auth_Session')?['value'])?['smkb_sol_userid']",
+                  "item/smkb_sol_activitytype": "@triggerBody()?['text_4']",
+                  "item/smkb_sol_coursename": "@triggerBody()?['text_5']",
+                  "item/smkb_sol_faculty": "@coalesce(triggerBody()?['text_2'], '')",
+                  "item/smkb_sol_department": "@coalesce(triggerBody()?['text_3'], '')",
+                  "item/smkb_sol_statuscode": 1
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {
+                "Validate_Auth_Token": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runAfter": {}
+        },
+        "Handle_Flow_Error": {
+          "type": "Scope",
+          "actions": {
+            "Check_Error_Emails_Configured": {
+              "type": "If",
+              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)'))))",
+              "actions": {
+                "Send_error_notification": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365_sol",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/From": "noreply@smkb.ac.il",
+                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [ERROR] smkb_sol_CreateLoanRequestRecord failed')",
+                      "emailMessage/Body": "@concat('<p>smkb_sol_CreateLoanRequestRecord failed in <strong>', parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), '</strong>. Run ID: ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/Importance": "High"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            },
+            "Respond_with_error": {
+              "type": "Response",
+              "kind": "PowerPages",
+              "inputs": {
+                "statusCode": 200,
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "errorCode": "ERROR"
+                }
+              },
+              "runAfter": {
+                "Check_Error_Emails_Configured": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Main_Flow": [
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ]
+          }
+        }
+      }
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}

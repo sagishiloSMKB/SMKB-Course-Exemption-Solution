@@ -20,7 +20,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { rules, globalRules } from './rules.mjs'
+import { rules, globalRules, specDeclaresSharePoint } from './rules.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -66,7 +66,17 @@ function findDir(root, ...endsWithAny) {
 }
 
 const flowsFound = findDir(repoRoot, 'Cloud Flows', 'Power Automate Flows Starter')
-const cloudFlowsDir = flowsDirArg ? path.dirname(path.resolve(flowsDirArg)) : flowsFound.dir
+// `dirname` of an explicit flows folder is the starter root - EXCEPT when the folder passed is not
+// inside a starter at all. Point this at `C:\anything` and cloudFlowsDir becomes `C:\`, and the XML
+// gather below then walks the entire drive: in practice it crashed with an EPERM stack trace naming
+// `C:\Windows\WUModels`, which tells a developer nothing about what they actually did wrong. So the
+// derived root is only trusted when it is inside the repo.
+const derivedFlowsDir = flowsDirArg ? path.dirname(path.resolve(flowsDirArg)) : flowsFound.dir
+const insideRepo = (p) => !!p && (path.resolve(p) + path.sep).startsWith(path.resolve(repoRoot) + path.sep)
+const cloudFlowsDir = insideRepo(derivedFlowsDir) ? derivedFlowsDir : null
+if (flowsDirArg && !cloudFlowsDir) {
+  console.log(`flow-lint: the folder passed is outside ${repoRoot} - linting its flows only, with no solution-XML checks.`)
+}
 const flowsActivated = flowsDirArg ? true : flowsFound.activated
 const workflowsDir = flowsDirArg ? path.resolve(flowsDirArg) : (cloudFlowsDir && path.join(cloudFlowsDir, 'Workflows'))
 const envVars = findDir(repoRoot, 'Environmental Variables', 'Environmental Variables Starter')
@@ -79,6 +89,10 @@ if (!workflowsDir || !fs.existsSync(workflowsDir)) {
 }
 
 // ── Shared context: env-var schema names + solution XML files ──────────────────
+// Hoisted above `ctx`: it is used there, and a `const` arrow is in the temporal dead zone until its
+// own line runs - which threw ReferenceError on the first run rather than failing quietly.
+const readIf = (p) => (p && fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '')
+
 function collectEnvVarSchemaNames(dir) {
   const set = new Set()
   if (!dir) return set
@@ -95,7 +109,13 @@ function collectEnvVarSchemaNames(dir) {
   return set
 }
 
-const ctx = { envVarSchemaNames: collectEnvVarSchemaNames(envVarsDir) }
+// The §7 SharePoint declaration the `sharepoint-data-action` rule keys on. The predicate itself lives
+// in rules.mjs so the self-test can pin it - it had two bugs on first write, including one where the
+// shipped template's own guidance silenced the rule on every solution.
+const ctx = {
+  envVarSchemaNames: collectEnvVarSchemaNames(envVarsDir),
+  sharePointDeclared: specDeclaresSharePoint(readIf(path.join(repoRoot, 'SOLUTION-SPEC.md'))),
+}
 
 // ── Load flows ─────────────────────────────────────────────────────────────────
 const flowFiles = fs.readdirSync(workflowsDir).filter((f) => f.endsWith('.json'))
@@ -127,17 +147,20 @@ function gatherXml(dir, out) {
   const stack = [dir]
   while (stack.length) {
     const cur = stack.pop()
-    for (const entry of fs.readdirSync(cur, { withFileTypes: true })) {
+    // Per-directory tolerance, not just at the top. A single unreadable subdirectory used to abort the
+    // whole run with a raw EPERM stack trace instead of a finding.
+    let entries
+    try { entries = fs.readdirSync(cur, { withFileTypes: true }) } catch { continue }
+    for (const entry of entries) {
       const abs = path.join(cur, entry.name)
       if (entry.isDirectory()) {
         if (!/(_dist|node_modules|\.git)/.test(entry.name)) stack.push(abs)
       } else if (entry.name.toLowerCase().endsWith('.xml')) {
-        out.push({ rel: path.relative(repoRoot, abs), raw: fs.readFileSync(abs, 'utf8') })
+        try { out.push({ rel: path.relative(repoRoot, abs), raw: fs.readFileSync(abs, 'utf8') }) } catch { /* unreadable */ }
       }
     }
   }
 }
-const readIf = (p) => (p && fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '')
 
 // Placeholder scope: ACTIVATED starters only, and the Tables starter is now included.
 //

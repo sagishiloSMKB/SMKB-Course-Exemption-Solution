@@ -135,7 +135,8 @@
                   "entityName": "[IMPLEMENT]:smkb_sol_sessions",
                   "$filter": "[IMPLEMENT]:smkb_sol_token eq '@{triggerBody()?['authToken']}'",
                   "$top": 1
-                }
+                },
+                "authentication": "@parameters('$authentication')"
               }
             },
             "If_Session_Found": {
@@ -172,7 +173,8 @@
                       "entityName": "[IMPLEMENT]:smkb_sol_sessions",
                       "recordId": "@{first(body('IMPLEMENT_Get_Auth_Session')?['value'])?['[IMPLEMENT]:smkb_sol_sessionid']}",
                       "item/[IMPLEMENT]:smkb_sol_expires_at": "@{addHours(utcNow(), -1)}"
-                    }
+                    },
+                    "authentication": "@parameters('$authentication')"
                   }
                 }
               },
@@ -211,7 +213,7 @@
               "actions": {
                 "Send_error_notification": {
                   "type": "OpenApiConnection",
-                  "description": "Send error alert to all addresses in smkb_sol_FlowErrorEmails (semicolon-separated String env var).",
+                  "description": "Alert the operators. Reports no caller identity on purpose: this flow's only caller identifier is the session token, and a token must never be emailed. The Run ID is the triage key - do not add an email field here.",
                   "inputs": {
                     "host": {
                       "connectionName": "shared_office365_[yourid]",
@@ -221,8 +223,8 @@
                     "parameters": {
                       "emailMessage/From": "[sol]NoReply@yourdomain.com",
                       "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)')",
-                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [ERROR] smkb_sol_CheckOtp failed')",
-                      "emailMessage/Body": "@concat('<p>The flow <strong>smkb_sol_CheckOtp</strong> failed unexpectedly in the <strong>', parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), '</strong> environment.</p><p><strong>Triggered by:</strong> ', coalesce(triggerBody()?['email'], '(unknown)'), '</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p><p>Open Power Automate &#8594; Cloud flows &#8594; smkb_sol_CheckOtp &#8594; Run history to investigate.</p>')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [ERROR] smkb_sol_RevokeSession failed')",
+                      "emailMessage/Body": "@concat('<p>The flow <strong>smkb_sol_RevokeSession</strong> failed unexpectedly in the <strong>', parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), '</strong> environment.</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p><p>Open Power Automate &#8594; Cloud flows &#8594; smkb_sol_RevokeSession &#8594; Run history to investigate.</p>')",
                       "emailMessage/Importance": "High"
                     },
                     "authentication": "@parameters('$authentication')"

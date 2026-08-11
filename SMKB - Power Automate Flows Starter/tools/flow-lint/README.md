@@ -63,11 +63,14 @@ silently reported clean.
 | `authenticated-flow-validates-token` | error | a token-titled trigger input (`authToken`, `auth token`, `sessionToken`, `token` - matched after normalizing case and separators) with no `sessionToken` reference in any **action input**. A mention in a `description` does not satisfy it |
 | `securedata-only-on-connector-actions` | error | `secureData` anywhere other than an `OpenApiConnection`/`Http` **action** — imports fine, then fails activation and stays in **Draft** |
 | `keyvault-secret-read-is-secured` | error | a Secret env-var read that doesn't mark its **outputs** secure (secret lands in run history) |
+| `openapi-action-has-authentication` | error | an `OpenApiConnection` action missing `"authentication": "@parameters('$authentication')"` (or holding a different value). Without it the action doesn't bind the solution's connection reference — **imports clean, fails at runtime**. All 30 such actions in the kit's harvested production flows carry it; every omission found was hand-typed JSON |
+| `no-undeclared-trigger-reference` | error | an action reading a trigger input the schema doesn't declare. **The failure mode with no symptom** — it evaluates to `null`, the column is written empty, the run says Succeeded. The mirror of `no-unused-trigger-inputs`, which only catches the harmless direction. Skips `description`/`metadata`, which the runtime never evaluates |
 | `connection-reference-complete` | warn | connection reference missing logical/api name |
 | `no-email-in-defaultvalue` | warn | an email committed in a parameter `defaultValue`, or hardcoded in an **action input** (set per-environment instead). The org-wide mandated sender is exempt - it is a convention every flow must use, not per-solution data |
 | `powerpages-trigger-fields-have-title` | warn | Power Pages trigger field missing a `title` (eventData maps by title) |
 | `env-var-param-defined` | warn | any `metadata.schemaName` with no matching Environmental Variables definition (no publisher-prefix filter - that field has exactly one meaning) |
 | `no-unused-trigger-inputs` | warn | a Power Pages trigger input the flow never reads — dead surface a reviewer can't distinguish from a record selector |
+| `sharepoint-data-action` | warn | a SharePoint data action while [`SOLUTION-SPEC.md`](../../../SOLUTION-SPEC.md) §7 declares no SharePoint dependency (CLAUDE.md → **Critical Rule 6**: Dataverse is the data platform, SharePoint is a declared legacy carve-out). Declaring the list and why the data cannot move silences it for the whole solution |
 
 ### Whole-solution (global)
 

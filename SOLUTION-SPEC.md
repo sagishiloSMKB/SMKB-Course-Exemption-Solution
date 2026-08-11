@@ -103,6 +103,14 @@ UI-only.
 > `RetrieveEnvironmentVariableSecretValue` action, never in flow parameters. See
 > [SECURITY-BASELINE.md](SECURITY-BASELINE.md).
 
+> **Reading or writing an existing SharePoint list? Declare it here.** Dataverse is this solution's data
+> platform (CLAUDE.md → **Critical Rule 6**); SharePoint is a legacy interoperability path for data that
+> already lives in a list and cannot be moved. Name the list and say why the data cannot move — it is a
+> constraint on the solution, which is what this section is for. `flow-lint`'s `sharepoint-data-action`
+> rule warns on every SharePoint action until this declaration exists, so an undeclared SharePoint write
+> shows up in review rather than a year later. If the answer is "it does not, we are storing in
+> Dataverse", write nothing here about SharePoint.
+
 ## 8. Design and UI
 
 | | |
