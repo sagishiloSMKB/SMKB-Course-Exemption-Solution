@@ -61,12 +61,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - shell: bash
+      # ABSENCE IS LEGITIMATE, and this job used to deny it. It hard-failed with "the Cloud Flows
+      # starter should always ship it" - an assumption that is false twice over: a solution may
+      # never activate Cloud Flows, and the cleanup audit deletes non-activated starter folders
+      # outright. Every other gate in the repo is already activation-aware (the sibling flow-lint
+      # job skips, discover-spas skips a folder still named "SMKB - <X> Starter",
+      # check-template-guards records an explicit SKIP); this one was the exception, so a solution
+      # with no flows would have had a permanently red CI for a starter it is correct not to have.
+      # Skip loudly instead: a printed reason is not the same as silence.
+      - name: flow-lint self-test
+        shell: bash
         run: |
           t=$(find . -path '*/tools/flow-lint/test.mjs' -not -path '*/node_modules/*' | head -1)
           if [ -z "$t" ]; then
-            echo "::error::flow-lint test.mjs not found - the Cloud Flows starter should always ship it."
-            exit 1
+            echo "No flow-lint self-test found (Cloud Flows starter not activated, or removed by the cleanup audit) - skipping."
+            exit 0
           fi
           node "$t"
 
@@ -79,8 +88,9 @@ jobs:
         run: |
           lint=$(find . -path '*/tools/flow-lint/lint.mjs' -not -path '*/node_modules/*' | head -1)
           if [ -z "$lint" ]; then
-            echo "::error::flow-lint lint.mjs not found."
-            exit 1
+            # Same reasoning as the self-test above: no Cloud Flows starter is a valid state.
+            echo "No flow-lint found (Cloud Flows starter not activated, or removed by the cleanup audit) - skipping."
+            exit 0
           fi
           status=0
           found=0

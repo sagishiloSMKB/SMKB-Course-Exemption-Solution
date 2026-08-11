@@ -193,11 +193,55 @@ expectGlobal('workflow-json-matches-customizations', 'bad: stale reference',
 expectGlobal('workflow-json-matches-customizations', 'good: referenced + exists',
   { flowFiles: ['sol_x-GUID.json'], customizationsXml: '<JsonFileName>/Workflows/sol_x-GUID.json</JsonFileName>' }, 0)
 
-// env-var-rootcomponents-complete
+// workflow-rootcomponents-match — the third leg of the three-file rule, both directions.
+const FLOW_GUID_A = 'e0000000-0001-4000-8000-000000000001'
+const FLOW_GUID_B = 'e0000000-0002-4000-8000-000000000002'
+const rootRow = (g) => `<RootComponent type="29" id="{${g}}" behavior="0" />`
+expectGlobal('workflow-rootcomponents-match', 'good: JSON + RootComponent agree',
+  { flowFiles: [`smkb_x_Flow-${FLOW_GUID_A}.json`], flowSolutionXml: rootRow(FLOW_GUID_A) }, 0)
+// THE orphan this rule was added for: the documented "delete the skeleton you don't use" step,
+// done without removing its RootComponent row. Nothing caught this once the GUID was real.
+expectGlobal('workflow-rootcomponents-match', 'bad: orphaned RootComponent (skeleton deleted, row left)',
+  { flowFiles: [], flowSolutionXml: rootRow(FLOW_GUID_A) }, 1)
+expectGlobal('workflow-rootcomponents-match', 'bad: flow with no RootComponent row (import would fail)',
+  { flowFiles: [`smkb_x_Flow-${FLOW_GUID_A}.json`], flowSolutionXml: '<RootComponents></RootComponents>' }, 1)
+// Case and braces must not decide the answer - XML carries {UPPER}, filenames carry lower.
+expectGlobal('workflow-rootcomponents-match', 'good: braces and case are normalized',
+  { flowFiles: [`smkb_x_Flow-${FLOW_GUID_A}.json`], flowSolutionXml: `<RootComponent type="29" id="{${FLOW_GUID_A.toUpperCase()}}" />` }, 0)
+// A Customizations.xml WorkflowId counts as "the flow exists", so a mid-edit repo is not blamed
+// on Solution.xml for a gap that belongs to another file.
+expectGlobal('workflow-rootcomponents-match', 'good: known via Customizations.xml WorkflowId',
+  { flowFiles: [], customizationsXml: `<Workflow WorkflowId="{${FLOW_GUID_B}}">`, flowSolutionXml: rootRow(FLOW_GUID_B) }, 0)
+expectGlobal('workflow-rootcomponents-match', 'good: no Solution.xml at all (starter absent) is silent',
+  { flowFiles: [`smkb_x_Flow-${FLOW_GUID_A}.json`], flowSolutionXml: '' }, 0)
+// REGRESSION. The shipped Customizations.xml documents the three-file rule with the literal text
+// `<Workflow WorkflowId="{GUID}">`, and Solution.xml quotes its placeholder rows in a comment. The
+// first cut of this rule scanned raw text, read the DOCUMENTATION as data, and reported a missing
+// RootComponent for a flow named "guid" - a checker firing on the prose that explains it, which is
+// the exact failure check-template-guards.mjs exists to prevent.
+expectGlobal('workflow-rootcomponents-match', 'good: prose inside an XML comment is not data',
+  { flowFiles: [`smkb_x_Flow-${FLOW_GUID_A}.json`],
+    customizationsXml: `<!-- 2. a <Workflow WorkflowId="{GUID}"> entry (this file) -->\n<Workflow WorkflowId="{${FLOW_GUID_A}}">`,
+    flowSolutionXml: `<!-- placeholder rows: <RootComponent type="29" id="{${FLOW_GUID_B}}" /> -->\n${rootRow(FLOW_GUID_A)}` }, 0)
+expectGlobal('workflow-rootcomponents-match', 'good: a non-GUID id attribute is ignored, not reported',
+  { flowFiles: [], flowSolutionXml: '<RootComponent type="29" id="{NOT-A-GUID}" />' }, 0)
+expectGlobal('env-var-rootcomponents-complete', 'good: a commented-out RootComponent is not an orphan',
+  { envVarSchemaNames: new Set(['smkb_A']),
+    envSolutionXml: '<!-- <RootComponent type="380" schemaName="smkb_Gone" /> -->\n<RootComponent type="380" schemaName="smkb_A" />' }, 0)
+
+// env-var-rootcomponents-complete — now bidirectional
 expectGlobal('env-var-rootcomponents-complete', 'bad: missing RootComponent',
   { envVarSchemaNames: new Set(['smkb_A']), envSolutionXml: '<RootComponents></RootComponents>' }, 1)
 expectGlobal('env-var-rootcomponents-complete', 'good: has RootComponent',
   { envVarSchemaNames: new Set(['smkb_A']), envSolutionXml: '<RootComponent type="380" schemaName="smkb_A" behavior="0" />' }, 0)
+// The reverse direction, and the reason it matters: deleting the shipped example variable is a
+// DOCUMENTED step, and leaving its row behind was reported by nothing.
+expectGlobal('env-var-rootcomponents-complete', 'bad: orphaned RootComponent (definition deleted, row left)',
+  { envVarSchemaNames: new Set(['smkb_A']),
+    envSolutionXml: '<RootComponent type="380" schemaName="smkb_A" /><RootComponent type="380" schemaName="smkb_Gone" />' }, 1)
+// Zero definitions means the starter is absent or not activated - not that every row is orphaned.
+expectGlobal('env-var-rootcomponents-complete', 'good: no definitions discovered is silent, not "all orphaned"',
+  { envVarSchemaNames: new Set(), envSolutionXml: '<RootComponent type="380" schemaName="smkb_A" />' }, 0)
 
 // xml-no-placeholders
 expectGlobal('xml-no-placeholders', 'bad: placeholder in xml',

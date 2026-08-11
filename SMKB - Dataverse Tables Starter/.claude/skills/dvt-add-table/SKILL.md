@@ -40,12 +40,28 @@ pipeline. Naming rule: `smkb_<prefix>_<PascalName>` / display `PREFIX - Name` �
    - logical (lowercase): `smkb_<prefix>_<pascalname-lowercased>`
    - display: `<PREFIX_UPPER> - <Human Display Name>` (singular) and its plural for the collection name.
 
-### 2 — Clone the example entity
-3. Copy `Entities/smkb_sol_ExampleTableA/` (the parent example — use `_B` only for a second table) to the
-   new folder name. Prefer `git mv`/copy so history is clean:
+### 2 — Clone an existing entity
+3. Copy an existing entity folder to the new folder name. **Prefer a real table the solution already has;
+   the shipped example is only the first-time source.** The example entities are deleted at the cleanup audit
+   — and they must be, because the deploy guard blocks on their placeholder segment and on their display name
+   — so a skill that can only clone the example stops working the moment the solution is tidy. Every entity
+   folder has the same shape (`Entity.xml`, `FormXml/{main,quick,card}`, `SavedQueries/`, `RibbonDiff.xml`),
+   so cloning a real one is equivalent and usually closer to what you want:
+   ```powershell
+   # What is available to clone from:
+   Get-ChildItem ".\Entities" -Directory | Select-Object -ExpandProperty Name
+   ```
+   ```powershell
+   # Clone the nearest real sibling:
+   Copy-Item -Recurse ".\Entities\<an existing entity>" ".\Entities\smkb_<prefix>_<PascalName>"
+   ```
+   Only if this is the solution's **first** table and the examples are still present, clone the parent
+   example (use `_B` only for a second table):
    ```powershell
    Copy-Item -Recurse ".\Entities\smkb_sol_ExampleTableA" ".\Entities\smkb_<prefix>_<PascalName>"
    ```
+   Cloning a real table has one extra consequence, handled in step 5 either way: its GUIDs are already live
+   in Dataverse, so they must be freshened exactly as the example's sentinels are.
 
 ### 3 — Rewrite the tokens (CASE-SENSITIVE — use -creplace)
 4. Run the two-token replace over the new folder, **PascalCase then lowercase**, with `-creplace`
@@ -53,10 +69,13 @@ pipeline. Naming rule: `smkb_<prefix>_<PascalName>` / display `PREFIX - Name` �
    [add-table-reference.md](add-table-reference.md) — do not use a case-insensitive `-replace`.
 
 ### 4 — Fresh GUIDs (new table only)
-5. The copied `FormXml/*.xml` and `SavedQueries/*.xml` carry the example's sentinel GUIDs (filename **and**
-   internal `id`/`formid`/`savedqueryid`). Generate a **fresh** `[System.Guid]::NewGuid()` for each and
-   replace it in both the filename and the file body (script in the reference). Reused GUIDs → duplicate-key
-   import failure. *(Renaming the example in place instead of cloning? Skip this — `guid-freshen.ps1` does it once before first deploy.)*
+5. The copied `FormXml/*.xml` and `SavedQueries/*.xml` carry the **source table's** GUIDs (filename **and**
+   internal `id`/`formid`/`savedqueryid`) — the example's shipped sentinels if you cloned the example, or a
+   real table's live GUIDs if you cloned a sibling. Either way they must not be reused: generate a fresh
+   `[System.Guid]::NewGuid()` for each and replace it in both the filename and the file body (script in the
+   reference). Reused GUIDs → duplicate-key import failure, and cloning a **live** table is the worse case —
+   the import would target the source table's own forms and views. *(Renaming the example in place instead of
+   cloning? Skip this — `guid-freshen.ps1` does it once before first deploy.)*
 
 ### 5 — Register the RootComponent
 6. Add the table to `Other/Solution.xml` inside `<RootComponents>`:

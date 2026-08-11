@@ -367,10 +367,29 @@ export const rules = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Global rules — operate on the whole solution, not one flow.
-//   g = { flowFiles: string[] (basenames), customizationsXml: string,
+//   g = { flowFiles: string[] (basenames), customizationsXml: string, flowSolutionXml: string,
 //         envVarSchemaNames: Set<string>, envSolutionXml: string,
 //         xmlFiles: { rel: string, raw: string }[] }
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Workflow GUIDs, normalized to lowercase with braces stripped, from any XML id attribute. */
+const normalizeGuid = (s) => String(s).replace(/[{}]/g, '').toLowerCase()
+
+/** Is this actually a GUID, or prose that happens to sit in an id attribute? */
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/**
+ * Drop XML comments before scanning for data.
+ *
+ * Not optional, and the reason is a bug this very file shipped for one run: `Other/Customizations.xml`
+ * documents the three-file rule in a header comment that includes the literal text
+ * `<Workflow WorkflowId="{GUID}"> entry`, and `Other/Solution.xml` explains its placeholder rows in a
+ * comment that quotes them. Scanning raw text therefore read the DOCUMENTATION as a declared workflow
+ * and reported a missing RootComponent for a flow named "guid". That is precisely the failure
+ * scripts/check-template-guards.mjs exists to prevent - a checker firing on the prose that explains it -
+ * and it is worth remembering that a rule can trip the trap it was written to close.
+ */
+const stripXmlComments = (s) => String(s || '').replace(/<!--[\s\S]*?-->/g, '')
 export const globalRules = [
   {
     id: 'workflow-json-matches-customizations',
@@ -392,18 +411,99 @@ export const globalRules = [
     },
   },
   {
-    id: 'env-var-rootcomponents-complete',
+    // The third leg of the THREE-FILE RULE that Other/Customizations.xml documents at the top of
+    // itself: a flow must appear in Workflows/*.json, in Customizations.xml as a <Workflow>, AND in
+    // Solution.xml as a <RootComponent type="29">, with the same GUID in all three. Two of the
+    // three pairings were checked; the Solution.xml leg was checked by nothing, in either
+    // direction. Both failure modes are real and both are silent:
+    //
+    //   ORPHAN  - delete a flow skeleton (the documented "keep the one matching your trigger type
+    //             and delete the other") and leave its RootComponent row, and the import declares a
+    //             component for a workflow that does not ship.
+    //   MISSING - add a flow and forget the row, and the import fails with "component not declared
+    //             in the solution file as a root component" - the error the three-file rule exists
+    //             to prevent, discovered at deploy time instead of lint time.
+    //
+    // Until now the only thing that caught the orphan was the deploy guard's all-zero sentinel
+    // token, and only while the GUID was still the shipped placeholder - i.e. not at all once a real
+    // GUID was in place.
+    id: 'workflow-rootcomponents-match',
     severity: 'error',
-    docs: 'Every env-var definition needs a <RootComponent type="380"> entry in the Environmental Variables Solution.xml, or the variable is upserted but not linked to the solution (it will not travel through the pipeline to Stage/Prod).',
+    docs: 'Every flow needs a <RootComponent type="29"> entry in the Cloud Flows Solution.xml carrying its workflow GUID, and every such entry needs a flow that exists. A missing entry fails the import ("component not declared in the solution file as a root component"); an orphaned entry declares a component that does not ship, and is what a deleted flow skeleton leaves behind.',
     check(g) {
       const out = []
-      if (!g.envSolutionXml || !g.envVarSchemaNames || g.envVarSchemaNames.size === 0) return out
+      if (!g.flowSolutionXml) return out
+      // Comments stripped, and every candidate shape-checked as a GUID - see stripXmlComments above.
+      // <RootComponent type="29" id="{GUID}" /> in either attribute order.
+      const declared = new Set(
+        [...stripXmlComments(g.flowSolutionXml)
+          .matchAll(/type="29"[^>]*\bid="([^"]+)"|\bid="([^"]+)"[^>]*type="29"/g)]
+          .map((m) => normalizeGuid(m[1] || m[2]))
+          .filter((gu) => GUID_RE.test(gu)),
+      )
+      // A flow's GUID is the 36-char suffix of its filename; Customizations.xml carries the same
+      // GUID in WorkflowId. Take the union so the rule still reports usefully when one of the other
+      // two files is mid-edit rather than blaming Solution.xml for someone else's gap.
+      const present = new Set()
+      for (const f of g.flowFiles || []) {
+        const m = /-([0-9A-Fa-f]{8}-(?:[0-9A-Fa-f]{4}-){3}[0-9A-Fa-f]{12})\.json$/.exec(f)
+        if (m) present.add(normalizeGuid(m[1]))
+      }
+      for (const m of stripXmlComments(g.customizationsXml).matchAll(/WorkflowId="([^"]+)"/g)) {
+        const gu = normalizeGuid(m[1])
+        if (GUID_RE.test(gu)) present.add(gu)
+      }
+      if (declared.size === 0 && present.size === 0) return out
+
+      for (const guid of declared) {
+        if (!present.has(guid)) {
+          out.push({
+            location: 'Other/Solution.xml',
+            message: `<RootComponent type="29"> declares workflow ${guid} but no flow carries that GUID - a stale entry (typically left by deleting a flow skeleton without its RootComponent row)`,
+          })
+        }
+      }
+      for (const guid of present) {
+        if (!declared.has(guid)) {
+          out.push({
+            location: 'Other/Solution.xml',
+            message: `workflow ${guid} has no <RootComponent type="29"> entry - the import will fail with "component not declared in the solution file as a root component"`,
+          })
+        }
+      }
+      return out
+    },
+  },
+  {
+    id: 'env-var-rootcomponents-complete',
+    severity: 'error',
+    // Now BIDIRECTIONAL. It only ever checked definition -> RootComponent, so deleting a definition
+    // folder and leaving its row went unreported - and that is the documented cleanup step for the
+    // shipped example variable, so the gap was on the happy path. apply-config.ps1 then re-prefixes
+    // the orphaned row on every run, so the solution imports a RootComponent for a definition that
+    // does not ship.
+    docs: 'Every env-var definition needs a <RootComponent type="380"> entry in the Environmental Variables Solution.xml or it is upserted but not linked to the solution (it will not travel through the pipeline to Stage/Prod) - and every such entry needs a definition that exists, or the import declares a variable that does not ship.',
+    check(g) {
+      const out = []
+      if (!g.envSolutionXml) return out
+      // Comments stripped for the same reason as the rule above: this file explains its own
+      // placeholder rows in a comment, and the reverse direction added below would have read that
+      // explanation as an orphaned RootComponent.
       const inRoot = new Set(
-        [...g.envSolutionXml.matchAll(/type="380"[^>]*schemaName="([^"]+)"|schemaName="([^"]+)"[^>]*type="380"/g)]
+        [...stripXmlComments(g.envSolutionXml)
+          .matchAll(/type="380"[^>]*schemaName="([^"]+)"|schemaName="([^"]+)"[^>]*type="380"/g)]
           .map((m) => m[1] || m[2]),
       )
-      for (const name of g.envVarSchemaNames) {
+      const defined = g.envVarSchemaNames ?? new Set()
+      // No definitions discovered at all means the Env Vars starter was not found or is not
+      // activated - not that every row is orphaned. Stay silent rather than reporting the whole file.
+      if (defined.size === 0) return out
+
+      for (const name of defined) {
         if (!inRoot.has(name)) out.push({ location: 'Environmental Variables/Other/Solution.xml', message: `env var "${name}" has a definition but no <RootComponent type="380"> entry (won't travel through the pipeline)` })
+      }
+      for (const name of inRoot) {
+        if (!defined.has(name)) out.push({ location: 'Environmental Variables/Other/Solution.xml', message: `<RootComponent type="380"> declares env var "${name}" but no definition folder exists - a stale entry (typically left by deleting a definition without its RootComponent row)` })
       }
       return out
     },

@@ -164,6 +164,11 @@ for (const [label, found, activated] of [
 const gctx = {
   flowFiles,
   customizationsXml: cloudFlowsDir ? readIf(path.join(cloudFlowsDir, 'Other', 'Customizations.xml')) : '',
+  // The Cloud Flows Solution.xml - the THIRD leg of the three-file rule. It was absent from this
+  // context, which is why nothing checked it: `workflow-json-matches-customizations` pairs the JSON
+  // against Customizations.xml, and the <RootComponent type="29"> rows were checked by no rule at
+  // all. Delete a flow skeleton and leave its RootComponent row and every lint stayed green.
+  flowSolutionXml: cloudFlowsDir ? readIf(path.join(cloudFlowsDir, 'Other', 'Solution.xml')) : '',
   envSolutionXml: envVarsDir ? readIf(path.join(envVarsDir, 'Other', 'Solution.xml')) : '',
   envVarSchemaNames: ctx.envVarSchemaNames,
   xmlFiles,
