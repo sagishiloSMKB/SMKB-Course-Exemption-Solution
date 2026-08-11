@@ -6,7 +6,7 @@
 **What this file is:** the durable record of what the solution must do — captured from the developer at the
 start, in their words. It is the **input** artifact.
 
-**What it is not:** the [`docs/`](docs/README.md) set is the **output** artifact, drafted at Phase 10 from
+**What it is not:** the [`docs/`](docs/README.md) set is the **output** artifact, drafted at Phase 12 from
 the solution that was actually built. This file is where that drafting starts, so `docs/` never has to
 reconstruct intent from code.
 
@@ -19,6 +19,12 @@ answers arrive — not at the end.
 > in plain language, record what you hear, and mark anything you inferred rather than were told. Where an
 > answer is missing, write it under **Open questions** instead of guessing — an unanswered question is a
 > finding, not a blank to fill.
+>
+> **How to mark an inference — use this exact form, so two runs are comparable:** suffix the sentence with
+> `[inferred]`, and where the inference is load-bearing say what from — `[inferred from §3]`. "Mark it"
+> without a prescribed shape produced whatever each run felt like, which is indistinguishable from not
+> marking it at all. An inference is weaker evidence than an answer, and a later reviewer can only tell the
+> two apart if the file says so.
 
 ---
 

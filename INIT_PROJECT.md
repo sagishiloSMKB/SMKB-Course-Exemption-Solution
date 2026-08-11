@@ -332,7 +332,7 @@ Cover:
 
 This is not bookkeeping. Phase 6.3 **mandates a Claude Code restart** when the folders are renamed, so a flow that keeps the specs only in the transcript guarantees losing them at exactly the point where the most has been decided. Anything not written down is gone.
 
-Mark what you **inferred** rather than were told, and put every unanswered question under **Open questions** instead of guessing a default.
+Mark what you **inferred** rather than were told — suffix the sentence with `[inferred]`, or `[inferred from §N]` where it matters which section you reasoned from. The shape is prescribed on purpose: "mark it" without one produced whatever each run felt like, which reads the same as not marking it. And put every unanswered question under **Open questions** instead of guessing a default.
 
 Naming conventions to apply while recording (CLAUDE.md → Critical Rule 3): schema names `smkb_<prefix>_<PascalName>`, display names `PREFIX - Name`. Environment variables use **String with semicolons for lists, never JSON** (Critical Rule 5). Power Pages-triggered flows follow the HTTP 200 + `errorCode` contract — see the [flow-error contract](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/FLOW-ERROR-CONTRACT.md).
 
