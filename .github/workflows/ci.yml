@@ -31,6 +31,22 @@ jobs:
           node-version: 20
       - run: node scripts/check-template-guards.mjs
 
+      # The cleanup audit's manifest coherence, in the same zero-auth zero-install job. This is the
+      # tripwire that keeps that tool a CLASSIFIER: it fails if a keep-list path is ever listed for
+      # deletion, and the architecture entries (the flows-only transport, the unwrap() contract, the
+      # generated barrel, the dev-mock target) are marked PROTECTED so a future edit cannot quietly
+      # put one on the removal list. Pure data - no filesystem, no config - so it is safe on the
+      # pristine kit and on every solution alike.
+      - name: cleanup-audit manifest coherence
+        run: node scripts/cleanup-audit.mjs --self-test
+
+      # A census, not a gate. The reporter exits 0 whatever it finds - it is a report - which means
+      # nothing would otherwise remind a solution six months on that it still ships two demo views
+      # and a dormant module. One visible, ignorable line; never red. Exit code forced to 0 because
+      # an uninitialized repo answers 2 by design.
+      - name: cleanup-audit census
+        run: node scripts/cleanup-audit.mjs --census || true
+
   # The two gates CLAUDE.md presents as THE drift guard used to run only in .githooks/pre-commit,
   # which is an opt-in per clone (`git config core.hooksPath .githooks`). So on any clone that
   # skipped that one command - and on CI unconditionally - config drift and broken root-doc links
