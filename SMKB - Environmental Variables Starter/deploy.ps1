@@ -17,6 +17,7 @@ if ($TargetEnv -ne $allowedEnv) {
 # -----------------------------------------------------------------------------
 
 $scriptDir = $PSScriptRoot
+$repoRoot  = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $distDir   = Join-Path $scriptDir "_dist"
 $zipPath   = Join-Path $distDir "solution.zip"
 
@@ -89,6 +90,19 @@ function Invoke-Pac {
 
 if (-not (Test-Path $distDir)) { New-Item -ItemType Directory -Path $distDir | Out-Null }
 if (Test-Path $zipPath) { Remove-Item $zipPath }
+
+# --- Solution version -------------------------------------------------------
+# Every XML starter imports into the SAME solution but ships its own Other/Solution.xml, so
+# without this each import re-stamps a hardcoded version and the deployed version can go
+# BACKWARDS - which breaks Pipeline promotion. The helper is root-owned and reconciles with the
+# live version, so it can never regress below what is already deployed. See CLAUDE.md Rule 7.
+$newVersion = & (Join-Path $repoRoot "scripts\Set-SolutionVersion.ps1") `
+    -SolutionXmlPath (Join-Path $scriptDir "Other\Solution.xml") -TargetEnv $TargetEnv
+if ($LASTEXITCODE -ne 0 -or -not $newVersion) {
+    Write-Host "Could not set the solution version - aborting before packing." -ForegroundColor Red
+    exit 1
+}
+Write-Host "Solution version -> $newVersion" -ForegroundColor Cyan
 
 Write-Host "Packing solution..."
 Invoke-Pac -What 'pac solution pack' -PacArgs @(

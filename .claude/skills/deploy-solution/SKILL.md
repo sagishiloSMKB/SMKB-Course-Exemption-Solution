@@ -47,7 +47,12 @@ after each starter. All deploys target **SMKB-Apps-Dev only**; Stage/Prod go thr
    **⑤ Power Pages Code Site** → drive its own skills: `/ppcs-provision-site` (first time) → `/ppcs-register-flow`
    per flow → `/ppcs-deploy`. Developer: open the site URL. **Log DEPLOY-LOG.**
 
-3. After each starter, append a dated `DEPLOY-LOG` entry to `STARTER_AGENT_FEEDBACK_AND_NOTES.md`: did the deploy
+3. **Commit the deploy-written values** (Init Project 8.8): `solution.version.json`, each XML starter's
+   re-stamped `Other/Solution.xml` `<Version>`, plus any platform-assigned ids (`power.config.json`,
+   `flows.ts`, site settings). The version file is what makes the number survive the next clone -
+   leaving it uncommitted lets a later import regress and fail Pipeline promotion.
+
+4. After each starter, append a dated `DEPLOY-LOG` entry to `STARTER_AGENT_FEEDBACK_AND_NOTES.md`: did the deploy
    complete cleanly? were components visible? any guard false-positives or unclear instructions? **This log is mandatory.**
 
 ## Error Handling

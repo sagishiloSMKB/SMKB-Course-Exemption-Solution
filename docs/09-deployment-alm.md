@@ -48,6 +48,34 @@ flowchart LR
     D2 -- "build + push per env" --> S2 -- "build + push per env" --> P2
 ```
 
+## Solution version — one number, always increasing
+
+**Pipeline promotion requires a monotonically increasing solution version.** A version that goes
+backwards is rejected at promotion, which is the worst place to find out: the deploy that caused it
+reported success, and nothing between the two says anything is wrong.
+
+Every XML starter in this repo imports into the **same** solution, but each ships its own
+`Other/Solution.xml` with its own `<Version>` — so the deployed version is whichever starter imported
+last. That is managed here, not by hand:
+
+| | |
+|---|---|
+| **Source of truth** | [`solution.version.json`](../solution.version.json) at the repo root — **git-tracked**. If it is ignored, every clone resets and the next import regresses. |
+| **Who bumps it** | [`scripts/Set-SolutionVersion.ps1`](../scripts/Set-SolutionVersion.ps1), called by each starter's `deploy.ps1` immediately before packing. |
+| **How it can't regress** | It reads the live version with `pac solution list` and uses that as the base when it is higher — so a manual bump or a pipeline promotion is picked up automatically. |
+| **Segment bumped** | the 4th (revision). A full Dev deploy therefore advances once per activated XML starter. |
+
+Two operational rules:
+
+- **Commit `solution.version.json` after a deploy** — that is what makes the number persist. Init
+  Project 8.8 stages it with the other deploy-written values.
+- **Rebuilding an existing solution? Seed it before the first deploy.** A fresh repo starts low while
+  the live solution may be far ahead. Run `pac solution list`, take the highest version across
+  Dev/Stage/Prod, and seed `solution.version.json` above it. The live reconcile normally catches this,
+  but only if `pac` is authenticated against the right environment — do not make that the only defence.
+
+Full rationale and failure history: root `CLAUDE.md` → **Critical Rule 7**.
+
 ## Deploy commands & gates (Dev)
 
 `[FILL IN: keep the rows for the components this solution activated.]`

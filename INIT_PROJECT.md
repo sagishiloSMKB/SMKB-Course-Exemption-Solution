@@ -502,6 +502,15 @@ It deliberately leaves platform-assigned placeholders (app IDs, workflow GUIDs, 
 
 > After this, `apply-config.ps1 -Check` reports **no drift**. The pre-commit hook runs the same check, so identity can never silently diverge between the root config and a starter.
 
+> **Rebuilding an existing solution? Seed the version now.** A fresh repo ships `solution.version.json`
+> at `1.0.0.0` while the live solution may be at `1.0.0.17`, and a solution version that goes backwards
+> is rejected by Pipeline promotion - discovered at promotion time, not at deploy time. Run
+> `pac solution list`, take the highest version across Dev/Stage/Prod, and seed the file **above** it.
+> `Set-SolutionVersion.ps1` also reconciles against the live version on every deploy, but that depends
+> on `pac` being authenticated against the right environment, so do not make it the only defence.
+> Record the seeded value in [`SOLUTION-SPEC.md`](SOLUTION-SPEC.md) §10. New solution? Nothing to do.
+> See CLAUDE.md -> **Critical Rule 7**.
+
 ### 6.2a Checkpoint — commit the activation, before the restart
 
 ```powershell
@@ -790,6 +799,9 @@ Stage whichever of these the solution activated:
 | `SMKB - [Name] - Cloud Flows/Workflows/*.json` + `Other/Customizations.xml` + `Other/Solution.xml` | the **workflow GUIDs** — the same GUID in all three files (the three-file rule) | authored, then confirmed against the imported solution |
 | `SMKB - [Name] - Power Pages Code Site/src/config/flows.ts` | each flow's **trigger GUID** | `/ppcs-register-flow` (8.7) |
 | `SMKB - [Name] - Power Pages Code Site/.powerpages-site/site-settings/` | per-environment **site-setting GUIDs** | `scripts/freshen-site-settings.ps1` |
+| `solution.version.json` (repo root) | the **solution version** each import stamped | `scripts/Set-SolutionVersion.ps1`, once per XML starter deployed |
+
+Each starter's `Other/Solution.xml` will also show a changed `<Version>` - that is expected and auto-managed (CLAUDE.md -> **Critical Rule 7**). Stage those too; the authoritative value is `solution.version.json`, and committing it is what makes the number survive the next clone.
 
 ```powershell
 git status                        # confirm nothing unexpected was written by the deploys

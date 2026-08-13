@@ -19,6 +19,9 @@ doubt about where a fact belongs, use this.
 - The init / onboarding flow — `INIT_PROJECT.md`, `INIT ONBOARDING`, and the `SESSION START` pre-flight.
 - Which starters are activated, and renaming their folders to solution-specific names.
 - The single solution config, `solution.config.json`, and the `apply-config.ps1` script that pushes it down.
+- The single solution **version**, `solution.version.json`, and `scripts/Set-SolutionVersion.ps1`, which bumps it
+  before every pack. Every XML starter imports into the same solution, so the version spans all of them and
+  cannot belong to any one - see Critical Rule 7. A starter owns only the one-line call in its own `deploy.ps1`.
 - Global cross-starter conventions (below): short-name uniqueness & registry, publisher prefix,
   display-name format, environment reference, deployment order, connection-reference sharing.
 - Git & CI — `.gitignore`, `.githooks/`, `.github/workflows/`, and the remote.
@@ -72,6 +75,7 @@ that owns it:
 | Solution documentation (architecture, security, privacy, ALM …) — templates, filled per solution at init | [docs/](docs/README.md) |
 | Testing strategy — the layered testing method | [TESTING-STRATEGY.md](TESTING-STRATEGY.md) |
 | **Security baseline** — shipped defaults, enforced invariants, accepted trade-offs (read before any security review) | [SECURITY-BASELINE.md](SECURITY-BASELINE.md) |
+| **Solution version** — the one monotonic version every XML starter imports under | [solution.version.json](solution.version.json) · [Set-SolutionVersion.ps1](scripts/Set-SolutionVersion.ps1) · Critical Rule 7 |
 | Pre-go-live review templates — cleanup, security, UX | [audit/](audit/README.md) |
 
 ## Skills
@@ -483,6 +487,50 @@ starter's `examples/` were genericized from a real SharePoint-backed solution, s
 most-copied artefacts taught the legacy pattern — and `examples/smkb_sol_CheckOtp` contradicted the very
 recipe it illustrated. The Dataverse examples now live in `examples/`; the SharePoint ones are under
 `examples/legacy-sharepoint/`, labelled for what they are. An unstated rule is not a rule.
+
+---
+
+## CRITICAL RULE 7 — The Solution Version Only Ever Goes Up
+
+**One solution, one version, and it is monotonic.** Every XML starter — Dataverse Tables,
+Environmental Variables, Cloud Flows — imports into the **same** solution: they share a
+`<UniqueName>`. But each ships its *own* `Other/Solution.xml`, so each one carries a `<Version>`,
+and each deploy packs and imports that file. The version the environment ends up with is therefore
+whichever starter deployed **last**.
+
+All three used to ship a hardcoded `1.0.0.0`. So every import re-stamped `1.0.0.0`, the deployed
+version never increased, and after any manual bump or pipeline promotion the next deploy pushed it
+**backwards**. Power Platform Pipeline promotion requires a monotonically increasing version, so
+the failure surfaces at promotion time — long after the deploy that caused it reported success.
+
+**The mechanism:**
+
+| Piece | Owner | What it does |
+|---|---|---|
+| [`solution.version.json`](solution.version.json) | root | The single source of truth. **Must stay git-tracked** — gitignore it and every clone resets, and the next import regresses. |
+| [`scripts/Set-SolutionVersion.ps1`](scripts/Set-SolutionVersion.ps1) | root | Reads the JSON, reconciles with the **live** version, increments the revision, writes it back, and stamps it into the `Solution.xml` being packed. |
+| each starter's `deploy.ps1` | starter | One call to the helper, immediately before packing. |
+
+It is **self-healing**: it derives the solution's `UniqueName` from the `Solution.xml` it is handed
+(no solution name is ever hardcoded), runs `pac solution list`, and if the live version is higher it
+uses that as the base. So it can never regress below what is deployed or promoted — even after a
+manual bump. If `pac` is missing or unauthenticated it falls back to the highest `<Version>` across
+every starter's `Solution.xml` rather than to a floor, and never fails the deploy for this reason.
+
+**Consequences to know:**
+
+- **The `<Version>` committed in each `Other/Solution.xml` is auto-managed.** Do not hand-edit it to
+  mean anything; the deploy overwrites it from the JSON. It survives only as the fallback seed above.
+- **A full deploy bumps once per activated XML starter** (Tables → Env Vars → Flows gives `.1`, `.2`,
+  `.3`). That is fine and intended — monotonic is the only property that matters.
+- **Commit `solution.version.json` after deploying** so the number persists. Init Project 8.8 stages it.
+- **Rebuilding an existing solution? Seed it first.** A rebuild's repo starts at `1.0.0.0` while the
+  live solution may be at `1.0.0.17`. The live reconcile catches this *if* `pac` is authenticated
+  against the right environment — do not rely on that. Check `pac solution list` and seed
+  `solution.version.json` **above** the highest version across Dev/Stage/Prod before the first
+  deploy. Record it in [`SOLUTION-SPEC.md`](SOLUTION-SPEC.md) §10.
+- **ASCII only in the helper**, like every `.ps1` here: PowerShell 5.1 reads a UTF-8-without-BOM
+  script as ANSI, so one em dash breaks it at parse time. Enforced by `check-template-guards.mjs`.
 
 ---
 

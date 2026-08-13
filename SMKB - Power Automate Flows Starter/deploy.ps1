@@ -52,6 +52,7 @@ Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $scriptDir = $PSScriptRoot
+$repoRoot  = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $distDir   = Join-Path $scriptDir "_dist"
 $zipPath   = Join-Path $distDir "solution.zip"
 
@@ -135,6 +136,19 @@ Add-ZipText $archive "[Content_Types].xml" @'
 # customizations.xml -- from Other/Customizations.xml (has <Workflow> entries + <connectionreferences>).
 # Without <Workflow> entries the flow JSONs ship in the zip but Dataverse never creates Workflow records.
 Add-ZipText $archive "customizations.xml" ([System.IO.File]::ReadAllText("$scriptDir\Other\Customizations.xml"))
+
+# --- Solution version -------------------------------------------------------
+# Every XML starter imports into the SAME solution but ships its own Other/Solution.xml, so
+# without this each import re-stamps a hardcoded version and the deployed version can go
+# BACKWARDS - which breaks Pipeline promotion. The helper is root-owned and reconciles with the
+# live version, so it can never regress below what is already deployed. See CLAUDE.md Rule 7.
+$newVersion = & (Join-Path $repoRoot "scripts\Set-SolutionVersion.ps1") `
+    -SolutionXmlPath (Join-Path $scriptDir "Other\Solution.xml") -TargetEnv $TargetEnv
+if ($LASTEXITCODE -ne 0 -or -not $newVersion) {
+    Write-Host "Could not set the solution version - aborting before packing." -ForegroundColor Red
+    exit 1
+}
+Write-Host "Solution version -> $newVersion" -ForegroundColor Cyan
 
 # solution.xml (from Other/)
 Add-ZipText $archive "solution.xml" (Get-Content "$scriptDir\Other\Solution.xml" -Raw)

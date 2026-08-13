@@ -143,6 +143,15 @@ Skip if this is new. If it is a rebuild:
 | **Live artifact** | [FILL IN: the URL / app / solution being replaced] |
 | **Source of truth commit** | [FILL IN: the ref that is actually deployed] |
 | **How that was confirmed** | [FILL IN: deploy tag, Dataverse solution version, deployed bundle timestamp] |
+| **Highest live solution version** | [FILL IN: from `pac solution list` across Dev/Stage/Prod] |
+| **`solution.version.json` seeded to** | [FILL IN: a value ABOVE the row above — see below] |
+
+> **Seed the solution version before the first deploy.** A rebuild's repo starts at `1.0.0.0` while the
+> live solution is already ahead, and a solution version that goes **backwards** is rejected by Power
+> Platform Pipeline promotion — which surfaces at promotion time, long after the deploy reported
+> success. `scripts/Set-SolutionVersion.ps1` reconciles against the live version on every deploy, but
+> only when `pac` is authenticated against the right environment, so record the seed here rather than
+> relying on it. See CLAUDE.md → **Critical Rule 7**.
 
 > **The deployed artifact is the specification; the repo is only evidence for it.** Do not assume the
 > default branch is what is live. On one rebuild `origin/main` was 7 commits and 11 days behind production

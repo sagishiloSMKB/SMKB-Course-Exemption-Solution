@@ -47,7 +47,17 @@ it is what *proves* a removal was clean, and a step cannot be its own post-condi
    Exit 1 = components are missing from the solution. Fix with `npm run solution:sync` (or just
    `npm run deploy`, which chains it). Needs an active `pac auth` profile; if `pac` is
    unavailable, report this check as SKIPPED rather than passed.
-5. Report each check as PASS/FAIL with the offending file(s). Deploy only if all four pass.
+5. **Solution version can only go up** - a version that regresses is rejected by Pipeline promotion,
+   at promotion time rather than at deploy time. Dry-run the bump for one activated XML starter:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\Set-SolutionVersion.ps1 `
+       -SolutionXmlPath "<an activated XML starter>\Other\Solution.xml" -TargetEnv "https://org229c958d.crm4.dynamics.com/" -DryRun
+   ```
+   PASS when `would become` is **above** both `recorded` and `live`. If `live` is ahead of `recorded`
+   the deploy will self-heal, but say so in the report - on a **rebuild** it means the seed was
+   missed (CLAUDE.md -> Critical Rule 7). `-DryRun` writes nothing. If `pac` is unavailable, report
+   the live half as SKIPPED rather than passed.
+6. Report each check as PASS/FAIL with the offending file(s). Deploy only if all five pass.
 
 ## Error Handling
 

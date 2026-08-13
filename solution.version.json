@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0.0",
+  "solution": null,
+  "updated": null,
+  "_doc": "Auto-managed by scripts/Set-SolutionVersion.ps1 on every deploy. This is the authoritative solution version - the <Version> in each starter's Other/Solution.xml is stamped FROM here at pack time, so its committed value does not matter. Every XML starter imports into the SAME solution, so without this each import re-stamped its own hardcoded 1.0.0.0 and the deployed version could go BACKWARDS, which breaks Power Platform Pipeline promotion (it requires a monotonic increase). Commit this file after a deploy so the number persists; if it is gitignored, every clone resets and the next import can regress. REBUILDING an existing solution? Seed this ABOVE the highest version across Dev/Stage/Prod before the first deploy - check with 'pac solution list'. See CLAUDE.md -> Critical Rule 7."
+}
