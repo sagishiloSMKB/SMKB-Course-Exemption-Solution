@@ -182,19 +182,27 @@ Never run a deploy without confirming the auth target. If the wrong profile is a
 - OR the pre-session check above finds the starter kit remote (proactively offer to run Init Project)
 
 **When triggered:** follow [`INIT_PROJECT.md`](INIT_PROJECT.md) phase by phase.
-- **Do not confirm every step.** The flow has **three decisions and two authorisations**, and nothing
+- **Do not confirm every step.** The flow has **three decisions and three authorisations**, and nothing
   else. The decisions: confirm the derived identity (Phase 2), give the specifications (Phase 4), approve
-  the plan (Phase 5). The authorisations: the first deploy to shared Dev **together with the one-way
+  the plan (Phase 5). The authorisations: pushes to the solution's own new repo (Phase 3.4 / H16 — asked
+  **once**, covering every later checkpoint), the first deploy to shared Dev **together with the one-way
   removal list** (Phase 8.2), and the cleanup removal list (Phase 9.3) — each one yes to a list you have
   already prepared, never an item-by-item confirmation. Plus the guided handoffs the user must physically
   perform. Everything else you decide and proceed with. Asking after each step is the behaviour this flow
   was restructured to remove.
+- **Phase 3 is the repository phase and it runs third — before the specs.** 3.1 removes the starter kit
+  remote, 3.3 creates the new private repo, 3.4 adds it and pushes a baseline commit of the whole starter,
+  3.5 enables the hooks. **Commit and push at every checkpoint after it** — 6.2a (activation, before the
+  restart), 7.1 (one commit per component as you build), 8.8 (the platform-assigned app IDs / workflow
+  GUIDs / site-setting GUIDs, which nobody can retype), 9.4 (cleanup removals), 10.4 (audit reports),
+  12 (docs). Phase 13 is a boundary marker, not the delivery: if it has real work left to do, a checkpoint
+  was skipped.
 - **Do not skip a phase or run one out of order.** The ordering carries real dependencies: identity is
   recorded before the baseline commit, the specs are written down before the restart that would otherwise
   lose them, and nothing that *acts* on the architecture (config flags, folder renames, installs) may run
   before the Phase 5 approval.
 - Every manual step is a **guided handoff**: give the exact path, then **verify the outcome** rather than
-  trusting "done". `INIT_PROJECT.md` indexes all of them as `H1`–`H15`.
+  trusting "done". `INIT_PROJECT.md` indexes all of them as `H1`–`H16`.
 - The git remote removal (Phase 3.1) is mandatory — never push before it.
 
 **This is a one-time operation.** Once Init Project has been completed and the remote points to the new solution repo, this command will not be triggered again in future sessions.

@@ -72,6 +72,13 @@ done
 # ── flow-lint for the Cloud Flows starter (static JSON/XML checks) ────────────
 # Only once the solution is initialized — the template's example flows carry placeholders
 # on purpose, and flow-lint (correctly) blocks on those. deploy.ps1 is the placeholder gate.
+#
+# Run with --pre-commit, which skips ONLY the placeholder rules (see DEPLOY_TIME_RULE_IDS in
+# rules.mjs). Without it, the whole Init Project build phase was uncommittable: INITIALIZED
+# flips at Phase 2.2, lint.mjs scans the whole Workflows folder, and the still-untouched
+# example skeletons plus Other/*.xml then rejected any commit that staged a flow — 11 errors,
+# 9 from files the developer never staged. Every other rule (the three-file rule, secrets,
+# auth-token validation, secureData, $authentication) still runs here.
 for FLOWS_DIR in "SMKB - Power Automate Flows Starter" "SMKB - "*" - Cloud Flows"; do
   [ -d "$FLOWS_DIR" ] || continue
   # An anchored `case` glob, not `grep -E`: the folder name is DATA, and passing it to a regex
@@ -84,7 +91,7 @@ for FLOWS_DIR in "SMKB - Power Automate Flows Starter" "SMKB - "*" - Cloud Flows
   [ "$INITIALIZED" = 1 ] && [ -n "$FLOW_STAGED" ] || continue
   if command -v node >/dev/null 2>&1 && [ -f "$FLOWS_DIR/tools/flow-lint/lint.mjs" ]; then
     echo "pre-commit: [$FLOWS_DIR] running flow-lint ..."
-    node "$FLOWS_DIR/tools/flow-lint/lint.mjs" "$FLOWS_DIR/Workflows" || status=1
+    node "$FLOWS_DIR/tools/flow-lint/lint.mjs" --pre-commit "$FLOWS_DIR/Workflows" || status=1
   else
     echo "pre-commit: [$FLOWS_DIR] node/flow-lint unavailable — skipping flow-lint"
   fi

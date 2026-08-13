@@ -27,10 +27,32 @@ node tools/flow-lint/test.mjs            # self-test: prove each rule fires on b
 # One rule over a folder that legitimately fails the others (a template folder still holds
 # placeholders by design), e.g. the OTP recipe's flow templates:
 node tools/flow-lint/lint.mjs --only=description-max-length "<path>/flow-templates"
+
+# What .githooks/pre-commit runs: everything EXCEPT the placeholder gates, so a half-built
+# solution stays committable. Never use this to clear a deploy.
+node tools/flow-lint/lint.mjs --pre-commit "<flows>/Workflows"
 ```
 
 Exit code: `0` clean, `1` errors (or warnings with `--strict`), `2` no flows found. A positional
 argument overrides the flows folder; otherwise it is auto-discovered.
+
+### `--pre-commit`: why a commit and a deploy are gated differently
+
+Placeholders are what a template **is** — `smkb_sol_`, `[REPLACE …]`, the `00000000-…-0001` GUIDs —
+and CLAUDE.md → **Critical Rule 2** puts the placeholder gate in each starter's own `deploy.ps1`.
+Running those two rules at *commit* time made the entire Init Project build phase uncommittable, for
+a reason that is not obvious: the hook's initialized-check flips at **Phase 2.2**, and `lint.mjs`
+scans the **whole** `Workflows` folder rather than the staged files. So staging one finished flow was
+rejected by placeholders in the *other*, still-untouched skeletons and in `Other/*.xml`. Measured on
+a clone: **11 errors, 9 of them from files the developer never staged.** A developer who cannot
+commit stops committing, which is how a whole build ends up in one commit at the end.
+
+`--pre-commit` therefore skips exactly `DEPLOY_TIME_RULE_IDS` (declared in `rules.mjs`, next to the
+rules, so a future placeholder rule joins the set instead of silently re-blocking commits). Nothing
+is weakened — `deploy.ps1`, `/pre-deploy-verify` and Init Project 8.1 all run the full set, and the
+run prints which gates it skipped so a clean commit-time result is never mistaken for
+"no placeholders left". Every other rule still runs at commit time, including the three-file rule
+and every security invariant.
 
 ### Which folders' XML is scanned
 

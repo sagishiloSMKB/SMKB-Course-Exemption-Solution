@@ -66,7 +66,7 @@ success.
    ```powershell
    powershell -ExecutionPolicy Bypass -File apply-config.ps1 -Check
    ```
-7. If the run renamed any folder, tell the developer to **restart Claude Code** (Init Project H6) —
+7. If the run renamed any folder, tell the developer to **restart Claude Code** (Init Project H4) —
    directory-scoped skills are discovered once per session and otherwise keep resolving to the old paths.
 
 ## Error Handling

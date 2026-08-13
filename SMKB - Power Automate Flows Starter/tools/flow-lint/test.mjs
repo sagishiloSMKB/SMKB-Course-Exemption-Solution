@@ -4,7 +4,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { rules, globalRules, specDeclaresSharePoint } from './rules.mjs'
+import { rules, globalRules, specDeclaresSharePoint, DEPLOY_TIME_RULE_IDS } from './rules.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -398,6 +398,18 @@ for (const r of [...rules, ...globalRules]) {
     fail++
   }
 }
+// DEPLOY_TIME_RULE_IDS drives what .githooks/pre-commit skips. A typo there would silently
+// stop skipping (commits blocked again) or skip nothing — so pin it to real rule ids.
+{
+  const all = new Set([...rules, ...globalRules].map((r) => r.id))
+  if (!DEPLOY_TIME_RULE_IDS.size) { results.push('FAIL DEPLOY_TIME_RULE_IDS :: is empty'); fail++ }
+  else { results.push(`ok   DEPLOY_TIME_RULE_IDS :: non-empty (${DEPLOY_TIME_RULE_IDS.size})`); pass++ }
+  for (const id of DEPLOY_TIME_RULE_IDS) {
+    if (all.has(id)) { results.push(`ok   DEPLOY_TIME_RULE_IDS :: "${id}" is a registered rule`); pass++ }
+    else { results.push(`FAIL DEPLOY_TIME_RULE_IDS :: "${id}" is not a registered rule id`); fail++ }
+  }
+}
+
 const known = new Set([...rules, ...globalRules].map((r) => r.id))
 for (const id of exercised.keys()) {
   if (!known.has(id)) { results.push(`FAIL ${id} :: coverage :: tested id is not a registered rule`); fail++ }

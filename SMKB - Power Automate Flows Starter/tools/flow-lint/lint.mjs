@@ -13,6 +13,10 @@
 //                invariant over a folder that legitimately fails the others - e.g.
 //                description-max-length over the OTP flow-templates, which carry
 //                placeholders by design.
+//     --pre-commit  skip the DEPLOY-time rules (the placeholder gates) and run everything
+//                else. Used by .githooks/pre-commit so a half-built solution can still be
+//                committed: placeholders are what a template IS, and Critical Rule 2 puts
+//                that gate in deploy.ps1. See DEPLOY_TIME_RULE_IDS in rules.mjs.
 //     flowsDir   override the auto-discovered Workflows folder
 //
 // Exit code: 0 = clean (no errors); 1 = errors found (or warnings with --strict).
@@ -20,7 +24,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { rules, globalRules, specDeclaresSharePoint } from './rules.mjs'
+import { rules, globalRules, specDeclaresSharePoint, DEPLOY_TIME_RULE_IDS } from './rules.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -32,8 +36,11 @@ const onlyIds = onlyArg
   ? new Set((onlyArg.includes('=') ? onlyArg.split('=')[1] : argv[argv.indexOf(onlyArg) + 1] || '')
       .split(',').map((s) => s.trim()).filter(Boolean))
   : null
+const preCommit = argv.includes('--pre-commit')
 const flowsDirArg = argv.find((a, i) => !a.startsWith('--') && !(onlyArg && !onlyArg.includes('=') && i === argv.indexOf(onlyArg) + 1))
-const wanted = (id) => !onlyIds || onlyIds.has(id)
+// --only is a whitelist and --pre-commit a blacklist; an explicit --only wins, so
+// `--only no-placeholders --pre-commit` still runs it rather than silently doing nothing.
+const wanted = (id) => (onlyIds ? onlyIds.has(id) : !(preCommit && DEPLOY_TIME_RULE_IDS.has(id)))
 
 // ── Discovery ────────────────────────────────────────────────────────────────
 // This script lives at <repo>/<flows starter>/tools/flow-lint/, but a solution renames
@@ -227,6 +234,9 @@ if (asJson) {
   }
   console.log(`\nflow-lint: ${flowFiles.length} flows · ${errors.length} error(s) · ${warns.length} warning(s)`)
   if (onlyIds) console.log(`  (--only: ran ${[...onlyIds].join(', ')} - all other rules were skipped)`)
+  // Never let a skipped gate be silent - a reader who does not know these were skipped would
+  // read a clean commit-time run as "no placeholders left".
+  if (preCommit && !onlyIds) console.log(`  (--pre-commit: skipped the deploy-time gates ${[...DEPLOY_TIME_RULE_IDS].join(', ')} - deploy.ps1 and /pre-deploy-verify still run them)`)
   // Say so when the blocking findings are in ANOTHER starter. This runs from the Cloud Flows
   // deploy, so "17 errors" listing files under `<solution> - Dataverse Tables` reads as a Flows
   // problem unless the report names what is actually happening: the solution-wide XML rules cover

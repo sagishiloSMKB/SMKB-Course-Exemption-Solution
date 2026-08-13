@@ -485,6 +485,24 @@ export const rules = [
 //         xmlFiles: { rel: string, raw: string }[] }
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Rules that gate a DEPLOY, not a commit.
+ *
+ * Placeholders are the whole point of a template: `smkb_sol_`, `[REPLACE ...]` and the
+ * `00000000-…-0001` GUIDs are what make a skeleton reusable, and CLAUDE.md → Critical Rule 2
+ * puts the placeholder gate in each starter's own `deploy.ps1`, where it belongs. Running these
+ * two at commit time made the whole Init Project build phase uncommittable: flow-lint scans the
+ * WHOLE Workflows folder, so staging one finished flow was rejected by placeholders in the
+ * *other*, still-untouched skeletons and in `Other/*.xml` — files the developer never staged.
+ * Verified on a clone: the commit was refused with 11 errors, 9 of them from unstaged files.
+ *
+ * So `--pre-commit` skips exactly these. Nothing is weakened: `deploy.ps1`, `/pre-deploy-verify`
+ * and Init Project 8.1 all still run the full set, and a placeholder cannot reach an environment.
+ * Kept HERE rather than in the hook so a future placeholder rule joins the set with its rule,
+ * instead of silently re-blocking commits until someone edits the shell script.
+ */
+export const DEPLOY_TIME_RULE_IDS = new Set(['no-placeholders', 'xml-no-placeholders'])
+
 /** Workflow GUIDs, normalized to lowercase with braces stripped, from any XML id attribute. */
 const normalizeGuid = (s) => String(s).replace(/[{}]/g, '').toLowerCase()
 
