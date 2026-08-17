@@ -130,7 +130,7 @@ solution — which is the whole reason a solution repo can safely drop them.
 
 ## SESSION START — Pre-Flight Check
 
-At the very start of every session, before applying any Critical Rule, run both checks:
+At the very start of every session, before applying any Critical Rule, run all three checks. Checks 1 and 2 establish *what* this repo is; Check 3 establishes *where its edge is* - run it before acting on the first request, not when you first want to write.
 
 **Check 1 — Git remote:**
 ```powershell
@@ -153,7 +153,7 @@ git remote get-url origin
 pac auth list
 ```
 
-The active profile (`*`) must target `https://org229c958d.crm4.dynamics.com/` (SMKB-Apps-Dev).
+The active profile (`*`) must target `https://org229c958d.crm4.dynamics.com/` (SMKB-Apps-Dev). Then proceed to Check 3.
 
 > **Warning:** The PAC profile named "SMKB-Apps-Dev" incorrectly targets `org1dce1895` (Seminar Hakibutzim College). If that profile is active, select the correct one before any deploy:
 > ```powershell
@@ -161,6 +161,23 @@ The active profile (`*`) must target `https://org229c958d.crm4.dynamics.com/` (S
 > ```
 
 Never run a deploy without confirming the auth target. If the wrong profile is active and a deploy runs, changes go to the wrong environment silently.
+
+**Check 3 — the work boundary:**
+```powershell
+git rev-parse --show-toplevel
+```
+
+That path is the boundary for the whole session (**Critical Rule 8**). Record it. Everything you create,
+modify or delete lives inside it; anything outside needs the developer's explicit yes, with the exact
+paths named first.
+
+Run this **before** acting on the first request, not when you first want to write something — the point
+is to know where you are while the request is still being read. The sibling folders one level up are
+other people's live solutions, so "outside" is one `..` away.
+
+**And check the request against it.** If the first request does not match what this repository is, say so
+before doing anything: a mismatched request is usually a message typed into the wrong session, not a
+request to reach into another project.
 
 **Windows-only — WebDAV:** Do not enable WebDAV or allow Claude Code to access `\\*` network paths. WebDAV is deprecated by Microsoft and may allow Claude Code to make unintended network requests that bypass the permission system. If VS Code or any tool offers to mount a WebDAV share, decline.
 
@@ -531,6 +548,93 @@ every starter's `Solution.xml` rather than to a floor, and never fails the deplo
   deploy. Record it in [`SOLUTION-SPEC.md`](SOLUTION-SPEC.md) §10.
 - **ASCII only in the helper**, like every `.ps1` here: PowerShell 5.1 reads a UTF-8-without-BOM
   script as ANSI, so one em dash breaks it at parse time. Enforced by `check-template-guards.mjs`.
+
+---
+
+## CRITICAL RULE 8 — This Repository Is the Work Boundary
+
+**Everything you create, modify, rename or delete must live inside this repository.** Anything outside
+it requires you to **say so first, name the exact paths, and get an explicit yes.** No exceptions for
+"it was obviously what they meant".
+
+### The part that actually matters: a request that does not fit this repo is a signal
+
+A developer keeps many projects open. **A request that does not match this repository is more likely a
+message typed into the wrong session than a request to reach into another project.** So when a request
+does not fit what this repo is:
+
+> **Say so before doing anything.** *"This looks like it's about \<other project\>, not this repo — did
+> you mean to ask here? I haven't touched anything."*
+
+Then wait. Do not search other projects to work out what they meant, and do not start the work "to be
+helpful". **Guessing right is worth far less than a wrong guess costs**, because a wrong guess is a
+silent change in a repository the developer is not currently looking at, discovered later — possibly
+much later, possibly after a deploy.
+
+This rule exists because it happened: a request meant for another project was typed into a starter-kit
+session, and the agent went looking through the developer's other projects and **changed one of them**
+without ever mentioning that the request looked misdirected. The edits were not the worst part — not
+being told was. A single sentence would have prevented all of it.
+
+### What "outside this repository" means here, concretely
+
+The boundary is the **git repository root** (`git rev-parse --show-toplevel`), established in the
+SESSION START pre-flight. Immediately **one level up** sit the developer's other projects — around nine
+sibling folders, several of them live solution repos with deployed Power Platform components. That is
+the blast radius, and it is one `..` away:
+
+| Outside the boundary | Notes |
+|---|---|
+| Sibling solution folders (`../SMKB - <Other> - Solution`, `../Standalone starters`, `../Tests`) | **The highest-risk case.** These are real repos with their own remotes and deployed components. |
+| Anything above the repo root, including `../TEST-SPEC-*.md` | Deliberately outside; still needs a yes to modify. |
+| The user's home, `~/.claude/`, global git config, installed toolchains | Config changes outlive the session. |
+| Another repository's git state — commits, branches, remotes, stashes | Never operate on a repo you were not asked to. |
+
+**The scratchpad directory is the one standing exception** — it is session-scoped, outside the project on
+purpose, and free to use.
+
+### It is not only Edit and Write
+
+A command can leave this repo just as easily as a file edit, and these are easy to miss:
+
+- `git` run with `-C <path>`, or after a `cd` / `Push-Location` out of the tree — including read-ish
+  commands that still write, like `git checkout`, `git stash`, `git config --global`.
+- Any `deploy.ps1`, `pac`, or pipeline command aimed at a solution that is not this one.
+- A package manager writing outside the repo — a global install, a global cache prune, `npm link`.
+- Shell redirection or `Remove-Item` / `rm` with a path starting `..`, `~`, or a drive letter.
+
+Before running anything whose target path starts with `..`, `~`, or an absolute drive path: **stop and
+name it.**
+
+### Reading is allowed; reading as a prelude to changing is not
+
+Reading outside the repo for context is fine and sometimes necessary — the test-drive fixture lives
+outside on purpose, and comparing against a sibling solution is a legitimate research act. State when
+you do it.
+
+What is not allowed is **searching the developer's other projects in order to change one.** If you
+notice you are reading another project to find something to edit, that is the moment this rule applies:
+stop and ask.
+
+### If you have already made a change outside the repo
+
+Say so immediately, in full: which absolute paths, what changed, and whether it is committed or pushed.
+**Do not quietly revert it and move on** — the developer needs to know their other project was touched,
+because the fix may not be limited to the files (a deploy may have run, a remote may have the commit).
+Then offer the revert.
+
+### How much of this is actually enforced, and how much is not
+
+Stated plainly, because a guardrail you believe in but do not have is worse than none:
+
+| Layer | Status |
+|---|---|
+| **This rule, plus SESSION START Check 3** | The primary mechanism. `CLAUDE.md` loads every session, which is exactly why the boundary belongs here rather than only in a settings file. |
+| `Bash(git -C *)` / `PowerShell(git -C *)` and `git config --global*` in the `deny` array | **Enforced.** These are the two command shapes that most easily operate on another repo, and the kit itself uses neither. Same `Bash(...)` form as the nine pre-existing deny rules, so the syntax is proven in that file. |
+| Path-based `Write` / `Edit` denies for the sibling folders | **Not enforced — deliberately absent.** `.claude/settings.json` grants `Write(**)` and `Edit(**)` in its `allow` array, so file writes are not path-gated. A path-based deny was *not* added because the absolute-path rule syntax was not verified against this Claude Code version, and **a permission rule that silently matches nothing looks like protection while providing none** — the same failure mode this repo warns about for `-replace`. Add one only after confirming it actually blocks a write outside the repo. |
+
+So the boundary is **behavioural, not mechanical.** Treat it as a rule you follow because it is written
+down, not one you will be stopped from breaking.
 
 ---
 

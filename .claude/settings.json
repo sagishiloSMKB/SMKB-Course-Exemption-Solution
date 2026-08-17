@@ -6,7 +6,6 @@
       "Edit(**)",
       "Glob(**)",
       "Grep(**)",
-
       "Bash(git status)",
       "Bash(git log*)",
       "Bash(git diff*)",
@@ -20,7 +19,6 @@
       "Bash(git tag*)",
       "Bash(git add*)",
       "Bash(git stash*)",
-
       "Bash(node --version)",
       "Bash(node scripts/*)",
       "Bash(pnpm --version)",
@@ -28,28 +26,23 @@
       "Bash(pnpm install)",
       "Bash(npm install)",
       "Bash(pnpm exec*)",
-
       "Bash(pac --version)",
       "Bash(pac auth list)",
       "Bash(pac pages list)",
       "Bash(pac solution list*)",
       "Bash(pac solution export*)",
       "Bash(pac solution unpack*)",
-
       "Bash(powershell*apply-config.ps1*-Check*)",
       "Bash(powershell*apply-config.ps1*-DryRun*)",
       "Bash(node*flow-lint*lint.mjs*)",
-
       "Bash(ls*)",
       "Bash(find*)",
       "Bash(cat*)",
       "Bash(echo*)",
       "Bash(pwd)",
       "Bash(which*)",
-
       "Bash(powershell*verify-consistency.ps1*)",
       "Bash(powershell*guid-freshen.ps1*-DryRun*)",
-
       "PowerShell(Get-ChildItem*)",
       "PowerShell(Test-Path*)",
       "PowerShell(Get-Content*)",
@@ -59,7 +52,6 @@
       "PowerShell(Write-Output*)",
       "PowerShell(Select-String*)",
       "PowerShell(Sort-Object*)",
-
       "PowerShell(git status*)",
       "PowerShell(git log*)",
       "PowerShell(git diff*)",
@@ -71,14 +63,12 @@
       "PowerShell(git add*)",
       "PowerShell(git stash*)",
       "PowerShell(git config*)",
-
       "PowerShell(node --version)",
       "PowerShell(node scripts/*)",
       "PowerShell(pnpm --version)",
       "PowerShell(pnpm run*)",
       "PowerShell(pnpm install)",
       "PowerShell(npm install)",
-
       "PowerShell(pac --version)",
       "PowerShell(pac auth list)",
       "PowerShell(pac pages list*)",
@@ -94,7 +84,11 @@
       "Bash(git push*--force*)",
       "Bash(git commit*--amend*)",
       "Bash(git reset*--hard*)",
-      "Bash(git clean*-f*)"
+      "Bash(git clean*-f*)",
+      "Bash(git -C *)",
+      "PowerShell(git -C *)",
+      "Bash(git config --global*)",
+      "PowerShell(git config --global*)"
     ]
   }
 }
