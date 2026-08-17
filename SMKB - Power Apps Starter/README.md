@@ -169,7 +169,7 @@ Vue component → domain service (src/services/*) → generated flow service (sr
 ## Quality Gates
 
 ```powershell
-pnpm lint   # ESLint — bans direct network calls & v-html, no stray console.log
+pnpm lint   # ESLint - bans direct network calls & v-html, no stray console.log
 pnpm test   # Vitest - every src/**/*.spec.ts. Node environment by default; jsdom for
             # src/composables/**/*.spec.ts and any *.dom.spec.ts (a spec that needs
             # window/sessionStorage/a Vue ref). Without that escape hatch a module

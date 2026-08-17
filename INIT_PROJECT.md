@@ -124,26 +124,56 @@ Some steps are **manual by definition**: they need a browser, a credential, or a
 
 The verification half is the point. Where a check is genuinely impossible from here, the block says so outright instead of implying success.
 
+**Three rules for the agent, each of which was learned the hard way in a real run:**
+
+1. **One handoff per message. Never issue the next handoff, or preview a later phase, in the same
+   message as the current one.** A developer cannot perform two physical steps at once, and a message
+   containing three of them obscures which to do *now*. This is worst at a restart: the developer comes
+   back to a session with no memory of the conversation, so everything said alongside the restart
+   instruction is gone and only what is **on disk** survives.
+2. **Any handoff that ends a session or a phase must close with the exact words that resume the flow** —
+   e.g. *"reopen and say 'continue init'"*. Not optional prose: without it a restart is a dead end.
+3. **A handoff's stated reason must be a fact that can be checked, not an assertion.** H1's reason is
+   good because `Bash(pac auth select*)` is verifiably in the `deny` array of
+   [`.claude/settings.json`](.claude/settings.json). A reason that is merely asserted goes stale, and an
+   agent that believes it will hand the developer work the settings permit it to do itself — which is
+   exactly what happened: H3 claimed installs were "blocked in agent settings" while
+   `Bash(pnpm install)` sat in the **allow** array, and H6 gave a reason (*"must run locally"*) that
+   never said why the *agent* could not do it. Both are now agent work. **Before issuing any handoff,
+   confirm its reason still holds.** If it does not, do the work and log it in
+   `STARTER_AGENT_FEEDBACK_AND_NOTES.md`.
+
 ### Handoff index
 
-| # | Your turn | Phase | Why it must be you | Agent verifies with |
-|---|---|---|---|---|
-| **H1** | `pac auth create` / `pac auth select` | 1.2 | blocked in agent settings | `pac auth list` — the active `*` profile targets the Dev URL |
-| **H2** | Create the private GitHub repo | 3.3 | browser | `git ls-remote` succeeds and returns nothing (empty repo) |
-| **H3** | `pnpm install` / `npm install` | 6.4 | blocked in agent settings | `node_modules` exists; `npm run lint` runs |
-| **H4** | **Restart Claude Code** after the folder renames | 6.3 | session-level | directory-scoped skills resolve to the new paths |
-| **H5** | Authorise the first deploy to shared Dev — **and with it the pass A removal list** | 8.2 | the deploy gate; this deploy is what makes those components permanent | — this is the approval itself. The agent then applies the removals and **re-runs 8.1's three checks** before the first `deploy.ps1`, so the gate proves the removals broke nothing |
-| **H6** | `pac code init` — create the Power App record | 8.6 | must run locally before the first push | `power.config.json` exists (`appId` null is expected) |
-| **H7** | Set environment-variable **values** in the Maker portal | 8.4 | portal-only data entry | agent lists every definition and confirms each with you |
-| **H8** | Confirm flow connection references and **turn each flow on** | 8.5 | portal-only | flows import **disabled** — agent re-checks published state |
-| **H9** | Power Pages provisioning / reactivation + typing the web URL slug | 8.7 | browser | `pac pages list` shows the site; slug matches `powerPages.webUrlSlug` |
-| **H10** | **Convert the site to Production** | 8.7 | admin role + portal | `pac pages list -v` no longer reports `Trial` |
-| **H11** | Run the Power Platform Pipeline for Stage / Prod | 11 | portal-only by policy | **cannot be verified from here** — the agent lists what to check in the target |
-| **H12** | Review the drafted `docs/` | 12 | business intent | — |
-| **H13** | Approve the final commit and push | 13 | approval | `git status` reviewed before staging |
-| **H14** | Approve the cleanup removal list | 9.3 | deleting a starter or a component is a judgement about what this solution *is*, not a fact the repo holds | the cleanup commit succeeds with the hooks enabled — `check-doc-boundaries.mjs` exit 0 (every root-doc link still resolves), `check-template-guards.mjs` naming each removed starter in its skip list, `apply-config.ps1 -Check` no drift |
-| **H15** | Annotate the audit findings | 10.3 | accepting a residual risk and declining a UX suggestion are owner decisions; no check can tell whether a risk is *truly* accepted | no finding is left at its default — no `SUGGESTED` rows remain in the UX report, and every security row is `FIXED` / `FIXED [needs deploy]` / `Documented` (rationale non-empty) / `Accepted` / `False positive` |
-| **H16** | Authorise pushes to the new repo — **once**, covering every checkpoint | 3.4 | pushing is outward-facing, but it should be asked once rather than at each of seven checkpoints | `git rev-parse --abbrev-ref --symbolic-full-name @{u}` resolves to `origin/main`; the agent re-states the remote URL before the first checkpoint push |
+**This is a reference, not a checklist to work through.** It answers "which steps will need me, and
+why" so you can see the shape of the flow in advance. The agent issues these **one at a time, when the
+flow reaches them** — never as a batch, and never ahead of time. Reading it as a to-do list is what
+produced a message containing three handoffs at once; see rule 1 above.
+
+The **Blocks** column says what actually waits on you. Several block nothing for a long time, which
+means a handoff you cannot do right now usually is not a reason to stop.
+
+> **H3 and H6 are deliberately absent.** Both turned out not to be handoffs at all - the agent is
+> permitted to run the installs (6.4) and `pac code init` (8.6). The numbers are **not** reused and the
+> rest are **not** renumbered: `H1`-`H16` are referenced from several files, and renumbering to close a
+> gap would silently repoint every one of them.
+
+| # | Your turn | Phase | Why it must be you | Blocks | Agent verifies with |
+|---|---|---|---|---|---|
+| **H1** | `pac auth create` / `pac auth select` | 1.2 | blocked in agent settings | Phase 8 (every deploy). Without it `environmentId` at 2.1 becomes an Open question and the flow continues | `pac auth list` — the active `*` profile targets the Dev URL |
+| **H2** | Create the private GitHub repo | 3.3 | browser | **nothing immediately** - 3.4's baseline commit can be made **locally**. Only the push, the CI-green proof and off-machine recovery wait on it | `git ls-remote` succeeds and returns nothing (empty repo) |
+| **H4** | **Restart Claude Code** after the folder renames | 6.3 | session-level | 6.4 onward - directory-scoped skills keep resolving to the pre-rename paths until you restart | directory-scoped skills resolve to the new paths |
+| **H5** | Authorise the first deploy to shared Dev — **and with it the pass A removal list** | 8.2 | the deploy gate; this deploy is what makes those components permanent | 8.3 onward (every starter deploy) | — this is the approval itself. The agent then applies the removals and **re-runs 8.1's three checks** before the first `deploy.ps1`, so the gate proves the removals broke nothing |
+| **H7** | Set environment-variable **values** in the Maker portal | 8.4 | portal-only data entry | any flow that reads the variable at runtime - the definitions import without values | agent lists every definition and confirms each with you |
+| **H8** | Confirm flow connection references and **turn each flow on** | 8.5 | portal-only | anything that calls a flow; flows import **disabled** | flows import **disabled** — agent re-checks published state |
+| **H9** | Power Pages provisioning / reactivation + typing the web URL slug | 8.7 | browser | the rest of 8.7 | `pac pages list` shows the site; slug matches `powerPages.webUrlSlug` |
+| **H10** | **Convert the site to Production** | 8.7 | admin role + portal | nothing immediately - but it starts a **90-day deletion clock** on the site | `pac pages list -v` no longer reports `Trial` |
+| **H11** | Run the Power Platform Pipeline for Stage / Prod | 11 | portal-only by policy | Stage and Prod entirely | **cannot be verified from here** — the agent lists what to check in the target |
+| **H12** | Review the drafted `docs/` | 12 | business intent | Phase 13 | — |
+| **H13** | Approve the final commit and push | 13 | approval | nothing - it is the boundary itself | `git status` reviewed before staging |
+| **H14** | Approve the cleanup removal list | 9.3 | deleting a starter or a component is a judgement about what this solution *is*, not a fact the repo holds | 9.4 (the removals) | the cleanup commit succeeds with the hooks enabled — `check-doc-boundaries.mjs` exit 0 (every root-doc link still resolves), `check-template-guards.mjs` naming each removed starter in its skip list, `apply-config.ps1 -Check` no drift |
+| **H15** | Annotate the audit findings | 10.3 | accepting a residual risk and declining a UX suggestion are owner decisions; no check can tell whether a risk is *truly* accepted | Phase 11 - an unresolved HIGH may reach Stage with a recorded decision, never Prod | no finding is left at its default — no `SUGGESTED` rows remain in the UX report, and every security row is `FIXED` / `FIXED [needs deploy]` / `Documented` (rationale non-empty) / `Accepted` / `False positive` |
+| **H16** | Authorise pushes to the new repo — **once**, covering every checkpoint | 3.4 | pushing is outward-facing, but it should be asked once rather than at each of seven checkpoints | pushing at the checkpoints. Local commits need no authorisation, so it blocks nothing on disk | `git rev-parse --abbrev-ref --symbolic-full-name @{u}` resolves to `origin/main`; the agent re-states the remote URL before the first checkpoint push |
 
 **Everything not in that table is the agent's**: filling `solution.config.json`, running `apply-config.ps1` (identity, folder renames, doc pointers), writing `SOLUTION-SPEC.md`, authoring every table / flow / env var / screen, running the deploy scripts once authorised, running the verification gates, running the cleanup reporter and proposing the removal list, applying the approved removals and re-pointing the root docs, running the security and UX audits and writing their reports, and drafting `docs/`.
 
@@ -167,6 +197,14 @@ https://github.com/SMKB-AC-IL/SMKB-Power-Platform-Solution-Starter-Kit.git
 ```
 
 If it already points to a solution-specific repo (e.g. `SMKB-Events-Tickets-Solution`), Init Project has already been run — stop here and start a regular session instead.
+
+> **Did you clone this kit during an already-running Claude Code session? Restart now.** The kit ships its
+> own `.claude/` — the root skills and every starter's — and skills are discovered **once per session**. If
+> `.claude/` arrived with the clone, nothing in it is in the `/` menu: `/solution-config`,
+> `/pre-deploy-verify`, `/deploy-solution`, `/cleanup-audit` and every starter skill are absent even though
+> the files are on disk. It is invisible here and first bites at **6.1**, the first phase that names a
+> skill. Phase 1 is where a restart costs nothing. *(The note at 6.1 reads as an edge case; on this path it
+> is the guaranteed state.)* Reported from a real run, where Phases 1-6 were done by hand.
 
 ## 1.2 Tools
 
@@ -304,7 +342,24 @@ git remote -v          # Expected: origin  <your new repo>  (fetch/push)
 
 This baseline commit carries the **real identity** from Phase 2 with all starters still on their template names. That makes it three useful things at once: proof the remote, CI and credential all work before any real work exists; a clean `git diff <baseline>..HEAD` boundary for "what this solution added"; and the `git reset --hard <baseline>` recovery point if the init goes wrong during the Phase 6 renames.
 
+> **H2 deferred, or no repo URL yet? Commit the baseline locally and move on.** The two halves of this
+> phase are one paragraph in the document but two independent facts on disk, and conflating them causes
+> real confusion about whether "the repo work" happened at all. To be explicit:
+>
+> - **3.1 (remove the starter kit remote) is the entire safety property.** With no remote configured,
+>   nothing can reach the template. That is done and it does not depend on H2.
+> - **The baseline commit can be made now, without a remote** — run the `git add -A` / `git commit` above
+>   and skip the `remote add` / `push`. That gives you the `git reset --hard <baseline>` recovery point the
+>   Phase 6 renames rely on, which is the property that actually matters locally.
+> - **What deferral costs, precisely:** the CI-green proof, off-machine recovery, and the checkpoint pushes
+>   below. Nothing else. Per the handoff index, H2 blocks **nothing** until then.
+>
+> When the URL arrives, run `git remote add origin <url>` and `git push -u origin main`, and ask H16 then.
+
 This is the **only** commit in the flow that stages everything with `git add -A`, and the only one that is deliberately not scoped to a single step — it is the "commit the whole starter once" boundary. Every commit after it stages specific paths.
+
+> **Skip this block until a remote exists** — if H2 was deferred there is nothing to authorise yet. Commit
+> at every checkpoint locally in the meantime, and ask this the moment `git remote add` runs.
 
 > **YOUR TURN — H16: authorise pushes to your new repo (once)**
 > (the agent cannot decide this: pushing is outward-facing, so it needs your go-ahead — but it should need it *once*, not at every checkpoint)
@@ -456,7 +511,7 @@ Cover:
 5. **Build sequence** — Critical Rule 4 order: Tables → Env Vars → Flows → Power Apps → Power Pages Code Site
 6. **Open questions** from `SOLUTION-SPEC.md` §11 that could change the shape of the build
 
-> **Power Apps — the app record must exist before the first deploy.** `pac code push` does NOT create app records; `pac code init` does, and it has no `--path` flag (run it from inside the folder). This is handoff **H6** at 8.6.
+> **Power Apps — the app record must exist before the first deploy.** `pac code push` does NOT create app records; `pac code init` does, and it has no `--path` flag (run it from inside the folder). The **agent** runs it at 8.6, under the 8.2 deploy authorisation.
 
 > **Cloud Flows — connection references** are shared, environment-level resources. Use the named SMKB connection-reference bank documented in the [Flows README](SMKB%20-%20Power%20Automate%20Flows%20Starter/README.md); only fall back to the export/unpack lookup (CLAUDE.md → "Connection References") if a needed connector is not already in the bank. Do NOT create a new connection reference per solution.
 
@@ -539,13 +594,22 @@ This restart is survivable because `SOLUTION-SPEC.md` and the approved plan are 
 
 ## 6.4 Install dependencies
 
-> **YOUR TURN — H3: install the toolchains**
-> (the agent cannot do this: `install` is blocked in agent settings)
->  1. For the Power Apps starter: `cd "SMKB - [Your App Name] - Power App"` then `pnpm install`
->  2. For the Code Site: `cd "SMKB - [Your Site Name] - Power Pages Code Site"` then `npm install`
->     (a flat project — no `client/` subfolder)
-> **Then:** say "done".
-> **Agent verifies:** `node_modules` exists in each, and `npm run lint` executes.
+**Agent work — this is not a handoff.** Run both installs for the activated starters:
+
+```powershell
+Push-Location "SMKB - [Your App Name] - Power App";              pnpm install; Pop-Location
+Push-Location "SMKB - [Your Site Name] - Power Pages Code Site"; npm install;  Pop-Location
+```
+
+Then verify: `node_modules` exists in each, and `npm run lint` / `pnpm run lint` executes.
+
+> **This used to be handoff H3, on the stated grounds that "`install` is blocked in agent settings". That
+> was not true** — [`.claude/settings.json`](.claude/settings.json) lists `Bash(pnpm install)`,
+> `Bash(npm install)`, `PowerShell(pnpm install)` and `PowerShell(npm install)` in the **allow** array,
+> and no install of any kind appears in the nine-entry `deny` array. The cost of the stale reason was
+> real: it handed the developer two `cd` + install commands they did not need to run, in folders whose
+> names had **just** changed, immediately after being made to restart. Reported from a real run.
+> See rule 3 under "Guided handoffs" — a handoff's reason must be checkable.
 
 Only activated starters with a `package.json` need this — skip Tables, Env Vars and Flows. The lint gate calls each starter's local ESLint, which needs `node_modules`.
 
@@ -703,14 +767,24 @@ powershell -ExecutionPolicy Bypass -File "SMKB - [Solution Name] - Cloud Flows\d
 
 ## 8.6 Power Apps *(skip if not activated)*
 
-> **YOUR TURN — H6: create the app record** *(first time only)*
-> (the agent cannot do this: it must run locally before the first push)
->  1. `Push-Location ".\SMKB - [Component Name] - Power App"`
->  2. Delete `power.config.json` first if it already exists
->  3. `pac code init --environment "https://org229c958d.crm4.dynamics.com/" --displayName "SMKB - [Component Name] - Dev"`
->  4. `Pop-Location`
-> **Then:** say "done".
-> **Agent verifies:** `power.config.json` exists. `appId` will be `null` — expected; it is populated on the first push. The agent then re-runs `apply-config.ps1` so the display name and environment stay in sync.
+**Agent work — create the app record first** *(first time only)*. `pac code push` does **not** create app records; `pac code init` does, and it has no `--path` flag, so run it from inside the folder:
+
+```powershell
+Push-Location "SMKB - [Component Name] - Power App"
+# Delete power.config.json first if it already exists, so init starts clean
+pac code init --environment "https://org229c958d.crm4.dynamics.com/" --displayName "SMKB - [Component Name] - Dev"
+Pop-Location
+```
+
+Then verify: `power.config.json` exists. `appId` will be `null` — expected; it is populated on the first push. Re-run `apply-config.ps1` afterwards so the display name and environment stay in sync.
+
+> **This used to be handoff H6, whose reason was *"it must run locally before the first push"*.** That
+> says *when* the command must run, never why the **agent** could not run it — and `pac code init` is
+> non-interactive and is **not** in [`.claude/settings.json`](.claude/settings.json)'s `deny` array
+> (`Bash(pac code push*)` is; `init` is not). Creating the app record does mutate the shared Dev
+> environment, but that is already covered by the **8.2 / H5** deploy authorisation, which precedes this
+> step. Found by auditing every handoff's stated reason after H3 turned out to be wrong — see rule 3
+> under "Guided handoffs".
 
 ```powershell
 Push-Location "SMKB - [Component Name] - Power App"
@@ -794,7 +868,7 @@ Stage whichever of these the solution activated:
 
 | File | Holds | Written by |
 |---|---|---|
-| `SMKB - [Name] - Power App/power.config.json` | `appId`, `environmentId` | `pac code init` (H6) + the first push |
+| `SMKB - [Name] - Power App/power.config.json` | `appId`, `environmentId` | `pac code init` (8.6) + the first push |
 | `SMKB - [Name] - Power App/src/generated/` | connector models + services | the Code Apps generator |
 | `SMKB - [Name] - Cloud Flows/Workflows/*.json` + `Other/Customizations.xml` + `Other/Solution.xml` | the **workflow GUIDs** — the same GUID in all three files (the three-file rule) | authored, then confirmed against the imported solution |
 | `SMKB - [Name] - Power Pages Code Site/src/config/flows.ts` | each flow's **trigger GUID** | `/ppcs-register-flow` (8.7) |

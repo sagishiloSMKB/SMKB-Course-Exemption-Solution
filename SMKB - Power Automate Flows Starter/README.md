@@ -112,7 +112,7 @@ To find logical names from an existing working solution:
 ```powershell
 pac solution export --name <AnExistingSolutionWithFlows> --path .\inspect.zip --environment "https://org229c958d.crm4.dynamics.com/" --overwrite
 pac solution unpack --zipFile .\inspect.zip --folder .\inspect_unpacked
-# ⚠️ There is NO connectionreferences/ folder — logical names are inside flow JSON files:
+# WARNING: There is NO connectionreferences/ folder - logical names are inside flow JSON files:
 Get-ChildItem .\inspect_unpacked\Workflows -Filter "*.json" | ForEach-Object {
     $j = Get-Content $_.FullName | ConvertFrom-Json
     $j.properties.connectionReferences.PSObject.Properties | ForEach-Object {
@@ -787,7 +787,7 @@ After running `pnpm pa add-flow`, `power.config.json` stores both under `workflo
 ## Useful PAC CLI Commands
 
 ```powershell
-# Add an existing (already-in-Dataverse) flow to a solution — one-time operation
+# Add an existing (already-in-Dataverse) flow to a solution - one-time operation
 pac solution add-solution-component `
     --environment "https://org229c958d.crm4.dynamics.com/" `
     --solutionUniqueName <SolutionUniqueName> `

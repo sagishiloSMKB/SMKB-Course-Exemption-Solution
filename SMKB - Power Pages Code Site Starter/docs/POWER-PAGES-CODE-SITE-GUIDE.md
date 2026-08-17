@@ -52,7 +52,7 @@
 ### Install
 
 ```powershell
-# 1. Node.js LTS — https://nodejs.org
+# 1. Node.js LTS - https://nodejs.org
 winget install OpenJS.NodeJS.LTS
 
 # 2. Power Platform CLI
@@ -62,9 +62,9 @@ pac --version   # must show 1.44.x or later
 
 # 3. VS Code + Power Platform Tools extension
 # Marketplace: https://marketplace.visualstudio.com/items?itemName=microsoft-IsvExpTools.powerplatform-vscode
-# Install ONE of these — NOT both:
+# Install ONE of these - NOT both:
 #   "Power Platform Tools"  (stable)
-#   "Power Platform Tools [PREVIEW]"  ← do not mix
+#   "Power Platform Tools [PREVIEW]"  <- do not mix
 ```
 
 ### Unblock JavaScript uploads in Dataverse (one-time per environment)
@@ -77,7 +77,7 @@ Power Platform Admin Center → Environment → Settings → Product → Privacy
 # Interactive (developer machine)
 pac auth create --environment "https://org229c958d.crm4.dynamics.com/"
 
-# Service Principal (CI/CD — preferred)
+# Service Principal (CI/CD - preferred)
 pac auth create `
   --environment "https://org229c958d.crm4.dynamics.com/" `
   --applicationId "<app-id>" `
@@ -889,12 +889,12 @@ pac pages download --path "./.powerpages-site" --webSiteId "<GUID>" --modelVersi
 
 # 2. Delete the record in the source environment (Portal Management App or Design Studio)
 
-# 3. Download again — deletion is recorded in manifest.yml
+# 3. Download again - deletion is recorded in manifest.yml
 pac pages download --path "./.powerpages-site" --webSiteId "<GUID>" --modelVersion 2 --overwrite
 
 # 4. Commit manifest.yml
 
-# 5. Upload to target — deletion is applied
+# 5. Upload to target - deletion is applied
 pac pages upload-code-site --rootPath "."
 ```
 

@@ -86,6 +86,28 @@ expect('no-email-in-defaultvalue', 'good: the org sender is exempt',
   flow({ actions: { Mail: { type: 'OpenApiConnection', inputs: { parameters: { 'emailMessage/From': 'NoReply@smkb.ac.il' } } } } }), {}, 0)
 expect('no-email-in-defaultvalue', 'good: an address mentioned in a description is not a leak',
   flow({ actions: { C: { type: 'Compose', description: 'see dev@smkb.ac.il for help', inputs: 'x' } } }), {}, 0)
+// THE regression, reported from a real solution built on this kit. A Dataverse lookup write is
+// spelled `item/<logical name>@odata.bind` - the documented and only way to do it - and matching
+// against JSON.stringify(inputs) read that KEY as an email address. Critical Rule 6 makes
+// Dataverse relationships the default, so every solution writing a lookup got false findings on
+// its first lint, on the one rule meant to make a real leaked address obvious.
+expect('no-email-in-defaultvalue', 'good: an @odata.bind lookup KEY is not an email',
+  flow({ actions: { Create: { type: 'OpenApiConnection', inputs: { parameters: {
+    entityName: 'smkb_prp_placements',
+    'item/smkb_prp_mentorteacherid@odata.bind': '/smkb_prp_mentors(00000000-0000-0000-0000-000000000001)',
+    'item/smkb_prp_siteid@odata.bind': "@{concat('/smkb_prp_sites(', triggerBody()?['text'], ')')}",
+  } } } } }), {}, 0)
+// A VALUE can carry an annotation too: reading a lookup's bind target out of an earlier action's
+// output puts `smkb_x@odata.bind` inside an expression string.
+expect('no-email-in-defaultvalue', 'good: an annotation inside a value is not an email either',
+  flow({ actions: { C: { type: 'Compose', inputs: "@{body('Get')?['value'][0]['smkb_prp_mentorid@odata.bind']}" } } }), {}, 0)
+// ...but the exemption is by annotation NAME, so a real address at a lookalike domain still fires.
+expect('no-email-in-defaultvalue', 'bad: a real address at odata.com is still reported',
+  flow({ actions: { Mail: { type: 'OpenApiConnection', inputs: { parameters: { 'emailMessage/To': 'ops@odata.com' } } } } }), {}, 1)
+// And a real leak nested deeper than the top level of inputs is still found.
+expect('no-email-in-defaultvalue', 'bad: a leak nested inside an inputs array is still found',
+  flow({ actions: { Mail: { type: 'OpenApiConnection', inputs: { parameters: {
+    'emailMessage/To': ['a@example.org'] } } } } }), {}, 1)
 
 // sharepoint-data-action — Critical Rule 6. Dataverse is the data platform; SharePoint is a declared
 // legacy path. The rule exists because that rule went unwritten and the worked examples drifted to

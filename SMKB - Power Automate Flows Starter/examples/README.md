@@ -75,7 +75,7 @@ logical names documented in the main README:
 |---|---|---|---|
 | `smkb_sol_GetBankList-*.json` | PowerPages | Outlook | **Simplest full flow.** External `Http` GET → `ParseJson` → `Select`/`Query` whitelist + cap → 200 payload. Public (no auth). `Main_Flow` + `Handle_Flow_Error`. Snippet 8. |
 | `smkb_sol_ListMyLoanRequests-*.json` | PowerPages | Outlook, **Dataverse** | **The row-level ownership pattern, end to end.** `ListRecords` to resolve the session from the caller's token, then a second `ListRecords` whose `$filter` scopes to the owner **taken from the session row** — never from the request. Quote-doubling in `$filter`, `$orderby`, and a `$top` cap. Snippets 12 + 15. This is the one to read first. |
-| `smkb_sol_CreateLoanRequest-*.json` | PowerPages | Outlook, **Dataverse** | **`CreateRecord` with `item/` fields** (Snippet 3), with the owner written from the session and the status set server-side. A create is where ownership is easiest to get wrong, because there is no existing row to check against. |
+| `smkb_sol_CreateLoanRequest-*.json` | PowerPages | Outlook, **Dataverse** | **`CreateRecord` with `item/` fields** (Snippet 3), and the **`@odata.bind` lookup write** (Snippet 3a) - the one syntax you cannot guess. The owner is a lookup bound to a record path, with its GUID read back from the session as `_..._value`; status is set server-side. A create is where ownership is easiest to get wrong, because there is no existing row to check against. |
 
 For the patterns these do not cover — `UpdateRecord`, `DeleteRecord`, the Approvals connector, file
 attachments, the PowerAppV2 trigger, Key Vault secret reads, Turnstile — see:

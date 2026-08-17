@@ -206,7 +206,7 @@ Never run a deploy without confirming the auth target. If the wrong profile is a
   lose them, and nothing that *acts* on the architecture (config flags, folder renames, installs) may run
   before the Phase 5 approval.
 - Every manual step is a **guided handoff**: give the exact path, then **verify the outcome** rather than
-  trusting "done". `INIT_PROJECT.md` indexes all of them as `H1`–`H16`.
+  trusting "done". `INIT_PROJECT.md` indexes all of them as `H1`–`H16` (H3 and H6 are deliberately absent - they proved not to be handoffs; numbers are never reused or renumbered).
 - The git remote removal (Phase 3.1) is mandatory — never push before it.
 
 **This is a one-time operation.** Once Init Project has been completed and the remote points to the new solution repo, this command will not be triggered again in future sessions.

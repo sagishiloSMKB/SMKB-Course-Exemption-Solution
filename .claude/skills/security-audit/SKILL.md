@@ -59,7 +59,7 @@ anything risky or behavior-changing, tagging runtime changes **[needs deploy]**.
    controls you confirmed, so a reader can see what was checked and passed, not only what failed.
 4. **Apply only low-risk fixes** and verify locally:
    ```powershell
-   pnpm run build   # or npx vue-tsc --noEmit — must exit 0 for any SPA touched
+   pnpm run build   # or npx vue-tsc --noEmit - must exit 0 for any SPA touched
    node "<component>/tools/flow-lint/lint.mjs"   # if flows
    ```
    Tag any fix that only takes effect after a redeploy **[needs deploy]**. Leave risky/behavior-changing

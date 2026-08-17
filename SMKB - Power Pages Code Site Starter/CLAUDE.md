@@ -430,10 +430,35 @@ import './assets/main.css'                       // app overrides — load last
 ### Toast
 ```typescript
 const toast = useSmkbToast()
-toast.add({ message: 'Done!', variant: 'success', duration: 3000 })
-toast.add({ message: 'Error!', variant: 'danger', closable: true })
+
+// Convenience helpers — first argument is a TITLE STRING, not an options object.
+toast.success('Done!', { duration: 3000 })
+toast.error('Something went wrong.')
+toast.warning('Check this.')
+toast.info('FYI.')
+
+// Full control — `push` takes SmkbToastOptions and returns the toast id.
+const id = toast.push({ title: 'Saved.', description: 'Your changes are live.', variant: 'success', duration: 0, closable: true })
+toast.dismiss(id)   // also: toast.clear(), toast.toasts (readonly)
 ```
+
+`variant` is `'default' | 'success' | 'error' | 'warning' | 'info'`. **There is no `'danger'`** — that is
+`SmkbButton`'s variant name, which is where the confusion comes from. `duration: 0` means persistent.
+
 `SmkbLayout` renders `SmkbToast` automatically — no need to add it manually.
+
+> **This snippet was wrong in three ways and cost a real build cycle.** It documented
+> `toast.add({ message, variant, duration })`: there is no `add` (it is `push`), the first argument of the
+> helpers is a `title` string rather than an options object with `message`, and `variant: 'danger'` is not
+> in the union. Copying it failed `vue-tsc` with TS2339.
+>
+> **The authority is the type, not this file.** `useSmkbToast`'s real surface is
+> `{ toasts, push, dismiss, clear, success, error, warning, info }`, declared in
+> `node_modules/@smkbacil/design-ui/dist/composables/useSmkbToast.d.ts` (options in
+> `dist/types/common.d.ts`). Read it when in doubt. Note that `SMKB-UI.md` is auto-generated but covers
+> **components and tokens only** — it does not document composables, so it cannot serve as the reference
+> here. Because this starter type-checks (`npm run build` runs `vue-tsc`), drift like this fails the build;
+> in a plain-JS project the same snippet would have shipped.
 
 ### Theme and direction
 Both managed automatically by `SmkbAppHeader`. Use CSS tokens in styles so they react:

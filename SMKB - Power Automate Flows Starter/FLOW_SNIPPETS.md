@@ -113,6 +113,35 @@ Replace `shared_commondataserviceforapps_[yourlocalkey]` with the **local key** 
 
 > **Auto-number fields:** If `sol_name` is an auto-number column, pass `" "` (a single space) as the value. Power Platform ignores the value and generates the auto-number, but the field must be present to avoid a validation error.
 
+### 3a. Lookups: `@odata.bind`, not a plain value
+
+**A lookup column is not set like a normal field.** Writing the GUID into `item/<logical name>` fails — you bind it to a *record path*, and the key carries an `@odata.bind` suffix:
+
+```json
+"parameters": {
+  "entityName": "sol_example_items",
+  "item/sol_name": " ",
+  "item/sol_ownerid@odata.bind": "/sol_users(11111111-2222-3333-4444-555555555555)",
+  "item/sol_siteid@odata.bind": "@{concat('/sol_sites(', triggerBody()?['text_1'], ')')}"
+}
+```
+
+Three things that are each easy to get wrong:
+
+| | |
+|---|---|
+| **The path is the plural *entity set* name**, not the table's schema name — `/sol_sites(<guid>)`, matching `entityName`. |
+| **Reading a lookup back gives a different key.** `ListRecords` returns the GUID as `_<logical name>_value` — `first(body('Get')?['value'])?['_sol_ownerid_value']`. Reading `['sol_ownerid']` yields null, silently. |
+| **Clearing a lookup** means passing `null` to the same `@odata.bind` key. |
+
+So a round trip is asymmetric — read `_x_value`, write `x@odata.bind`:
+
+```
+"item/sol_ownerid@odata.bind": "@{concat('/sol_users(', first(body('Get_Auth_Session')?['value'])?['_sol_userid_value'], ')')}"
+```
+
+> **flow-lint used to report these as leaked email addresses.** `item/sol_ownerid@odata.bind` is "text, an `@`, then dot-suffixed text", which is also the shape of an address, and the rule matched against the serialized inputs — keys included. It now inspects values only and exempts the OData annotations by name. Noted because the false positive landed on `no-email-in-defaultvalue`, whose whole job is to make a *real* leaked address stand out; if you see it fire on a bind key, the rule has regressed.
+
 ---
 
 ## 4. SendEmailV2 — Office 365 Outlook

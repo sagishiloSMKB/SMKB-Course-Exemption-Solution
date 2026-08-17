@@ -272,7 +272,7 @@
             },
             "Create_Loan_Request": {
               "type": "OpenApiConnection",
-              "description": "Owner AND display name come from the session, never the request - a caller who could set borrowerid would create rows owned by someone else. Status is server-set so the caller cannot self-approve. Optional inputs coalesce to '' (Dataverse rejects null).",
+              "description": "Owner and name come from the session, never the request. The owner is a LOOKUP: written as item/<name>@odata.bind bound to a record path, read back as _smkb_sol_userid_value - see FLOW_SNIPPETS.md 3a. Status is server-set so the caller cannot self-approve.",
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps",
@@ -282,7 +282,7 @@
                 "parameters": {
                   "entityName": "smkb_sol_loanrequests",
                   "item/smkb_name": "@first(body('Get_Auth_Session')?['value'])?['smkb_sol_displayname']",
-                  "item/smkb_sol_borrowerid": "@first(body('Get_Auth_Session')?['value'])?['smkb_sol_userid']",
+                  "item/smkb_sol_BorrowerId@odata.bind": "@{concat('/smkb_sol_borrowers(', first(body('Get_Auth_Session')?['value'])?['_smkb_sol_userid_value'], ')')}",
                   "item/smkb_sol_activitytype": "@triggerBody()?['text_4']",
                   "item/smkb_sol_coursename": "@triggerBody()?['text_5']",
                   "item/smkb_sol_faculty": "@coalesce(triggerBody()?['text_2'], '')",

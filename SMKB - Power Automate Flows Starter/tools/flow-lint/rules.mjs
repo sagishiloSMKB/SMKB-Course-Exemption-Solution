@@ -47,6 +47,10 @@ const triggers = (json) => def(json).triggers ?? {}
 const connRefs = (json) => json?.properties?.connectionReferences ?? {}
 
 const EMAIL_RE = /[^@\s"]+@[^@\s"]+\.[a-z]{2,}/i
+// OData annotations look like email addresses to EMAIL_RE: `item/smkb_x@odata.bind` is
+// "something, an @, then dot-suffixed text". Enumerated by NAME rather than matching any
+// `@odata.` so that a genuine address at a domain such as `odata.com` is still reported.
+const ODATA_ANNOTATION_RE = /@odata\.(bind|type|etag|id|context|count|nextLink|deltaLink|associationLink|navigationLink|mediaReadLink|mediaEditLink|mediaContentType|editLink|readLink)\b/i
 // Keep this list in step with the $placeholders array in the Flows starter's deploy.ps1 - that
 // is the no-Node backstop for exactly the same invariant. It listed BOTH all-zero sentinels
 // while this one listed only ...0001, so the second shipped example flow (and its
@@ -147,11 +151,35 @@ export const rules = [
       // invisible here. Scoped to inputs so a description mentioning an address is not a
       // finding, and the org sender is exempt - flagging it would make this rule red on every
       // correct shipped skeleton, which is worse than not having it.
+      //
+      // VALUES only, never keys. This used to match against JSON.stringify(n.inputs), which
+      // includes the KEYS - and a Dataverse lookup write is spelled
+      // `item/<logical name>@odata.bind`, which EMAIL_RE reads as an address because there is an
+      // `@` with dot-suffixed text after it. Since Critical Rule 6 makes Dataverse relationships
+      // the default, EVERY solution that writes a lookup hit two false findings on its first lint
+      // - on the very rule whose job is to make a real leaked address stand out. Reported from a
+      // real solution built on this kit. An email leak is a value, so only values are inspected.
+      const values = []
+      const collect = (n) => {
+        if (n === null || n === undefined) return
+        if (Array.isArray(n)) { for (const v of n) collect(v); return }
+        if (typeof n === 'object') { for (const v of Object.values(n)) collect(v); return }
+        if (typeof n === 'string') values.push(n)
+      }
       walk(def(flow.json), (n, p) => {
         if (Array.isArray(n) || !n.inputs || typeof n.inputs !== 'object') return
-        for (const m of JSON.stringify(n.inputs).matchAll(new RegExp(EMAIL_RE.source, 'gi'))) {
-          if (ORG_SENDER_RE.test(m[0])) continue
-          out.push({ location: `${p}.inputs`, message: `hardcoded email "${m[0]}" in an action input - use an environment variable` })
+        values.length = 0
+        collect(n.inputs)
+        for (const v of values) {
+          for (const m of v.matchAll(new RegExp(EMAIL_RE.source, 'gi'))) {
+            if (ORG_SENDER_RE.test(m[0])) continue
+            // A value can legitimately carry an OData annotation too - reading a lookup's bind
+            // target out of an earlier action's output puts `smkb_x@odata.bind` inside an
+            // expression string. Exempt the known annotations by name rather than any `@odata.`,
+            // so a real address at a domain like `odata.com` is still reported.
+            if (ODATA_ANNOTATION_RE.test(m[0])) continue
+            out.push({ location: `${p}.inputs`, message: `hardcoded email "${m[0]}" in an action input - use an environment variable` })
+          }
         }
       })
       return out

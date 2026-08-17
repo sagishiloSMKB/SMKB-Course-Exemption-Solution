@@ -14,9 +14,9 @@ A **flow-based (UI-only)** Power Apps Code App starter: Vue 3 + Vite + TypeScrip
 
 ```powershell
 pnpm install          # Install deps. No credential needed - design-ui is vendored under vendor/.
-pnpm dev              # Dev server — "../generated" barrel is aliased to an in-memory mock automatically
-pnpm build            # vue-tsc type check + Vite build → dist/
-pnpm lint             # ESLint — bans fetch/XHR/WebSocket & v-html; no stray console.log
+pnpm dev              # Dev server - "../generated" barrel is aliased to an in-memory mock automatically
+pnpm build            # vue-tsc type check + Vite build -> dist/
+pnpm lint             # ESLint - bans fetch/XHR/WebSocket & v-html; no stray console.log
 pnpm test             # Vitest - src/**/*.spec.ts; node env, jsdom for composables/*.spec.ts + *.dom.spec.ts
 pnpm pa <cmd>         # npm-based Power Apps CLI (e.g. pnpm pa add-flow, pnpm pa push)
 powershell -ExecutionPolicy Bypass -File deploy.ps1   # placeholder + env guard + lint + test + build + pnpm pa push

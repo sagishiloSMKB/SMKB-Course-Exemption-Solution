@@ -26,6 +26,7 @@
       "Bash(pnpm --version)",
       "Bash(pnpm run*)",
       "Bash(pnpm install)",
+      "Bash(npm install)",
       "Bash(pnpm exec*)",
 
       "Bash(pac --version)",
@@ -76,6 +77,7 @@
       "PowerShell(pnpm --version)",
       "PowerShell(pnpm run*)",
       "PowerShell(pnpm install)",
+      "PowerShell(npm install)",
 
       "PowerShell(pac --version)",
       "PowerShell(pac auth list)",

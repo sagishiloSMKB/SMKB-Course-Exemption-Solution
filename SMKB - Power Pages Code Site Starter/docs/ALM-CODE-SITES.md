@@ -74,10 +74,10 @@ pac pages upload-code-site --rootPath .
 ### Authenticate to a Specific Environment
 
 ```powershell
-# Interactive (browser login) — for local developer machines
+# Interactive (browser login) - for local developer machines
 pac auth create --environment "https://<org>.crm4.dynamics.com/"
 
-# Service principal — for CI/CD (no browser)
+# Service principal - for CI/CD (no browser)
 pac auth create \
   --environment    "https://<org>.crm4.dynamics.com/" \
   --applicationId  "<client-id>" \

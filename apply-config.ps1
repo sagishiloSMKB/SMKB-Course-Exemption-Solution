@@ -652,4 +652,13 @@ if ($targetUrl -ne 'https://org229c958d.crm4.dynamics.com/') {
 }
 Write-Host ""
 if ($DryRun) { Write-Host "Dry run complete - no files changed." -ForegroundColor Cyan }
-else { Write-Host "Apply complete - $($script:writes) file(s) updated. Review 'git diff', then continue with each starter's deploy steps." -ForegroundColor Cyan }
+else {
+    Write-Host "Apply complete - $($script:writes) file(s) updated. Review 'git diff', then COMMIT this state (Init Project 6.2a) before the 6.3 restart." -ForegroundColor Cyan
+    # Says "commit" rather than the old "continue with each starter's deploy steps", which read as an
+    # invitation to commit while the placeholder gates made that impossible: applying the config stages
+    # the flow JSONs for the first time, which is what makes the pre-commit hook dispatch flow-lint at
+    # them, and its placeholder rules then failed on every scaffold Phase 7 had not yet replaced. A
+    # developer trying to be careful hit a red gate with no way to tell whether they had broken
+    # something - and the tempting wrong move, --no-verify, defeats Critical Rule 2. flow-lint now runs
+    # with --pre-commit from the hook, so this state IS committable; 6.2a is the checkpoint for it.
+}
