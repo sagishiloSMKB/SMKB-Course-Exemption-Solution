@@ -139,6 +139,26 @@ jobs:
       # Gated on an INITIALIZED solution, exactly like .githooks/pre-commit: while the repo is still
       # the uninitialized template, the example flows carry starter placeholders ON PURPOSE and
       # flow-lint (correctly) errors on them. deploy.ps1 is the placeholder gate for a real solution.
+      #
+      # --- LOCAL PATCH (2026-08-26) - deliberate divergence from the starter kit -----------------
+      # As shipped, this step goes RED on the Phase 3.4 baseline push of every solution:
+      #   1. Its only activation test was `[ -z "$lint" ]` - "the checker file is missing". But
+      #      Critical Rule 1 requires a NON-activated starter to stay pristine and PRESENT until
+      #      the Phase 9 cleanup deletes it, so the file is always there and the test never fires.
+      #      The `activate` flags in solution.config.json were never consulted at all.
+      #   2. lint.mjs:87 is `flowsActivated = flowsDirArg ? true : flowsFound.activated`, so
+      #      passing the Workflows path - which this step does deliberately - HARDCODES
+      #      activated=true and defeats lint.mjs's own activation logic (that logic still works
+      #      for Env Vars and Tables, which is why only Cloud Flows was scanned).
+      # Net effect: 11 placeholder errors against a pristine template nobody had edited.
+      #
+      # The fix below extends the activation gate lint.mjs already applies at its lines 172-192.
+      # It is a NO-OP once Cloud Flows is activated: the flag flips true, the check falls through,
+      # and the full lint runs with every rule, placeholder gates included. No rule is ever muted.
+      # NOTE: expect CI to go red again at Init Project 6.2a if the example flows still carry
+      # placeholders when the starter is activated - that is correct signal, not this bug.
+      # See STARTER_AGENT_FEEDBACK_AND_NOTES.md - "CI flow-lint ignores the activation flags".
+      # ------------------------------------------------------------------------------------------
       - name: Run flow-lint
         shell: bash
         run: |
@@ -150,9 +170,20 @@ jobs:
             echo "Skipping flow-lint."
             exit 0
           fi
+          # LOCAL PATCH: read the ACTUAL activation flag rather than inferring it from a file's
+          # presence. This is the same source of truth apply-config.ps1 gates every write on.
+          # Defaults to false if the config is missing or malformed, so a bad config skips rather
+          # than false-fails. Loud, not silent - a skipped gate that says nothing reads as a pass.
+          activated=$(node -p "!!(require('./solution.config.json').activate||{}).powerAutomateFlows" 2>/dev/null || echo false)
+          if [ "$activated" != "true" ]; then
+            echo "Cloud Flows starter is not activated (activate.powerAutomateFlows=false) - skipping flow-lint."
+            exit 0
+          fi
           lint=$(find . -path '*/tools/flow-lint/lint.mjs' -not -path '*/node_modules/*' | head -1)
           if [ -z "$lint" ]; then
-            echo "No flow-lint checker found (Cloud Flows starter not activated) — skipping."
+            # With a real activation gate above, a missing checker can now only mean the cleanup
+            # audit deleted the folder. The old wording ("not activated") would be misleading here.
+            echo "No flow-lint checker found (starter removed by the cleanup audit) - skipping."
             exit 0
           fi
           # Pass the Workflows folder explicitly (same as deploy.ps1 / the pre-commit hook) so the

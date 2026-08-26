@@ -10,6 +10,91 @@ during initialization should be logged here so the starter kit can be improved.
 
 <!-- Agents: add your entries below this line, newest first -->
 
+## [2026-08-26] — Course Exemption (Phase 3.4): CI flow-lint ignores the activation flags and fails every baseline push
+
+> ### ⚠️ READ THIS AT INIT PROJECT 6.2a
+> **Expect CI to go red again at 6.2a, and do not re-diagnose it as this bug.** When Cloud Flows is
+> activated at Phase 6, the patch below becomes a no-op by design and the full lint runs - including the
+> placeholder gates. If the example flow skeletons still carry `smkb_sol_` / `[REPLACE]` at that moment,
+> CI **correctly** goes red. That is real signal about an activated starter, not a repeat of this defect.
+> The fix is Phase 7: author the real flows and remove the example skeletons. **A red CI at 6.2a is
+> expected; a red CI at 3.4 was the bug.**
+
+### Issue / Observation
+The `flow-lint` CI job fails on the Phase 3.4 baseline push with **11 errors** (`no-placeholders`,
+`xml-no-placeholders`) against the **pristine, never-edited** Power Automate Flows starter - while
+`activate.powerAutomateFlows` is `false` and Critical Rule 1 requires that starter to be left untouched.
+
+This is not a tolerable quirk. [`INIT_PROJECT.md:326`](INIT_PROJECT.md) states H2's verification as
+*"...and **the first CI run after 3.4 is green**"*, and `INIT_PROJECT.md:343` calls the baseline commit
+*"proof the remote, CI and credential all work"*. **It is a stated success criterion the kit cannot
+currently meet.** No doc anywhere describes a red baseline as expected; searched every `.md`.
+
+**The four-link chain:**
+
+| # | Where | What happens |
+|---|---|---|
+| 1 | `scripts/is-initialized.mjs` | Reads **only** the three identity sentinels (`solutionUniqueName`, `solutionDisplayName`, `shortPrefix`). It never consults `activate`. So INITIALIZED flips at **Phase 2.2**, six phases before activation. |
+| 2 | `.github/workflows/ci.yml:148` | Skips only when NOT initialized - so it runs. |
+| 3 | `.github/workflows/ci.yml:154` | The **only** activation test is `[ -z "$lint" ]`, i.e. "the checker file is missing". But a non-activated starter stays **pristine and PRESENT** until the Phase 9 cleanup deletes it, so the file is always there and this never fires. The `activate` flags are never read. |
+| 4 | `ci.yml:160-162` -> `lint.mjs:87` | CI passes the Workflows path deliberately ("so the run never depends on folder-name auto-discovery"). But `lint.mjs:87` is `flowsActivated = flowsDirArg ? true : flowsFound.activated` - **passing a path hardcodes activated=true**, defeating lint.mjs's own gate. |
+
+Link 4 explains the tell-tale asymmetry in the output: Env Vars and Tables resolve through `findDir()`
+and correctly print *"not activated - still template-named"*, while Cloud Flows is scanned. Only the
+starter whose path was passed loses its activation check.
+
+### The fix already existed and was not propagated
+[`.githooks/pre-commit:76-81`](.githooks/pre-commit) documents this **identical** failure, down to the
+count:
+
+> *"Without it, the whole Init Project build phase was uncommittable: INITIALIZED flips at Phase 2.2,
+> lint.mjs scans the whole Workflows folder, and the still-untouched example skeletons plus
+> `Other/*.xml` then rejected any commit that staged a flow - **11 errors**, 9 from files the developer
+> never staged."*
+
+It was fixed **for commits only**, via `--pre-commit` at line 94. CI never received an equivalent, and
+the two gates drifted. Same defect, two runners, one fixed.
+
+### Reproduction — universal, not specific to this solution
+Every solution built from this kit hits it. Phase 2.2 sets identity (-> INITIALIZED), activation is not
+until Phase 6, and 3.4 mandates a baseline push in between. **If Cloud Flows is never activated, CI stays
+red from Phase 2.2 until Phase 9 deletes the folder.** Locally:
+
+```
+node "<Flows>/tools/flow-lint/lint.mjs" "<Flows>/Workflows"                # 11 errors, exit 1
+node "<Flows>/tools/flow-lint/lint.mjs" --pre-commit "<Flows>/Workflows"   # clean, exit 0
+```
+
+### Resolution
+**Patched our copy locally rather than waiting for upstream.** `.github/workflows/ci.yml` now reads
+`activate.powerAutomateFlows` from `solution.config.json` and skips (loudly) when false. It carries a
+`LOCAL PATCH` comment block citing both links and pointing back to this note, so an upstream sync can
+recognise it as deliberate divergence rather than drift. **Not fixed upstream.**
+
+Chose the activation gate over `--pre-commit` deliberately: `--pre-commit` would have gone green too, but
+it **permanently mutes both placeholder rules in CI**, including after activation. The activation gate is
+a strict no-op the moment the flag flips true, so it changes nothing about a real solution's CI.
+
+### Suggested improvement
+1. **`ci.yml`: gate on the flag, not on file presence** - the fix applied here. It extends the pattern
+   `lint.mjs:172-192` already implements for Env Vars and Tables, whose comment describes this very bug:
+   *"a starter that was NOT activated was scanned anyway ... blocked by `xml-no-placeholders` firing on a
+   pristine template it is required by Critical Rule 1 to leave untouched."* The one path that bypassed
+   that gate was the one CI uses.
+2. **Alternatively (or additionally) fix `lint.mjs:87`** so an explicit `flowsDirArg` no longer implies
+   activation - resolve activation from the folder name regardless of how the path arrived. That would fix
+   CI, `deploy.ps1`, and any future caller **without** touching the workflow, and is the better single fix
+   upstream. The two are independent; either closes the hole.
+3. **Do NOT put `--pre-commit` in CI** as the upstream remedy, for the muting reason above.
+4. **Make `is-initialized.mjs` the wrong predicate for this decision, and say so.** "Identity is filled"
+   and "this starter is activated" are different questions six phases apart. Every gate that means the
+   latter should read `activate`, not INITIALIZED.
+5. **`INIT_PROJECT.md:326` should not promise a green first CI run** until the above is fixed - or should
+   state which jobs are expected to skip at baseline. A verification step that cannot pass trains agents
+   and developers to ignore CI, which is worse than having no criterion.
+
+---
+
 ## [2026-08-26] — Course Exemption (Phase 3.3): repo created under a personal account, transfer pending
 
 > **THIS IS A LIVE DECISION RECORD, NOT A CLOSED FINDING.** The transfer below has **not** happened yet.
