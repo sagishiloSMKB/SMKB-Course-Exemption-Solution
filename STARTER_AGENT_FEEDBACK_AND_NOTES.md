@@ -10,6 +10,95 @@ during initialization should be logged here so the starter kit can be improved.
 
 <!-- Agents: add your entries below this line, newest first -->
 
+## [2026-08-26] — Course Exemption (Phase 3.5): toolchain probes test existence, not executability — hooks block every commit
+
+### Issue / Observation
+Enabling the git hooks at Phase 3.5 (`git config core.hooksPath .githooks`) made **every commit in the
+repository fail**.
+
+`.githooks/pre-commit:116` selects the interpreter with `command -v powershell`, which proves the file is
+on PATH but **not that it can be executed**. On this machine Windows PowerShell is present at
+`C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe` and **blocked by Group Policy**. So `PS` was
+set, line 119 died with `Permission denied`, `status=1`, and the hook rejected the commit - for an
+environmental reason with **nothing to do with the change being committed**.
+
+**The graceful-skip branch at line 121 is unreachable on this machine.** The hook's own header promises:
+
+> *"Every step SKIPS GRACEFULLY when its toolchain is not installed, so a fresh clone is never blocked"*
+
+The kit models two states - **absent** or **working**. This machine is a third: **present but not
+runnable**. Every probe in the kit that asks "is the tool there?" instead of "does the tool run?" has
+this hole.
+
+### Third manifestation of one root cause
+The same Group Policy block has now surfaced three times, in three different places, because each caller
+probes differently:
+
+| # | Phase | Symptom |
+|---|---|---|
+| 1 | Phase 1 | The Claude Code **PowerShell tool** fails with `EUNKNOWN: uv_spawn`; `powershell.exe` from Bash gives `Permission denied`. Blocks `apply-config.ps1` (6.2) and every `deploy.ps1` (Phase 8) - **still open** |
+| 2 | Phase 1.2 | The tool check never probes PowerShell at all, so a machine that cannot run the flow reads as fully prepared |
+| 3 | **Phase 3.5** | **This** - the hook's `command -v` probe, blocking every commit |
+
+The shared assumption is that a tool present on disk can be invoked. That holds on almost every machine,
+which is exactly why it survives until it does not.
+
+### Reproduction
+Any machine where `powershell.exe` exists but is policy-blocked. Confirm the block with:
+
+```
+cmd.exe /c powershell -NoProfile -Command "Write-Output ok"
+  -> This program is blocked by group policy.
+```
+
+Then `git config core.hooksPath .githooks` and commit anything - the hook exits 1. Verify directly
+without making a commit:
+
+```
+sh .githooks/pre-commit
+  doc-boundaries: OK
+  template-guards: OK
+  .githooks/pre-commit: line 119: /c/WINDOWS/.../powershell: Permission denied
+  pre-commit: checks failed - fix the issues (or stage the fixes) and re-commit.
+  exit 1
+```
+
+Note both Node gates **pass**; only the PowerShell step fails, and it fails environmentally rather than
+on any real finding.
+
+### Resolution
+**Patched our copy locally.** `.githooks/pre-commit` now probes with a cheap no-op before trusting the
+interpreter, and falls through to the (now loud) skip when it will not run. The real
+`apply-config.ps1 -Check` invocation is byte-identical - only the predicate changed, from *exists* to
+*exists and runs*. The `pwsh` -> `powershell` preference order is preserved, and the two skip reasons are
+distinguished ("is not installed" vs "is present but will not run") so the message states which case it
+is. The patch is **future-neutral**: `ps_runs` is evaluated on every commit, so the moment PowerShell
+becomes runnable the check starts running for real with no further edit, and there is no state in which
+drift detection is permanently muted.
+
+The hook carries a `LOCAL PATCH` comment pointing at this note, matching the marker used in
+`.github/workflows/ci.yml`. **Not fixed upstream.**
+
+### Suggested improvement
+1. **Probe executability, not presence**, wherever the kit selects a tool:
+   ```sh
+   ps_runs() { command -v "$1" >/dev/null 2>&1 && "$1" -NoProfile -Command exit 0 >/dev/null 2>&1; }
+   ```
+   Use `-Command`, **not** `-File`: execution policy governs script *files*, so `-Command` cannot fail
+   for a policy reason that the real `-ExecutionPolicy Bypass -File` call would have survived. That
+   removes the only plausible false negative.
+2. **Audit every other `command -v` in the kit** for the same assumption - this is a pattern bug, not a
+   one-line bug. `command -v node` has it too, though a blocked Node is far less likely.
+3. **Make the skip loud and name the gate.** The original single line
+   (`"PowerShell unavailable — skipping config-drift check"`) is easy to lose in hook output, and a
+   silently skipped gate reads as a pass. This also closes suggestion #3 from the Phase 1 entry below,
+   which flagged the same quietness before we knew it would matter this much.
+4. **Add PowerShell to the Phase 1.2 tool check** (repeat of the Phase 1 entry, reinforced): three
+   separate failures would have been one known prerequisite if the flow probed the interpreter it
+   depends on most.
+
+---
+
 ## [2026-08-26] — Course Exemption (Phase 3.4): CI flow-lint ignores the activation flags and fails every baseline push
 
 > ### ⚠️ READ THIS AT INIT PROJECT 6.2a

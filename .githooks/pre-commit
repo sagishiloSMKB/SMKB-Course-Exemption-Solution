@@ -110,15 +110,39 @@ if command -v node >/dev/null 2>&1 && [ -f "scripts/check-template-guards.mjs" ]
   node "scripts/check-template-guards.mjs" || status=1
 fi
 
+# --- LOCAL PATCH (2026-08-26) - deliberate divergence from the starter kit ------------------
+# `command -v powershell` proves the FILE EXISTS on PATH; it does not prove it RUNS. On this
+# machine Windows PowerShell is present at C:\WINDOWS\System32\... but Group Policy blocks
+# execution, so PS was set, the real call died with "Permission denied", status=1, and EVERY
+# commit in the repo was rejected - for an environmental reason unrelated to the change being
+# committed. The graceful-skip branch below was unreachable.
+# The kit models "absent or working". This machine is a third state: present but not runnable.
+# Probe with a cheap no-op instead, and make the skip LOUD so a missing gate never reads as a
+# pass. See STARTER_AGENT_FEEDBACK_AND_NOTES.md - "toolchain probes test existence, not
+# executability".
+# --------------------------------------------------------------------------------------------
 if [ -f "apply-config.ps1" ]; then
+  # Exists AND executes. `-Command exit 0` touches nothing in the repo and is not subject to
+  # execution policy, so it can only fail for interpreter-level reasons (absent, blocked,
+  # broken install) - never for a real config-drift finding. Drift is still decided solely by
+  # the real invocation below, whose exit code is unchanged.
+  ps_runs() {
+    command -v "$1" >/dev/null 2>&1 || return 1
+    "$1" -NoProfile -Command exit 0 >/dev/null 2>&1
+  }
   PS=""
-  if command -v pwsh >/dev/null 2>&1; then PS=pwsh
-  elif command -v powershell >/dev/null 2>&1; then PS=powershell
+  PS_WHY="is not installed"
+  if ps_runs pwsh; then PS=pwsh
+  elif ps_runs powershell; then PS=powershell
+  elif command -v pwsh >/dev/null 2>&1 || command -v powershell >/dev/null 2>&1; then
+    PS_WHY="is present but will not run (blocked by policy, or a broken install)"
   fi
   if [ -n "$PS" ]; then
     "$PS" -NoProfile -ExecutionPolicy Bypass -File "apply-config.ps1" -Check || status=1
   else
-    echo "pre-commit: PowerShell unavailable — skipping config-drift check"
+    echo "pre-commit: WARNING - PowerShell $PS_WHY."
+    echo "pre-commit: SKIPPING the config-drift check (apply-config.ps1 -Check)."
+    echo "pre-commit: identity drift between solution.config.json and the starters is NOT being caught."
   fi
 fi
 
