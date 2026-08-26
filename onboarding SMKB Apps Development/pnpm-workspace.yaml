@@ -1,3 +1,0 @@
-allowBuilds:
-  '@smkbacil/design-ui': true
-  esbuild: true
