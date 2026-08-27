@@ -1,201 +1,615 @@
-# [SOLUTION NAME] — Solution Specification
+# SMKB - Course Exemption — מפרט הפתרון
 
-> **TEMPLATE.** This ships blank in the starter kit and is filled during **Init Project Phase 4**, before
-> any architecture decision is made. Keep the section structure.
+**סמינר הקיבוצים (SMKB)** · `SMKBCourseExemption` · קידומת `cex` · 2026-08-26
 
-**What this file is:** the durable record of what the solution must do — captured from the developer at the
-start, in their words. It is the **input** artifact.
+---
 
-**What it is not:** the [`docs/`](docs/README.md) set is the **output** artifact, drafted at Phase 12 from
-the solution that was actually built. This file is where that drafting starts, so `docs/` never has to
-reconstruct intent from code.
+> **מהו הקובץ הזה.** התיעוד ה**טכני** של מה שהפתרון צריך לעשות, ואיך הוא בנוי.
+> הוא נכתב בשלב 4 של `INIT_PROJECT.md` והוא ה**קלט** — להבדיל מ-[`docs/`](docs/README.md),
+> שהוא ה**פלט** ונכתב בשלב 12 מתוך מה שנבנה בפועל.
 
-**Why it exists at all:** the specs used to live only in the chat transcript. Init Project **mandates a
-Claude Code restart** the moment starter folders are renamed (Phase 6.3), so a flow that never wrote the
-specs down guaranteed losing them at exactly the point where the most had been decided. Fill this in as the
-answers arrive — not at the end.
+**שלושת מסמכי המקור, ומה כל אחד מהם קובע:**
 
-> **Agent:** this file is yours to write, from the developer's answers. Do not hand them a blank form. Ask
-> in plain language, record what you hear, and mark anything you inferred rather than were told. Where an
-> answer is missing, write it under **Open questions** instead of guessing — an unanswered question is a
-> finding, not a blank to fill.
+| מסמך | מה הוא קובע | סמכות |
+|---|---|---|
+| [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md) | **מה** המוצר עושה — מסכים, הודעות, כללים, חוויית משתמש | סמכות מלאה. מחייב |
+| [`decisions.md`](decisions.md) | **מדוע** נבחרה כל דרך — 19 החלטות עם נימוק והשלכות | סמכות מלאה על כל מה שסותר את `PRODUCT_SPEC.md` |
+| שלושת סקרי ה-starters | **מה אפשרי** — אילוצי הפלטפורמה והדפוסים הקיימים | עובדתי. מגביל את ה"איך", לא את ה"מה" |
+
+**מוסכמות:** עברית; מזהים טכניים ב-`backticks`; תוכן מובנה בטבלאות.
+מה שהוסק ולא נמסר מסומן `[מוסק]`, ובמקרים מהותיים `[מוסק מ-§N]`.
+
+> ### שינוי היקף מהותי — `D-01`
+> **בוטלה ההבחנה בין פונה טרום-הרשמה לסטודנט/ית רשומ/ה.** כל מי שמגיש/ה הוא/היא "מועמד/ת לתוכנית".
+> **הוסרו מההיקף:** `R-07`, `M-05`, `M-09`, `S-P-12`, `J-PRO-01`, `P-2`, וכל מנגנון זיהוי הרשמה.
+> **בנוסף הוסרו:** תפקיד הצבע החמישי "זמני" (`§8.1`), המצב הרביעי ב-`S-P-03`, עמודת "הומר מהערכה"
+> ב-`S-R-01`, פריט ההקשר החמישי ב-`S-R-02`, מסגור טרום-הרשמה ב-`S-P-04`/`S-P-08`, והמונח
+> `הערכה מקדימה` מ-`§2.1`.
+> **הרווח הטכני:** אין עמודת `Kind` בטבלת הבקשות. טבלה אחת, מחזור חיים אחד.
+
+---
+
+## 1. סיכום
+
+| | |
+|---|---|
+| **מה הפתרון עושה** | מאפשר למועמד/ת לתוכנית לימודים ב-SMKB לדווח על לימודים קודמים ותעודות מקצועיות, מציע לבודק/ת אנושי/ת התאמות אפשריות בין הלימודים הקודמים לדרישות התוכנית, ומפיק אישור פטור רשמי המפרט בדיוק מאילו דרישות המועמד/ת פטור/ה |
+| **מי משתמש** | מועמדים (ציבור, ללא זהות מוסדית מוקדמת) · בודקים (סגל אקדמי) · מנהלים (סגל מנהלי-אקדמי) |
+| **למה עכשיו / מה זה מחליף** | התשובה הקודמת לשאלה הייתה "לשלוח מייל למחלקה ולחכות". התהליך היה ידני, איטי, ולא עקבי — אותה התאמה הוכרעה אחרת ביום שלישי ובחמישי (`§1.1`) |
+| **איך נדע שהצליח** | סטודנט/ית יודע/ת תמיד היכן הבקשה עומדת בלי לשאול אף אחד · זמן הבודק/ת מוקדש לשיפוט ולא לחיפוש · שני בודקים מגיעים לאותה החלטה על אותן ראיות · החלטה מהיום ניתנת להסבר בעוד שלוש שנים (`§1.3`) |
+
+**סדר עדיפות כשהמדדים מתנגשים** (`D-14`): מאמץ הבודק/ת → זמן ההמתנה של הסטודנט/ית → עקביות ההחלטות.
+
+---
+
+## 2. משתמשים והרשאות
+
+| קהל | מאומת? | מה מותר לו |
+|---|---|---|
+| **מועמד/ת** (`P-1`, `P-3`) | **OTP מותאם** — קוד חד-פעמי לדוא"ל, ללא סיסמה | ליצור בקשות, לערוך טיוטה, להוסיף מסמכים בכל שלב, לבטל לפני הקצאה, לצפות בתוצאה ולהוריד אישור — **הכול מוגבל לבקשות שלו/ה בלבד** |
+| **בודק/ת** (`P-4`) | Entra — משתמש/ת Dataverse עם תפקיד `CEX - Reviewer` | לראות את התור, לקחת בקשה, להחליט בכל התאמה, לבטל החלטה משלו/ה, לאשר או לדחות בקשה שברשותו/ה |
+| **מנהל/ת** (`P-5`) | Entra — משתמש/ת Dataverse עם תפקיד `CEX - Admin` | כל הרשאות הבודק/ת, ובנוסף: תוכניות ודרישות, כללי התאמה וגרסאות, פתיחה מחדש, החרגת החלטה, ניהול הרשאות צוות ושחרור נעילה בכפייה |
+
+### כלל הבעלות
+
+**מועמד/ת רואה ועורך/ת אך ורק רשומות שהמזהה שלו/ה מופיע עליהן**, והמזהה נלקח **משורת ה-`Session`
+בלבד** — לעולם לא מגוף הבקשה. זהו ה-scaffold של `§15` ב-`FLOW_SNIPPETS.md`, בחמישה צעדים:
+
+1. איתור שורת ה-`Session` לפי ה-`authToken` שהלקוח שלח. אין שורה → `UNAUTHORIZED`
+2. דחיית session שפג — השוואת תפוגה מול `utcNow()` בצד השרת
+3. **פתרון זהות המבצע/ת מתוך שורת ה-`Session`** — הצעד נושא המשקל
+4. סינון כל קריאה וכתיבה לפי הבעלים שנפתר
+5. תשובה `NOT_FOUND` כשרשומה קיימת אך אינה של הפונה — **לעולם לא** `FORBIDDEN`, שמאשר קיום
+
+> **קריטי:** הרשאות טבלה **אינן נאכפות בתוך Cloud Flow**. תפקידי הרשת (`web roles`) קובעים רק
+> **מי רשאי להפעיל** את ה-flow; ברגע שהוא רץ, הוא ניגש ל-Dataverse בהרשאות החיבור שלו.
+> ה-scaffold של `§15` הוא גבול האבטחה היחיד.
+
+**תפקידי האבטחה אינם נפרסים מהמאגר.** `CEX - Reviewer` ו-`CEX - Admin` הם **נתוני סביבה** שנוצרים
+ידנית — הערכה משלחת `<Roles />` ריק. ראו `§9` ואת רשימת פעולות הבעלים.
+
+---
+
+## 3. מודל הנתונים
+
+17 טבלאות. שמות סכימה `smkb_cex_<PascalName>`, שמות תצוגה `CEX - <Name>` (`CLAUDE.md` כלל קריטי 3).
+כל הטבלאות `UserOwned`.
+
+> **אזהרת מימוש.** ה-Tables starter מדגים כעמודה מותאמת **חיה** רק `nvarchar`. `picklist` ו-`datetime`
+> קיימים כדוגמאות **מוערות** בלבד; `ntext`, `int` ו-`bit` קיימים כשורת הסבר בלבד; ל-`decimal`
+> ול-`File` **אין XML בשום מקום**. כל טיפוס שאינו `nvarchar` נכתב כאן בפעם הראשונה.
+> ראו `D-02` ואת המלצת ה-spike.
+
+### קבוצה א' — זהות הפורטל
+
+#### `smkb_cex_Candidate` — CEX - Candidate (מועמד/ת)
+- **מטרה:** זהות הפורטל. נוצרת בכניסה הראשונה, לפני שיש כל קשר מוסדי (`§1.4`)
+- **עמודות:**
+
+| עמודה | טיפוס | חובה | הערות |
+|---|---|---|---|
+| `smkb_name` | `nvarchar(100)` | כן | שם מלא. עמודת השם הראשית |
+| `smkb_cex_Email` | `nvarchar(200)` | כן | מפתח הזהות. ערוץ ה-OTP |
+| `smkb_cex_NationalId` | `nvarchar(20)` | לא | נדרש לאישור (`§12.2`) |
+| `smkb_cex_Status` | `picklist` | כן | `Active` / `Archived` — `Archived` חוסם כניסה |
+
+- **קשרים:** אב ל-`Application`, `Session`, `OtpRequest`
+- **מידע אישי?** כן — שם, דוא"ל, ת"ז
+- **שמירה:** כל עוד קיימת בקשה פעילה או אישור בתוקף (`D-13`)
+
+> **`Contact` או טבלה משלנו? — הוכרע: טבלה משלנו** (`O-1`, 2026-08-27).
+> **במכללה אין CRM לסטודנטים**, ולכן אין רשומת `contact` קיימת להיתלות בה, ואין גם מערכת שתצפה
+> למצוא אחת. בנוסף, מודול ה-OTP המשולח אינו משתמש ב-`contact` של הפורטל כלל — הוא עובד מול טבלת
+> משתמשים וטבלת sessions משלו. שימוש ב-`contact` היה מחייב יצירת רשומת CRM לכל פונה, כולל מי
+> שלא ימשיך, לטובת מערכת שאינה קיימת.
+
+#### `smkb_cex_Session` — CEX - Session (הפעלה)
+- **מטרה:** ה-`authToken` שהשרת הנפיק. **מקור האמת היחיד לזהות המבצע/ת**
+- **עמודות:** `smkb_cex_Token` (`nvarchar(200)`, חובה) · `smkb_cex_CandidateId` (`lookup`, חובה) ·
+  `smkb_cex_ExpiresOn` (`datetime`, חובה) · `smkb_cex_RevokedOn` (`datetime`)
+- **מידע אישי?** עקיף — הטוקן מקשר לזהות
+- **שמירה:** נמחקת בפקיעה. TTL שעה
+- **🔒 חובת בעלים:** הטבלה **מוגבלת לחשבון השירות של ה-flow**, ועמודת הטוקן מחוץ לתצוגות, לחיפוש
+  ולייצוא (`SECURITY-BASELINE.md` שורה 137). זו הבקרה שמדלגים עליה
+
+#### `smkb_cex_OtpRequest` — CEX - OTP Request (בקשת קוד)
+- **עמודות:** `smkb_cex_Email` · `smkb_cex_Code` (`nvarchar(10)`) · `smkb_cex_ExpiresOn` ·
+  `smkb_cex_Attempts` (`int`) · `smkb_cex_ConsumedOn` (`datetime`)
+- **שמירה:** נמחקת בפקיעה או בשימוש
+- **🔒 אותה חובת בעלים כמו `Session`.** הקוד נשמר כפי שהוא — **ל-Power Automate אין ביטוי גיבוב**,
+  וזו מגבלת פלטפורמה מתועדת, לא השמטה
+
+### קבוצה ב' — קטלוג (נתוני ייחוס)
+
+#### `smkb_cex_Programme` — CEX - Programme (תוכנית לימודים)
+- `smkb_name` (`nvarchar`, חובה) · `smkb_cex_Code` (`nvarchar(50)`) · `smkb_cex_Active` (`bit`)
+- לפיילוט: **תוכנית אחת — חינוך מיוחד** (`D-05`)
+- **מידע אישי?** לא · **שמירה:** קבועה
+
+#### `smkb_cex_Requirement` — CEX - Requirement (קורס נדרש)
+- `smkb_name` · `smkb_cex_Code` · `smkb_cex_Credits` (`decimal`) · `smkb_description` (`ntext`) ·
+  `smkb_cex_ProgrammeId` (`lookup`, חובה) · `smkb_cex_Retired` (`bit`)
+- **קשרים:** בן של `Programme`
+- **הערה:** ביטול דרישה **אינו מוחק החלטות שהתקבלו מולה** (`S-A-01`)
+- כ-30–40 שורות לפיילוט (`D-05`)
+
+#### `smkb_cex_CertificateType` — CEX - Certificate Type (סוג תעודה)
+- `smkb_name` · `smkb_cex_IssuingBody` (`nvarchar`) · `smkb_cex_Active` (`bit`)
+- מזין את "בחירת סוג מוכר או תיאור אחר" ב-`S-P-06`
+
+### קבוצה ג' — הבקשה ותוכנה
+
+#### `smkb_cex_Application` — CEX - Application (בקשה)
+- **מטרה:** הישות המרכזית. בקשה פעילה אחת לכל צמד מועמד/ת–תוכנית (`R-09`)
+- **עמודות:**
+
+| עמודה | טיפוס | חובה | הערות |
+|---|---|---|---|
+| `smkb_name` | `nvarchar` | כן | מזהה קריא — `[מוסק]`, המפרט אינו דורש מספר בקשה |
+| `smkb_cex_CandidateId` | `lookup` | כן | |
+| `smkb_cex_ProgrammeId` | `lookup` | כן | |
+| `smkb_cex_Status` | `picklist` | כן | `Draft` · `Submitted` · `InReview` · `Finalised` · `Declined` · `Withdrawn` |
+| `smkb_cex_SubmittedOn` | `datetime` | לא | |
+| `smkb_cex_DueOn` | `date` | לא | **מחושב פעם אחת בהגשה ונשמר** — ראו `X-2` |
+| `smkb_cex_AssignedTo` | `lookup` → `systemuser` | לא | ריק = ניתן לביטול (`R-08`) |
+| `smkb_cex_AssignedOn` | `datetime` | לא | בסיס פקיעת הנעילה (`D-08`) |
+| `smkb_cex_DeclineReason` | `ntext` | לא | **מוצג לסטודנט/ית כלשונו** (`M-04`, `S-P-11`) |
+| `smkb_cex_RuleSetId` | `lookup` | לא | הגרסה שהפיקה את ההצעות (`S-A-03`) |
+| `smkb_cex_ClosedOn` | `datetime` | לא | מפעיל את מחיקת הראיות (`D-13`) |
+
+- **מידע אישי?** עקיף (דרך `Candidate`)
+- **שמירה:** 8 שנים מהנפקת האישור או מתאריך ההחלטה (`D-13`)
+
+> **שני המצבים הגלויים לסטודנט/ית** נגזרים מ-`AssignedTo`, ואינם נשמרים כעמודה נפרדת:
+> ריק → "התקבלה וממתינה לבדיקה" (ביטול זמין) · מלא → "בבדיקה" (ביטול לא זמין).
+> `S-P-09` נושא הערת `BY DESIGN` מפורשת: **אין "לתקן" זאת על ידי הסתרת ההקצאה** — היעלמות
+> כפתור הביטול חושפת את המידע ממילא, וגילוי מכוון עדיף על גילוי מקרי.
+
+#### `smkb_cex_PriorStudy` — CEX - Prior Study (לימודים קודמים)
+- `smkb_name` (שם הקורס) · `smkb_cex_Institution` (`nvarchar`) · **`smkb_cex_Grade` (`nvarchar`)** ·
+  `smkb_cex_Credits` (`decimal`) · `smkb_cex_CompletedOn` (`date`) · `smkb_cex_ApplicationId` (`lookup`)
+- **הציון הוא טקסט, לא מספר** — `S-P-05` מחייב שסולם ציונים חריג ממוסד זר לא יידחה על ידי טופס.
+  המשמעות: **אי אפשר להשוות ציונים אריתמטית** בכללי ההתאמה. עקבי עם `D-17`
+- **מידע אישי?** כן — היסטוריה אקדמית
+- **שמירה:** כשמירת הבקשה
+
+#### `smkb_cex_PriorCertificate` — CEX - Prior Certificate (תעודה מקצועית)
+- `smkb_name` · `smkb_cex_CertificateTypeId` (`lookup`, לא חובה) · `smkb_cex_OtherDescription`
+  (`nvarchar`) · `smkb_cex_IssuingBody` · `smkb_cex_IssuedOn` (`date`) · `smkb_cex_ApplicationId`
+- **הפרדה מבנית מ-`PriorStudy` בכוונה** (`S-P-06`): לא רשימה נפתחת, כדי שתעודה לא תוזן כקורס ללא
+  ציון ותישפט שגוי
+
+#### `smkb_cex_Evidence` — CEX - Evidence (מסמך)
+- `smkb_name` (שם הקובץ **שהשרת ייצר**) · `smkb_cex_OriginalFileName` (`nvarchar`) ·
+  **`smkb_cex_File` (`File`)** · `smkb_cex_SizeBytes` (`int`) · `smkb_cex_ContentType` (`nvarchar`) ·
+  `smkb_cex_UploadedOn` (`datetime`) · `smkb_cex_PurgeAfter` (`date`) · `smkb_cex_ApplicationId`
+- **`PDF`/`JPEG`/`PNG` בלבד, 4MB לקובץ, 5 קבצים להעלאה, ללא הגבלה לבקשה** (`D-06`)
+- **מסמכים לעולם אינם מוסרים או מוחלפים** (`R-08`) — אין פעולת מחיקה בממשק
+- **מידע אישי?** כן — **הפריט הרגיש ביותר שהמערכת מחזיקה**
+- **שמירה:** `ClosedOn` + 90 יום, ואז מחיקה (`D-13`). ההחלטה שורדת בלעדיו
+
+### קבוצה ד' — התאמות והחלטות
+
+#### `smkb_cex_Suggestion` — CEX - Suggestion (התאמה אפשרית)
+- **מטרה:** צימוד מוצע בין דרישה ללימוד קודם, עם החוזק וההסבר. **לעולם אינו מוצג לסטודנט/ית** (`R-02`)
+- **עמודות:**
+
+| עמודה | טיפוס | הערות |
+|---|---|---|
+| `smkb_cex_ApplicationId` | `lookup` | |
+| `smkb_cex_RequirementId` | `lookup` | |
+| `smkb_cex_PriorStudyId` | `lookup` | אחד משניהם |
+| `smkb_cex_PriorCertificateId` | `lookup` | |
+| `smkb_cex_Strength` | `decimal` | **לבודק/ת בלבד** (`§2.2`) |
+| `smkb_cex_Band` | `picklist` | `Strong` (מוצג) / `NearMiss` (מקופל) — שני הספים של `R-03` |
+| `smkb_cex_Explanation` | `ntext` | "מה הניע את ההתאמה", בשפה אנושית |
+| `smkb_cex_Decision` | `picklist` | `Pending` / `Granted` / `Refused` |
+| `smkb_cex_DecisionReason` | `ntext` | **חובה בסירוב.** מוצג לסטודנט/ית כלשונו |
+| `smkb_cex_DecidedBy` / `DecidedOn` | `lookup` / `datetime` | |
+| `smkb_cex_Excluded` + `ExclusionReason` + `ExclusionBy` + `ExclusionOn` | `bit` + `ntext` + ... | `S-A-05` — החרגה **אינה מוחקת** |
+
+- **שמירה:** כשמירת הבקשה — 8 שנים
+
+#### `smkb_cex_DecisionHistory` — CEX - Decision History (היסטוריית החלטות)
+- `smkb_cex_SuggestionId` (`lookup`) · `smkb_cex_Action` (`picklist`: `Granted`/`Refused`/`Undone`/
+  `Excluded`/`ExclusionReversed`) · `smkb_cex_Reason` (`ntext`) · `smkb_cex_ActedBy` / `ActedOn`
+- **למה טבלה ולא ביקורת פלטפורמה:** בערכה `IsAuditEnabled` ברמת הישות הוא `0` בעוד שברמת העמודה
+  הוא `1` — כלומר **דבר אינו מבוקר בפועל**. `R-06` מחייב שתיקון לעולם אינו מוחק את מה שהיה, ו-`P-6`
+  כולל מבקר/ת שקורא/ת תיק כעבור שנה. שורות מפורשות הן המנגנון; ביקורת הפלטפורמה היא הגנה נוספת
+
+### קבוצה ה' — מנוע הכללים (`D-04`)
+
+> **סעיף זה יעודכן אחרי ניתוח מודל ה-Python.** הסכימה שלהלן היא נקודת פתיחה סבירה, אך שלב ב'
+> של `D-04` עשוי לחשוף סוגי כללים שאינה תומכת בהם. **אין לקבע אותה לפני שלב ב'.**
+
+#### `smkb_cex_RuleSet` — CEX - Rule Set (גרסת כללים)
+- `smkb_name` · `smkb_cex_Version` (`int`) · `smkb_cex_IsActive` (`bit`) ·
+  `smkb_cex_ActivatedBy` / `ActivatedOn` · `smkb_cex_ProgrammeId` (`lookup`)
+- **הפעלה חלה קדימה בלבד.** בקשות שכבר נותחו שומרות את ההצעות שקיבלו, וכל בקשה מציגה
+  **איזו גרסה הפיקה אותן** — כך שהחלטה מלפני שנה נשארת ניתנת להסבר (`S-A-03`)
+
+#### `smkb_cex_Rule` — CEX - Rule (כלל התאמה)
+
+| עמודה | טיפוס | הערות |
+|---|---|---|
+| `smkb_name` | `nvarchar` | שם קצר |
+| `smkb_description` | `ntext` | **הכלל בשפה אנושית** — זה מה ש-`S-A-02` מציג |
+| `smkb_cex_RuleSetId` | `lookup` | |
+| `smkb_cex_RequirementId` | `lookup` | ריק = חל על כל הדרישות בתוכנית |
+| `smkb_cex_MatchType` | `picklist` | `SubjectKeyword` · `CourseCode` · `Institution` · `CertificateType` · `Recency` |
+| `smkb_cex_MatchValue` | `nvarchar(400)` | |
+| `smkb_cex_Strength` | `decimal` | תרומת הכלל לחוזק |
+| `smkb_cex_Active` | `bit` | |
+
+> **כשכמה כללים חלים על אותו צימוד — רק החזק ביותר נחשב** (`S-A-02`). זהו `max`, לא סכום, והמסך
+> מסביר את המגבלה במפורש כדי שמנהל/ת לא תערום כללים חלשים בציפייה שיצטברו.
+> שימו לב ש-`MatchType` **אינו כולל סף ציון** — הציונים הם טקסט (`D-17`).
+
+#### `smkb_cex_RuleFiring` — CEX - Rule Firing (הפעלת כלל)
+- `smkb_cex_SuggestionId` · `smkb_cex_RuleId` · `smkb_cex_Contribution` (`decimal`)
+- **זה מה שהופך את "מדוע הוצע הפריט הזה" לתשובה אמיתית** (`R-02`) — ואת `D-04`'s שקיפות לניתנת להוכחה
+
+### קבוצה ו' — תוצרים
+
+#### `smkb_cex_Certificate` — CEX - Certificate (אישור פטור)
+- `smkb_name` · `smkb_cex_ApplicationId` (`lookup`) · `smkb_cex_IssuedOn` (`datetime`) ·
+  `smkb_cex_Version` (`int`) · `smkb_cex_Superseded` (`bit`) · `smkb_cex_SupersededById` (`lookup`) ·
+  **`smkb_cex_Pdf` (`File`)** · `smkb_cex_VerificationCode` (`nvarchar(40)`, חובה)
+- **קוד האימות מודפס על האישור** בתסדיר **`VER-XXXX-XXXX`** (`O-5`, הוכרע 2026-08-27).
+  המדור לענייני סטודנטים נדרש לאמת שאישור שהוצג לו אמיתי, ולכן האישור חייב לשאת מזהה שניתן לבדיקה
+- **הערך אקראי, לא רץ.** מספר סידורי היה ניתן למניה — מי שמחזיק `VER-0001-0001` יכול לנחש את הבא.
+  שמונה התווים נגרלים ממרחב שאינו כולל תווים דומים (`0`/`O`, `1`/`I`), כדי שהקלדה מדף מודפס תעבוד
+- **התסדיר הוא הפתרון למתח בין `§12.2` ל-`§2.2`:** `§2.2` אוסר להציג לסטודנט/ית מזהה פנימי,
+  ו-`§12.2` מחייב שהאישור יהיה ניתן לאימות. `VER-XXXX-XXXX` **אינו** המזהה הפנימי של אף רשומה —
+  הוא ערך שנוצר לצורך האימות בלבד, ולכן אינו חושף דבר על המערכת
+- **אישור שהוחלף מכריז על עצמו על פניו** ואינו נמחק (`§12.2`, `R-06`)
+- **שמירה:** 8 שנים מההנפקה (`D-13`)
+
+#### `smkb_cex_Reopening` — CEX - Reopening (פתיחה מחדש)
+- `smkb_cex_ApplicationId` · `smkb_cex_Reason` (`ntext`, חובה) · `smkb_cex_ReopenedBy` / `ReopenedOn`
+- **כל פתיחה שורה משלה**, כך שפתיחות חוזרות שומרות כל אחת את הנימוק שלה (`S-A-04`)
+
+---
+
+## 4. משתני סביבה
+
+| מטרה | שם סכימה | טיפוס | ברירת מחדל | שונה בין סביבות? |
+|---|---|---|---|---|
+| שם הסביבה (תחילית לנושא הודעה) | `smkb_cex_EnvironmentName` | String | `dev` | כן |
+| נמעני שגיאות flow | `smkb_cex_FlowErrorEmails` | String (`;`) | — | כן |
+| כתובת בסיס לפורטל | `smkb_cex_PortalBaseUrl` | String | — | כן |
+| תיבת הדואר השולחת | `smkb_cex_SenderMailbox` | String | — | כן (`D-07`) |
+| כתובת התמיכה למועמדים | `smkb_cex_SupportEmail` | String | — | כן |
+| מפתח אתר Turnstile (ציבורי) | `smkb_cex_TurnstileSiteKey` | String | — | כן |
+| **מפתח סוד Turnstile** | `smkb_cex_TurnstileSecretKey` | **Secret** | — | כן (`D-10`) |
+| תקרת OTP יומית | `smkb_cex_OtpDailyCap` | Number | `300` | לא |
+| נמעני התראות אבטחה | `smkb_cex_SecurityAlertEmails` | String (`;`) | — | כן |
+| ימי עבודה לתגובה | `smkb_cex_TurnaroundDays` | Number | `10` | לא |
+| חגים וימי שבתון | `smkb_cex_HolidayDates` | String (`;`) | — | לא |
+| ימי שמירת ראיות | `smkb_cex_EvidenceRetentionDays` | Number | `90` | לא |
+| שעות נעילת בדיקה | `smkb_cex_ReviewLockHours` | Number | `4` | לא |
+| סף "חזק" | `smkb_cex_StrongThreshold` | Number | — | לא |
+| סף "כמעט" | `smkb_cex_NearMissThreshold` | Number | — | לא |
+
+> **רשימות הן `String` עם נקודה-פסיק, לעולם לא `JSON`.** סוג `JSON` מאלץ `json()` בכל ביטוי
+> **ואינו ניתן לשינוי על ידי ייבוא חוזר** (כלל קריטי 5). זו אחת מדלתות הכיוון-האחד בסעיף `Y`.
 >
-> **How to mark an inference — use this exact form, so two runs are comparable:** suffix the sentence with
-> `[inferred]`, and where the inference is load-bearing say what from — `[inferred from §3]`. "Mark it"
-> without a prescribed shape produced whatever each run felt like, which is indistinguishable from not
-> marking it at all. An inference is weaker evidence than an answer, and a later reviewer can only tell the
-> two apart if the file says so.
+> **משתנה `Secret` לעולם אינו נקרא דרך `parameters()`** — הוא מיובא בהצלחה ואז ה-flow **מסרב
+> להידלק**. הקריאה היחידה היא דרך הפעולה הלא-מאוגדת `RetrieveEnvironmentVariableSecretValue`
+> עם `secureData` על הפלט.
 
 ---
 
-## 1. Summary
+## 5. אוטומציה — Cloud Flows
 
-| | |
-|---|---|
-| **What the solution does** | [FILL IN: one or two sentences, in the developer's own words] |
-| **Who uses it** | [FILL IN: the audiences — e.g. staff, lecturers, the public] |
-| **Why now / what it replaces** | [FILL IN: a manual process, a spreadsheet, an existing site being rebuilt] |
-| **Success looks like** | [FILL IN: how the owner will judge it worked] |
+**כל מה שנוגע בנתונים רץ ב-flow.** שני ה-SPA הם ממשק בלבד, ואיסור זה נאכף ב-ESLint בשניהם.
 
-## 2. Users and access
+### שני חוזי שגיאה שונים באותו פתרון
 
-| Audience | Authenticated? | What they can do |
+| קורא | חוזה | מקור |
 |---|---|---|
-| [FILL IN] | [FILL IN: anonymous / custom OTP / Entra] | [FILL IN] |
+| **Power Pages** (פורטל) | **תמיד `HTTP 200`**, כולל שגיאה. שגיאה עסקית = `{"errorCode": "<CODE>"}` ואז `Terminate` במצב `Succeeded` | הפלטפורמה **משליכה את גוף כל תשובה שאינה 2xx** |
+| **Power Apps** (צוות) | מותר `non-2xx`. הצורה היא `{success, data, error.code}` ו-`unwrap()` זורק | ה-Code App קורא את הסטטוס ישירות |
 
-**Ownership rule** — [FILL IN: which records a given user may see and edit. This drives the row-level
-ownership scaffold in every authenticated flow; see [SECURITY-BASELINE.md](SECURITY-BASELINE.md).]
+**זהו הבדל אמיתי ומכוון, ואף אחד מהם אינו נאכף ב-flow-lint.** יש לתעד אותו כאן כדי שסוקר/ת
+לא "יתקן/תתקן" אחד לשני.
 
-## 3. Data model
+### הפרדה מכוונת למעט flows גסים
 
-One block per table. Schema names follow `smkb_<prefix>_<PascalName>`, display names `PREFIX - Name`
-(CLAUDE.md → Critical Rule 3).
+הטריגר של Power Pages מקבל **פרמטרים שטוחים בלבד** (`text`, `text_1`, `number`), רישום כל flow
+ב-Studio הוא **ידני, לכל סביבה, ללא CLI**, ו**אין דפוס flow-בן** — כלומר scaffold `§15` משוכפל
+לכל flow מאומת. לכן ה-flows אוחדו במכוון. `[מוסק מסקר ה-Cloud Flows]`
 
-### [FILL IN: Table name]
-- **Purpose:** [FILL IN]
-- **Columns:** [FILL IN: name · type · required? · notes]
-- **Relationships:** [FILL IN: to which table, which direction, required?]
-- **Holds personal data?** [FILL IN: yes/no + which columns — feeds `docs/06-data-privacy.md`]
-- **Retention:** [FILL IN: how long, and what happens after]
+### מפת ה-flows
 
-## 4. Configuration values (environment variables)
+**פורטל (טריגר `PowerPages`, תפקיד `Anonymous Users`):**
 
-Values that differ between Dev / Stage / Prod, or that an admin should change without a redeploy.
-
-| Purpose | Type | Default | Differs per environment? |
+| flow | מטרה | קורא / כותב | שולח |
 |---|---|---|---|
-| [FILL IN] | [FILL IN: String / Number / Boolean — **lists are String + semicolons, never JSON**] | [FILL IN] | [FILL IN] |
+| `CEX-CreateOtp` | שולח קוד לדוא"ל | `OtpRequest`, `Candidate` | `M-01` |
+| `CEX-CheckOtp` | מאמת קוד, יוצר session | `OtpRequest`, `Session`, `Candidate` | — |
+| `CEX-RevokeSession` | מבטל טוקן. אידמפוטנטי | `Session` | — |
+| `CEX-GetPortalConfig` | מפתח Turnstile ציבורי, כתובות תמיכה | משתני סביבה | — |
+| `CEX-PortalBootstrap` | לוח הבקשות + רשימת התוכניות בקריאה אחת | `Application`, `Programme` | — |
+| `CEX-PortalStartApplication` | פותח בקשה. מחזיר קיימת אם יש (`R-09`) | `Application` | — |
+| `CEX-PortalSaveDraftItem` | שומר לימוד קודם או תעודה (מבחין לפי סוג) | `PriorStudy`, `PriorCertificate` | — |
+| `CEX-PortalDeleteDraftItem` | מוחק פריט טיוטה | כנ"ל | — |
+| `CEX-PortalUploadEvidence` | העלאה + ולידציה `§16` | `Evidence` | — |
+| `CEX-PortalSubmitApplication` | מגיש, מחשב `DueOn`, מפעיל ניתוח | `Application`, `Suggestion` | `M-02` |
+| `CEX-PortalGetApplication` | מצב / תוצאה / דחייה | `Application`, `Suggestion`, `Evidence` | — |
+| `CEX-PortalWithdrawApplication` | ביטול לפני הקצאה | `Application` | `M-10` |
+| `CEX-PortalGetCertificateUrl` | כתובת הורדה קצרת-מועד | `Certificate` | — |
 
-## 5. Automation (cloud flows)
+**צוות (טריגר `PowerAppV2`):**
 
-One block per flow. Everything that touches data or an external system runs in a flow — the SPAs are
-UI-only.
-
-### [FILL IN: what the flow does]
-- **Trigger:** [FILL IN: Power Pages request / Power Apps / Dataverse row created-updated / scheduled]
-- **Logic:** [FILL IN: the steps, in order, including validation and business rules]
-- **Reads / writes:** [FILL IN: which tables, which columns]
-- **Sends anything?** [FILL IN: email/SMS — to whom, with what content. Note anything sensitive.]
-- **Inputs from the caller:** [FILL IN: and which of them must NOT select a record — resolve those from
-  the session instead]
-
-## 6. Interfaces
-
-### Power Apps (staff / admin)
-- **Function:** [FILL IN: what this app is *for* — this becomes the component name and the folder name]
-- **Key screens:** [FILL IN]
-- **Tables it reads / writes:** [FILL IN]
-
-### Power Pages Code Site (portal)
-- **Function:** [FILL IN: what this site is *for* — becomes the component name and the folder name]
-- **Bare site name:** [FILL IN: the unprefixed name; apply-config derives `PREFIX - Name`]
-- **Titles and languages:** [FILL IN: Hebrew / English / both, and the document title]
-- **Pages:** [FILL IN]
-- **Auth:** [FILL IN: anonymous, custom OTP, or Entra — see the note in §9]
-
-## 7. External systems
-
-| System | Direction | What moves | Auth |
-|---|---|---|---|
-| [FILL IN] | [FILL IN: in / out / both] | [FILL IN] | [FILL IN: key in a Secret env var? Key Vault?] |
-
-> Any credential belongs in a **Secret** environment variable read through the Dataverse
-> `RetrieveEnvironmentVariableSecretValue` action, never in flow parameters. See
-> [SECURITY-BASELINE.md](SECURITY-BASELINE.md).
-
-> **Reading or writing an existing SharePoint list? Declare it here.** Dataverse is this solution's data
-> platform (CLAUDE.md → **Critical Rule 6**); SharePoint is a legacy interoperability path for data that
-> already lives in a list and cannot be moved. Name the list and say why the data cannot move — it is a
-> constraint on the solution, which is what this section is for. `flow-lint`'s `sharepoint-data-action`
-> rule warns on every SharePoint action until this declaration exists, so an undeclared SharePoint write
-> shows up in review rather than a year later. If the answer is "it does not, we are storing in
-> Dataverse", write nothing here about SharePoint.
-
-## 8. Design and UI
-
-| | |
-|---|---|
-| **Design system** | [FILL IN: **the SMKB design system** (`@smkbacil/design-ui`, the default) **or its own visual identity**] |
-| **Provided assets** | [FILL IN: Figma, brand guide, logos, fonts, an existing site to match] |
-| **Accessibility / language** | [FILL IN: RTL? bilingual? WCAG target?] |
-
-> **Answer the design-system question early.** A solution that builds its own UI still carries every
-> design-ui wiring point and its vendored tarball for a library it never renders. If the answer is "its own
-> identity", run **`/ppcs-remove-design-ui`** during Phase 7 — a 13-step removal where two steps are easy to
-> miss. (It needs no credential: design-ui is vendored, so installs never authenticate.)
-
-## 9. Security and compliance requirements
-
-[FILL IN: anything the solution must satisfy beyond the house baseline — a review it must pass, a data
-classification, an approval chain, a retention obligation.]
-
-The cross-starter defaults (CSP and browser headers, disabled built-in login paths, default-deny table
-permissions, Secure I/O on secret-handling actions, uniform anti-enumeration responses, rate limiting) ship
-already hardened and are documented in [SECURITY-BASELINE.md](SECURITY-BASELINE.md). Record here only what
-is **specific to this solution**.
-
-## 10. Rebuilding an existing solution?
-
-Skip if this is new. If it is a rebuild:
-
-| | |
-|---|---|
-| **Live artifact** | [FILL IN: the URL / app / solution being replaced] |
-| **Source of truth commit** | [FILL IN: the ref that is actually deployed] |
-| **How that was confirmed** | [FILL IN: deploy tag, Dataverse solution version, deployed bundle timestamp] |
-| **Highest live solution version** | [FILL IN: from `pac solution list` across Dev/Stage/Prod] |
-| **`solution.version.json` seeded to** | [FILL IN: a value ABOVE the row above — see below] |
-
-> **Seed the solution version before the first deploy.** A rebuild's repo starts at `1.0.0.0` while the
-> live solution is already ahead, and a solution version that goes **backwards** is rejected by Power
-> Platform Pipeline promotion — which surfaces at promotion time, long after the deploy reported
-> success. `scripts/Set-SolutionVersion.ps1` reconciles against the live version on every deploy, but
-> only when `pac` is authenticated against the right environment, so record the seed here rather than
-> relying on it. See CLAUDE.md → **Critical Rule 7**.
-
-> **The deployed artifact is the specification; the repo is only evidence for it.** Do not assume the
-> default branch is what is live. On one rebuild `origin/main` was 7 commits and 11 days behind production
-> and the deployed commit existed only as a deploy tag — porting from `main` would have silently produced a
-> faithful copy of the wrong version, and nothing would have failed a build. Enumerate every ref
-> (`git fetch --all --tags`, then `git for-each-ref --sort=-committerdate`), correlate with the live
-> artifact, diff your candidate against the default branch before porting, and verify afterwards by hashing
-> the ported files against that commit.
-
-## 11. Open questions
-
-Anything not yet answered. Each one is a real gap — do not silently assume a default.
-
-| Question | Blocks | Status |
+| flow | מטרה | הערה |
 |---|---|---|
-| [FILL IN] | [FILL IN: which phase or component it blocks] | open |
+| `CEX-StaffGetQueue` | התור + התיישנות + **שחרור עצל של נעילות שפגו** | `D-08` |
+| `CEX-StaffClaimApplication` | לקיחת תיק | קריאה חוזרת לפני כתיבה |
+| `CEX-StaffReleaseApplication` | החזרה לתור | |
+| `CEX-StaffGetWorkspace` | הצעות מקובצות + ראיות + התקדמות | `S-R-02` |
+| `CEX-StaffGetEvidenceUrl` | כתובת קצרת-מועד לצפייה במסמך | ראו `X-3` |
+| `CEX-StaffDecideSuggestion` | אישור/סירוב + נימוק | כותב `DecisionHistory` |
+| `CEX-StaffUndoDecision` | ביטול החלטה בזמן שהתיק פתוח | `R-06` |
+| `CEX-StaffFinaliseApplication` | **מפיק אישור ואז שולח `M-03`** | סדר מחייב |
+| `CEX-StaffDeclineApplication` | דוחה בקשה שלמה | `M-04` |
+| `CEX-StaffGetCrossProgramme` | הקשר מתוכניות אחרות — **בטעינה עצלה** | `D-18` |
+| `CEX-AdminSaveProgramme` / `SaveRequirement` | קטלוג | `S-A-01` |
+| `CEX-AdminSaveRule` / `ActivateRuleSet` | כללים וגרסאות | `S-A-02`, `S-A-03` |
+| `CEX-AdminPreviewRuleSet` | **הרצה יבשה** מול N הבקשות האחרונות | ראו `O-3` |
+| `CEX-AdminReopenApplication` | פתיחה מחדש | `M-06` |
+| `CEX-AdminExcludeDecision` | החרגת החלטה בודדת | `S-A-05` |
+| `CEX-AdminForceRelease` | שחרור נעילה בכפייה — **תוספת ל-`S-A-06`** | `D-08` |
+
+**מתוזמנים** — ראו `X-1`: `CEX-DailyReviewerDigest` (`M-07`) · `CEX-OverdueApology` (`M-08`) ·
+`CEX-EvidencePurge` (`D-13`).
+
+### שלושה flows שראויים לפירוט
+
+#### `CEX-PortalSubmitApplication`
+1. אימות session (`§15`)
+2. ולידציה: לפחות לימוד קודם אחד או תעודה אחת (`S-P-08`)
+3. **חישוב `DueOn`** — `TurnaroundDays` ימי עבודה, ראשון–חמישי, בהחסרת `HolidayDates`. **נשמר**
+4. `Status` → `Submitted`
+5. הפעלת ניתוח ההתאמות (`D-04`)
+6. שליחת `M-02` הנושא את **התאריך**, לא "בתוך עשרה ימים" (`M-02` דורש זאת במפורש)
+
+#### `CEX-StaffFinaliseApplication`
+1. חסימה כל עוד יש התאמה שלא הוכרעה — **והמסך אומר כמה נותרו**, לא נותר מושבת בשקט (`R-05`)
+2. הפקת האישור מתבנית `Word` → `PDF` → שמירה ב-`Certificate.Pdf`
+3. `Status` → `Finalised`
+4. **רק אז** שליחת `M-03`
+5. **בכשל בהפקה: הסופיות אינה מושלמת למחצה** — הבודק/ת מקבל/ת הודעה, הסטודנט/ית **אינו/ה** מקבל/ת,
+   והתיק מסומן לטיפול מנהל/ת. קישור לאישור שאינו קיים, בהודעה החשובה ביותר, הוא הכשל הגרוע ביותר (`S-R-04`)
+
+#### `CEX-CreateOtp`
+1. **`Guard_Turnstile_Misconfigured` ראשון** — מפתח ריק ו-`EnvironmentName != dev` → `CONFIG_ERROR`
+2. אימות Turnstile מול Cloudflare, **כשל סגור**: ענף הדחייה עם
+   `runAfter: [Succeeded, Failed, Skipped]`
+3. הגבלת קצב לכל כתובת + תקרה גלובלית + התראה על **מעבר** למצב חסום, לא על כל ניסיון
+4. יצירת קוד, שמירה, שליחה
+5. **תשובה אחידה**: כתובת לא מוכרת נענית **בדיוק כמו הצלחה** (`§17`)
 
 ---
 
-## 12. Derived architecture — the agent's conclusion
+## 6. ממשקים
 
-> **Agent:** fill this in at **Phase 5**, from the sections above, and state it to the developer as part of
-> the plan. This is not a menu for them to pick from — it is your reasoning, recorded so it survives the
-> Phase 6.3 restart and can be checked later.
+### Power Apps (צוות / ניהול)
+- **תפקיד:** כלי הבדיקה והניהול הפנימי — תור, סביבת בדיקה, קטלוג, כללים, פתיחה מחדש
+- **שם רכיב:** `Exemption Review` → תיקייה `SMKB - Exemption Review - Power App`,
+  שם תצוגה `SMKB - Exemption Review - Dev`
+- **מסכים:** `S-R-01`–`S-R-05`, `S-A-01`–`S-A-06`
+- **קורא/כותב:** כל 17 הטבלאות, דרך flows בלבד
+- **זהות:** `getContext()` מזמן הריצה, **אך הערכה אינה קוראת לו בפועל היום** — זו משימת החיווט
+  הראשונה. הגבול האמיתי הוא ה-flow, שנדרש לגזור מחדש ולבדוק הרשאה בצד השרת
 
-| Starter | Activate? | Why — cite the section above |
+### Power Pages Code Site (פורטל)
+- **תפקיד:** הפורטל הפונה למועמדים
+- **שם בסיסי:** `Course Exemptions` → אתר `CEX - Course Exemptions`,
+  תיקייה `SMKB - Course Exemptions - Power Pages Code Site`
+- **כתובת מוצעת:** `cex-course-exemptions-dev`
+- **שפות וכותרות:** **עברית בלבד** (`D-15`). `defaultLanguage: 'he'`, `languages: []`
+- **עמודים:** `S-P-01`–`S-P-11`, `S-P-13`, `S-P-14` — **13 מסכים** (`S-P-12` הוסר ב-`D-01`)
+- **אימות:** OTP מותאם לדוא"ל
+
+> **פער מוכר:** מודול ה-OTP המשולח הוא **טלפון/SMS**. `M-01` דורש **דוא"ל**. תשתית האבטחה
+> (נעילה, אנטי-מנייה, הגבלת קצב, תקרה) אינה תלויה בערוץ — מוחלף המחבר בלבד. `/ppcs-enable-otp-auth`
+> מחווט מסלולים וטקסטים ספציפיים לטלפון וידרוש התאמה.
+>
+> **חובה לפני פריסה:** אין `import()` דינמי בנתב — נתח לא רשום מוגש כ-`index.html` ונכשל ב-404.
+
+---
+
+## 7. מערכות חיצוניות
+
+| מערכת | כיוון | מה עובר | אימות |
+|---|---|---|---|
+| **Cloudflare Turnstile** | יוצא | אסימון הלקוח לאימות | מפתח סוד ב-`Azure Key Vault` דרך משתנה `Secret` |
+| **Office 365 Outlook** | יוצא | כל עשר ההודעות | התייחסות חיבור מהבנק, חשבון שירות |
+| **Word Online (Business)** | יוצא | תבנית + נתונים → `PDF` | **התייחסות חיבור חמישית — קבועה** (`D-03`) |
+
+**אין SharePoint.** הראיות והאישורים נשמרים ב-Dataverse (`D-02`) — כלל קריטי 6.
+**אין אינטגרציה עם מערכת מידע לסטודנטים**, ולא נדרשת אחת: `D-01` ביטל את זיהוי ההרשמה,
+שהיה הצורך היחיד באינטגרציה כזו.
+
+---
+
+## 8. עיצוב וממשק
+
+| | |
+|---|---|
+| **מערכת עיצוב** | `@smkbacil/design-ui` — ברירת המחדל של הערכה, מוטמעת כ-tarball ללא צורך בהרשאה |
+| **נכסים שסופקו** | תבנית `Word` רשמית — **טרם הורדה** (פעולת המשך 4). בינתיים תבנית זמנית |
+| **נגישות ושפה** | **עברית בלבד, RTL כשפת המוצר.** רצפה `IS 5568` / `WCAG 2.0 AA`, יעד `WCAG 2.2 AA`, **בשני המשטחים** (`D-12`) |
+
+**שתי צפיפויות** (`§8.3`): הפורטל רגוע ומרווח, עם **מצב בהיר וכהה** לפי העדפת המערכת;
+כלי הצוות צפוף, **בהיר בלבד, ללא החלפת שפה** (`D-09`, `§11.0`).
+
+**תפקידי הצבע: ארבעה, לא חמישה.** `D-01` ביטל את "זמני".
+נותרו: ניטרלי · בתהליך · הסתיים בטוב · הסתיים ברע. הצבע לעולם אינו הנושא היחיד של משמעות.
+
+---
+
+## 9. אבטחה ותאימות
+
+הבסיס המשותף (CSP וכותרות, נתיבי כניסה מובנים מנוטרלים, הרשאות טבלה בברירת מחדל דוחה,
+`secureData`, תשובות אחידות, הגבלת קצב) מגיע מוכן ומתועד ב-[`SECURITY-BASELINE.md`](SECURITY-BASELINE.md).
+כאן נרשם **רק מה שמיוחד לפתרון הזה**:
+
+| דרישה | מקור | מימוש |
 |---|---|---|
-| Dataverse Tables | [yes/no] | [FILL IN: e.g. "§3 defines two custom tables"] |
-| Environmental Variables | [yes/no] | [FILL IN] |
-| Cloud Flows | [yes/no] | [FILL IN] |
-| Power Apps | [yes/no] | [FILL IN] |
-| Power Pages Code Site | [yes/no] | [FILL IN] |
+| חוק הגנת הפרטיות הישראלי; ללא GDPR | `D-11` | הודעת פרטיות + זכות עיון, ייצוא ותיקון |
+| שמירה: 8 שנים / 90 יום | `D-13` | `PurgeAfter` + תהליך מחיקה מתוזמן |
+| נגישות `WCAG 2.2 AA` בשני המשטחים | `D-12` | **אין שער אוטומטי בערכה** — הסקירה היא `/ux-audit` + רכז/ת הנגישות |
+| נימוק בודק/ת מוצג כטקסט, לעולם לא כ-markup | `S-P-11` | `vue/no-v-html: 'error'` — איסור בזמן בנייה, חזק מסניטייזר |
+| הגבלת טבלאות ה-OTP וה-Session לחשבון השירות | `SECURITY-BASELINE` 137 | **פעולת בעלים — ידנית** |
 
-**Component names derived:**
+### פעולות בעלים — לא ניתנות לפריסה מהמאגר
 
-| Component | Name | Source |
+1. יצירת תפקידי האבטחה `CEX - Reviewer` ו-`CEX - Admin` (הערכה משלחת `<Roles />` ריק)
+2. הגבלת `smkb_cex_Session` ו-`smkb_cex_OtpRequest` לחשבון השירות; הוצאת עמודות הטוקן והקוד
+   מתצוגות, חיפוש וייצוא
+3. הפעלת ביקורת **ברמת הישות** — כרגע `0`, כך שדבר אינו מבוקר בפועל
+4. הגדרת `Azure Key Vault` ל-Turnstile (`D-10`)
+5. תיבת דואר משותפת עם `Send-As` (`D-07`)
+6. הגבלת קצב לפי IP בקצה — **ל-flow אין כתובת IP אמינה**
+
+---
+
+## 10. בנייה מחדש של פתרון קיים
+
+| | |
+|---|---|
+| **הפריט החי** | `SMKBCourseExemption` בסביבת `SMKB-Apps-Dev` |
+| **מקור האמת** | **אין.** קוד ה-`C#` המקורי אינו זמין; `_backup/` מכיל DLL מהודר בלבד |
+| **איך אומת** | ייצוא מלא ופירוק לפני המחיקה |
+| **הגרסה החיה הגבוהה ביותר** | `1.0.0.0` |
+| **`solution.version.json` נזרע ל-** | `1.0.0.0` — **ללא צורך בזריעה** |
+
+> **הפתרון הישן נמחק במלואו לפני שהתחלנו.** 100 רכיבים הוסרו בסדר תלויות ואומתו כאפס,
+> ואז נמחק המכל. אין `Stage` ואין `Prod`, ולכן אין גרסה חיה גבוהה יותר שיש לעבור אותה.
+> **זו אינה בנייה מחדש מתוך קוד — זו בנייה חדשה מתוך מפרט מוצר.**
+
+---
+
+## X. נושאים חוצי-רוחב
+
+### `X-1` — אין טריגר מתוזמן בערכה
+
+**שורש משותף לשלוש החלטות.** בערכה **אין טריגר `Recurrence` כלל** — לא flow, לא snippet.
+קיימים רק `PowerPages` ו-`PowerAppV2`.
+
+| נדרש עבור | ההחלטה |
+|---|---|
+| `M-07` תקציר יומי | `D-16` — נכתב מאפס |
+| `M-08` התנצלות על איחור | נכתב מאפס |
+| מחיקת ראיות | `D-13` — נכתב מאפס |
+| **שחרור נעילה שפגה** | `D-08` — **נמנע**: שחרור עצל בעת צפייה בתור |
+
+**זו הסיבה ש-`D-08` בחרה בשחרור עצל.** שלושה תהליכים מתוזמנים הם עלות מקובלת; רביעי, עבור
+משהו שאפשר לעשות בחינם ברגע שמסתכלים על התור, אינו.
+
+### `X-2` — חישוב ימי עבודה
+
+ל-Power Automate **אין פונקציית ימי עבודה**, ושבוע העבודה הישראלי הוא ראשון–חמישי עם לוח חגים נע.
+`DueOn` **מחושב פעם אחת בהגשה ונשמר בעמודה**. כל השאר קורא את העמודה.
+
+זה זול יותר, **וזו הדרך היחידה לקיים את דרישת "מקור אחד"**: תאריך שמחושב מחדש עלול להיפרד בין
+`M-02` ל-`S-P-09`, ואז הסטודנט/ית מקבל/ת שני תאריכים סותרים מאותה מערכת.
+
+### `X-3` — קבצים: אין תקדים להורדה
+
+**העלאה נתמכת מקצה לקצה.** `buildNamedFilePayload` → base64 → flow → ולידציה `§16`.
+
+**להורדה אין תקדים כלשהו בערכה** — סריקה אחר `Blob(`, `createObjectURL`, `annotation`,
+`documentbody`, "Get file content" החזירה **אפס תוצאות** בשני ה-starters ובספריית הרכיבים.
+
+**ההחלטה:** **לא להזרים קבצים דרך flow.** ה-flow מחזיר **כתובת הורדה קצרת-מועד** והדפדפן מושך
+ישירות. base64 של 4MB הוא מטען של ~5.5MB מול מגבלות תגובה וזיכרון.
+
+זה נוגע בשני מקומות: הורדת האישור (`S-P-10`) והצגת הראיות ב-`S-R-02` — **והשני חמור יותר**,
+כי `S-R-02` מגדיר את מיקום הראיות כ"דרישה קשיחה, לא העדפת פריסה": החלטה שמתקבלת בלי גיליון
+הציונים על המסך היא ניחוש.
+
+> **spike מוקדם נדרש.** יש לאמת שכתובת קצרת-מועד עובדת מהקשר האימות של ה-Code App **לפני**
+> שמודל הנתונים נבנה סביב ההנחה. אם לא — נופלים לתקרת גודל נמוכה והמרת תמונות בצד השרת.
+
+**CSP חוסם מציג `PDF` מוטמע:** `object-src 'none'`, **אין `frame-src` כלל**,
+ו-`Inject-unsafe-eval: false`. כל מציג מוטמע דורש עריכת CSP מכוונת.
+
+### `X-4` — מנוע ההתאמות: מיקום, פריסה ותהליך (`D-04`)
+
+**מיקום הקוד:** `plugins/scoring/` — תיקייה חדשה במאגר, **מחוץ למודל ה-starter**.
+לערכה אין תמיכה ב-plugin assembly: אין דוגמה, אין guard, ואין `deploy.ps1` שמכיר אותה.
+
+**פריסה:** רישום דרך Plug-in Registration Tool (`pac tool prt`) או כרכיב פתרון.
+**אינה חלק מ-`/deploy-solution`** ויש לתעד אותה בנפרד ב-`docs/09`.
+
+**התהליך בארבעה שלבים** (`D-04`):
+
+| שלב | מה קורה | תוצר |
 |---|---|---|
-| [FILL IN: Power App / Code Site] | [FILL IN] | [FILL IN: which §6 function statement it came from] |
+| א' | הרצת מודל עצי ההחלטה ב-Python על 10–50 החלטות היסטוריות | עצי החלטה |
+| ב' | **שיפוט אנושי** על העצים וזיהוי דפוסים חוזרים | כללים מועמדים בשפה אנושית |
+| ג' | קידוד ככללים ב-`smkb_cex_Rule` | טבלה מאוכלסת |
+| ד' | plugin ב-`C#` שקורא את הטבלה ומיישם | הרכיב הרץ |
 
-**Deliberately not activated:** [FILL IN: and why — an explicit "no flows are needed because …" is worth
-more later than silence. **These starter folders are deleted from this repo at the Phase 9 cleanup audit,
-so this line becomes the only surviving record of the decision** — name each one. A folder is recoverable
-later from the Phase 3.4 baseline commit: `git checkout <baseline> -- "<folder>"`.]
+> **מודל ה-Python אינו מומר ל-`C#` ואינו רץ בייצור.** הוא כלי מחקר לשלב א' בלבד.
+> מי שימצא מחברת Colab במאגר בעוד שנה עלול להסיק שיש ML בייצור. **אין.**
+>
+> **10–50 דגימות הן מעט מאוד** מול 30–40 דרישות. שלב ב' חייב להיות שיפוט, לא תעתוק.
 
-**Removed at the cleanup audit:** [FILL IN: after Phase 9, the dated `audit/cleanup-audit-*.md` report is
-the detail; name the headline removals here so this file stays the one place the architecture is
-explained.]
+**האסטרטגיה לצמצום נפח ההשוואות:** לא לעבור על מכפלת כל הדרישות בכל הקורסים (עד 1,200 השוואות).
+לכל לימוד קודם, **Dataverse מצמצם** בשאילתה למועמדים סבירים, והניקוד רץ רק על השורדים. `[מוסק]`
+
+---
+
+## Y. דלתות כיוון-אחד — לפני הפריסה הראשונה (שלב `8.1a`)
+
+**ארבע החלטות שאינן ניתנות לביטול על ידי ייבוא חוזר.** יש להכריע בהן במפורש, ברשימה כתובה.
+
+| # | ההחלטה | מדוע חד-כיוונית |
+|---|---|---|
+| 1 | **הוספת `Word Online (Business)`** כהתייחסות חיבור חמישית | לייבוא unmanaged אין פעולת הסרה. תלווה את הפתרון לצמיתות (`D-03`) |
+| 2 | **גזימת התייחסויות שאינן בשימוש** — `Approvals`, `SharePoint` | אותה חד-כיווניות. פתרון אמיתי נשלח עם שני מחברים מיותרים לנצח |
+| 3 | **סוגי משתני סביבה** | סוג `JSON` אינו ניתן לשינוי בייבוא חוזר. כל הרשימות `String` עם `;` |
+| 4 | **משתני ה-ALM המשולחים** — `OtpDailyCap`, `SecurityAlertEmails` | הסרה דורשת **שלוש** עריכות מתואמות; החמצת השלישית מאדימה את `apply-config.ps1 -Check` לצמיתות |
+
+---
+
+## 11. שאלות פתוחות
+
+| # | שאלה | מה היא חוסמת | סטטוס |
+|---|---|---|---|
+| ~~`O-1`~~ | טבלת `Candidate` משלנו או `contact` של Dataverse? | — | ✅ **הוכרע 2026-08-27: טבלה משלנו.** אין CRM לסטודנטים במכללה |
+| `O-2` | סכימת `smkb_cex_Rule` — האם `MatchType` מכסה את מה ששלב ב' יגלה? | `D-04` שלב ג' | פתוח בכוונה עד שלב ב' |
+| `O-3` | כמה בקשות בתצוגה המקדימה של `S-A-02`? | היקף `CEX-AdminPreviewRuleSet` | **המלצה: N אחרון, ו-N מוצג על המסך.** המפרט אומר "אחרונות", לא "כולן" |
+| `O-4` | שם תיבת הדואר המשותפת | `D-07`, כל עשר ההודעות | פעולת המשך 3 |
+| ~~`O-5`~~ | האם `VerificationCode` על האישור סותר את איסור המזהים? | — | ✅ **הוכרע 2026-08-27: כן להציג**, בתסדיר `VER-XXXX-XXXX`. המדור נדרש לאמת אישורים |
+| `O-6` | תדירות `M-07` וטווח שעות העבודה | `D-16` | `§7.0`: לעולם לא ב-03:00 |
+
+---
+
+## 12. הארכיטקטורה שנגזרה
+
+| Starter | להפעיל? | מדוע |
+|---|---|---|
+| **Dataverse Tables** | **כן** | סעיף 3 מגדיר 17 טבלאות מותאמות |
+| **Environmental Variables** | **כן** | סעיף 4 מגדיר 15 משתנים, מהם אחד `Secret` |
+| **Cloud Flows** | **כן** | סעיף 5 מגדיר ~33 flows. כל גישה לנתונים עוברת דרכם |
+| **Power Apps** | **כן** | 11 מסכי צוות (`S-R-*`, `S-A-*`) |
+| **Power Pages Code Site** | **כן** | 13 מסכי פורטל (`S-P-*`) לקהל ללא זהות מוסדית |
+
+**כל חמשת ה-starters מופעלים.**
+
+**שמות הרכיבים:**
+
+| רכיב | שם | מקור |
+|---|---|---|
+| Power App | `Exemption Review` | סעיף 6 — הכלי שבו בודקים ומנהלים עובדים |
+| Code Site | `Course Exemptions` | סעיף 6 — הפורטל הפונה למועמדים |
+
+**לא הופעל:** אין. **רכיב שישי מחוץ למודל:** `plugins/scoring/` (`D-04`, `X-4`).
+
+**סדר הפריסה** (כלל קריטי 4): טבלאות → משתני סביבה → flows → Power Apps → Power Pages.
+ה-plugin נפרס אחרי הטבלאות ולפני ה-flows שמפעילים אותו. `[מוסק]`
