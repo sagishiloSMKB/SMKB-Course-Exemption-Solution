@@ -14,16 +14,16 @@
     "powerPages": true
   },
   "powerApps": {
-    "componentName": "CHANGEME-APP-COMPONENT-NAME",
-    "appDisplayName": "Your App Display Name",
+    "componentName": "Exemption Review",
+    "appDisplayName": "SMKB - Exemption Review - Dev",
     "region": "prod"
   },
   "powerPages": {
-    "siteName": "CHANGEME-SITE-NAME",
-    "appNameHe": "CHANGEME-APP-NAME-HE",
-    "appNameEn": "CHANGEME-APP-NAME-EN",
-    "documentTitle": "CHANGEME-TITLE",
+    "siteName": "Course Exemptions",
+    "appNameHe": "פטור מקורסים",
+    "appNameEn": "Course Exemptions",
+    "documentTitle": "פטור מקורסים - סמינר הקיבוצים",
     "defaultLanguage": "he",
-    "webUrlSlug": "CHANGEME-WEB-URL-SLUG"
+    "webUrlSlug": "cex-course-exemptions-dev"
   }
 }
