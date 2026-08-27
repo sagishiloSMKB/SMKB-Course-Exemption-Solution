@@ -7,11 +7,11 @@
   "targetEnvUrl": "https://org229c958d.crm4.dynamics.com/",
   "environmentId": "63329b6f-93c0-ea79-a29e-3a46daca7653",
   "activate": {
-    "dataverseTables": false,
-    "environmentVariables": false,
-    "powerAutomateFlows": false,
-    "powerApps": false,
-    "powerPages": false
+    "dataverseTables": true,
+    "environmentVariables": true,
+    "powerAutomateFlows": true,
+    "powerApps": true,
+    "powerPages": true
   },
   "powerApps": {
     "componentName": "CHANGEME-APP-COMPONENT-NAME",
