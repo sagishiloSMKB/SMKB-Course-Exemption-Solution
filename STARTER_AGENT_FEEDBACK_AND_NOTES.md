@@ -10,6 +10,96 @@ during initialization should be logged here so the starter kit can be improved.
 
 <!-- Agents: add your entries below this line, newest first -->
 
+## [2026-08-30] — Course Exemption (Phase 6.2/6.3): the PowerShell block was Windows PowerShell 5.1 only, not PowerShell as such
+
+### Issue / Observation
+
+Phases 1 through 6.1 were run on the assumption that **PowerShell was blanket-blocked by Group Policy**
+at the institution. `powershell.exe` failed with `This program is blocked by group policy` from `cmd`,
+`Permission denied` from Bash, and `EUNKNOWN: uv_spawn` from the Claude Code PowerShell tool. On that
+assumption `apply-config.ps1` (6.2) and every starter `deploy.ps1` (Phase 8) were treated as blocked
+pending an IT exception, and an IT request was drafted asking for one.
+
+**That assumption was wrong, and it cost several phases of planning around a blocker that did not exist
+in the form assumed.**
+
+### What the policy actually says
+
+The mechanism is **Software Restriction Policy in the user hive** —
+`HKCU\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers`. It was missed on the first pass
+because only `HKLM` was checked; the machine hive carries only unrelated `ftp.exe` and `OpenSSH` rules.
+
+`DefaultLevel` is `0x40000` (**Unrestricted**) — default-allow with explicit deny rules. Seven rules
+concern PowerShell, and **every one is specific to Windows PowerShell 5.1**:
+
+| Kind | Target |
+|---|---|
+| Path x5 | `C:\Windows\System32\WindowsPowerShell\v1.0` (the folder), `...\v1.0\powershell.exe`, the `SysWOW64` twin, and the two `powershell_ise.exe` variants |
+| Hash x2 | `PowerShell.EXE (10.0.19041.546)`, `powershell_ise.EXE (10.0.19041.1)` |
+
+**No rule names `pwsh.exe`.** No rule covers `C:\Program Files\PowerShell` or
+`%LOCALAPPDATA%\Programs\PowerShell`. ACLs on `powershell.exe` are normal (`BUILTIN\Users:(RX)`), so
+this is policy, not permissions.
+
+One adjacent rule needs care: `%LocalAppData%\*.exe` is Disallowed ("Don't allow executables to run
+from %AppData%"). It does **not** reach into subdirectories — verified empirically, since `pac.exe`,
+VS Code, Git and Ollama all run from `%LOCALAPPDATA%` subfolders on this machine.
+
+### The workaround
+
+**Install PowerShell 7 user-scope. No admin, no registry, no IT ticket.** Two routes, both confirmed
+working here:
+
+- **Microsoft Store** (per-user) — what the developer used; lands `pwsh` in
+  `%LOCALAPPDATA%\Microsoft\WindowsApps`, already on `PATH`, so no restart is needed for the shell to
+  see it.
+- **ZIP extraction** to `%LOCALAPPDATA%\Programs\PowerShell\7` — no installer at all. Requires adding
+  that folder to the **user** `PATH` via `[Environment]::SetEnvironmentVariable('Path', ..., 'User')`.
+  **Do not use `setx PATH "%PATH%;..."`** — it expands the combined machine+user PATH into user scope
+  and truncates at 1024 characters.
+
+`apply-config.ps1` and every starter `deploy.ps1` run unmodified under PowerShell 7 — no
+`#requires -Version` anywhere, and nothing in the kit hardcodes `powershell.exe` in a way that matters.
+
+### The hook picked it up with zero edits
+
+The `ps_runs` probe added in the Phase 3.5 entry — `command -v "$1" && "$1" -NoProfile -Command exit 0`
+— tries `pwsh` first and only falls back to `powershell`. The moment `pwsh` appeared on `PATH`, the
+pre-commit hook stopped printing its skip warning and **ran the config-drift check for the first time
+since Phase 3.5**. That entry claimed the patch was future-neutral because `ps_runs` is evaluated on
+every commit; **that claim is now proven in practice rather than asserted.**
+
+### Caveat — do not generalise this
+
+This is **one institution's SRP configuration**. Another organisation may block PowerShell broadly, by
+publisher rule or by a WDAC/AppLocker policy that catches `pwsh.exe` too.
+
+The reusable finding is **"check the SRP scope before assuming the worst case"**, not "PowerShell 7
+always works". Concretely, before requesting an IT exception:
+
+```
+reg query "HKCU\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers" /s
+reg query "HKLM\SOFTWARE\Policies\Microsoft\Windows\Safer\CodeIdentifiers" /s
+```
+
+Check **both hives**, read `DefaultLevel`, and enumerate the path and hash rules. If every PowerShell
+rule names `WindowsPowerShell\v1.0` or a 5.1 hash, a user-scope PowerShell 7 install is very likely to
+work — and is far preferable to asking security to weaken a deliberate anti-malware control.
+
+### Suggested improvement
+
+1. **Add the SRP scope check to the Phase 1.2 tool check.** The flow probes `node`, `git` and `pac` but
+   never PowerShell, so a machine that cannot run the kit's core script reads as fully prepared. Probing
+   executability (not just presence) plus a one-line SRP scope check would have caught this in Phase 1
+   instead of Phase 6.
+2. **Document the user-scope PowerShell 7 route in `INIT_PROJECT.md`** as the first thing to try when
+   `apply-config.ps1` cannot run — before drafting an IT request.
+3. **Prefer `pwsh` over `powershell` in kit tooling and permission patterns.** The shipped
+   `.claude/settings.json` allowlists only `powershell*`; on any machine using PowerShell 7 those entries
+   silently match nothing. This solution added `*pwsh*` twins alongside them.
+
+---
+
 ## [2026-08-26] — Course Exemption (Phase 3.5): toolchain probes test existence, not executability — hooks block every commit
 
 ### Issue / Observation
