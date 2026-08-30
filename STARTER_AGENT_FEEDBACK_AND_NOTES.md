@@ -10,6 +10,126 @@ during initialization should be logged here so the starter kit can be improved.
 
 <!-- Agents: add your entries below this line, newest first -->
 
+## [2026-08-30] — Course Exemption (Phase 6.4): TLS interception blocks corepack but not npm — they resolve certificates differently
+
+### Issue / Observation
+
+`corepack pnpm install` failed before installing anything:
+
+```
+Error: unable to get local issuer certificate
+  code: 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY'
+```
+
+The network here is TLS-inspected: the proxy presents a corporate-issued certificate whose root is in
+the **Windows certificate store** but not in Node's bundled CA list.
+
+The confusing part is that **`npm` on the same machine works fine**. Two independent reasons, and
+conflating them wastes a debugging cycle:
+
+- `npm` reads `~/.npmrc`, which on this machine contains `strict-ssl=false` — so npm skips certificate
+  verification entirely.
+- **`corepack` does not read npm config at all.** It calls Node's `fetch` directly, so no `.npmrc`
+  setting reaches it. `strict-ssl`, `cafile` and `ca` are all inert for corepack.
+
+So a machine can install every dependency successfully and still be unable to *obtain the package
+manager*, with an error that names certificates rather than corepack.
+
+### Resolution
+
+Node 22+ supports `--use-system-ca`, which reads the **Windows certificate store** — where the
+inspection root already lives. Session-scoped, no persistent change:
+
+```bash
+NODE_OPTIONS=--use-system-ca corepack pnpm install --frozen-lockfile
+```
+
+Verified directly before use — the same `fetch` fails without the flag and returns `200` with it:
+
+| Probe | Result |
+|---|---|
+| `node -e "fetch(<pnpm tarball>)"` | `UNABLE_TO_GET_ISSUER_CERT_LOCALLY` |
+| `node --use-system-ca -e "fetch(<same>)"` | `status=200` |
+
+This is **strictly better than `strict-ssl=false`**: it verifies the chain against the system trust
+store rather than disabling verification. `npm ci` needed no flag, because `strict-ssl=false` already
+carried it.
+
+### Separate cleanup owed — global `strict-ssl=false`
+
+`C:\Users\<user>\.npmrc` contains one line, `strict-ssl=false`. It **predates this project** and is
+outside the repository, so it was not touched. It silently disables certificate verification for
+*every* npm project on the machine. The cleanup path is to delete that line and rely on
+`--use-system-ca` (or a persistent `NODE_EXTRA_CA_CERTS` pointing at the exported corporate root),
+which restores verification without breaking npm. Logged, not actioned — it is a machine-policy change,
+not an init-flow change.
+
+### Suggested improvement
+
+1. **Document `NODE_OPTIONS=--use-system-ca` in the starters' install instructions**, as the first
+   thing to try when `corepack` fails with a certificate error. A fresh clone on any TLS-inspected
+   corporate network hits this, and the error message points at TLS rather than at the fix.
+2. **Probe it in the Phase 1.2 tool check.** The flow checks `node`, `git` and `pac` for presence. A
+   one-line `corepack` reachability probe would surface this in Phase 1 rather than at the first
+   install in Phase 6.4.
+3. **Do not reach for `NODE_TLS_REJECT_UNAUTHORIZED=0` or `strict-ssl=false`.** Both disable
+   verification process-wide; `--use-system-ca` achieves the same outcome while still checking the
+   chain.
+4. **Open follow-up — add `*.md text eol=lf` to the kit's `.gitattributes`.** The
+   `@smkbacil/design-ui` postinstall rewrites `SMKB-UI.md` with byte-identical content on every
+   install; with `core.autocrlf=true` and no `*.md` rule, git then reports it modified indefinitely
+   despite a zero-byte diff. `git add` clears it until the next install. Not actioned here - the kit
+   should fix it once rather than every solution clearing it by hand.
+
+---
+
+## [2026-08-30] — Course Exemption (Phase 6.4): dependency vulnerability snapshot, deferred to Phase 10
+
+### Issue / Observation
+
+The first dependency install of the two Node starters reported vulnerabilities.
+**Snapshot taken 2026-08-30** — advisory databases move, so a Phase 10 reviewer should re-run rather
+than trust these counts.
+
+| Starter | Tool | All deps | Production only |
+|---|---|---|---|
+| Power Pages Code Site | `npm audit` | 9 — 1 critical, 5 high, 3 moderate | 2 high (`postcss`) |
+| Power App | `pnpm audit` | 20 — 1 critical, 14 high, 5 moderate | 9 — 7 high, 2 moderate |
+
+**The 20-vs-9 gap is mostly counting method, not exposure.** `pnpm` reports per advisory (eight separate
+`brace-expansion` advisories); `npm` collapses per package. The overlapping set is identical:
+`brace-expansion`, `esbuild`, `js-yaml`, `nanoid`, `postcss`, `vite`, `vitest`. The Power App adds
+`@nevware21/ts-utils` (high) and `uuid` (moderate), both arriving via `@microsoft/power-apps`.
+
+Two facts that decide the triage:
+
+- **The critical is `vitest`, a devDependency in both starters.** It requires the Vitest UI server to be
+  listening to be exploitable — a dev-only condition that never exists in a deploy.
+- **`postcss` is labelled "production" only because it arrives through `vue` -> `@vue/compiler-sfc`**,
+  the build-time SFC compiler. It does not ship to the browser. The exposure is to the build machine,
+  not to the deployed app or site.
+
+### Resolution
+
+**Deferred to Phase 10** (`/security-audit` and the `audit/` templates exist for exactly this). Every
+fix for the critical and most highs is marked `BREAKING` — major-version bumps of `vite` / `vitest` —
+which is not a change to make mid-init, when the lockfiles are the reference for a green baseline and
+nothing has been deployed yet. Nothing here blocks Phase 7 authoring.
+
+Recorded so Phase 10 rediscovers it as a known deferral rather than as a new finding.
+
+### Suggested improvement
+
+1. **The starter kit ships these versions.** `vitest` 2.1.9 and `vite` 6.4.2 are what the templates
+   pin, so *every* solution initialized from this kit inherits the same critical-severity dev
+   advisory on its first install. Bumping them in the kit fixes it once instead of once per solution.
+2. **Run an audit at the end of Phase 6.4 and record the snapshot**, rather than discovering it during
+   a pre-go-live review. `npm ci` prints it unprompted; `pnpm install` does not, so the Power App's
+   larger count would have gone unseen without an explicit `pnpm audit`. Asymmetric defaults produce
+   asymmetric attention.
+
+---
+
 ## [2026-08-30] — Course Exemption (Phase 6.2/6.3): the PowerShell block was Windows PowerShell 5.1 only, not PowerShell as such
 
 ### Issue / Observation
@@ -57,6 +177,13 @@ working here:
   that folder to the **user** `PATH` via `[Environment]::SetEnvironmentVariable('Path', ..., 'User')`.
   **Do not use `setx PATH "%PATH%;..."`** — it expands the combined machine+user PATH into user scope
   and truncates at 1024 characters.
+
+**Update (Phase 6.4, 2026-08-30) — both routes ended up installed, and the Store one wins.** The ZIP
+install (`%LOCALAPPDATA%\Programs\PowerShell\7`, v7.4.19) and a Microsoft Store install
+(`%LOCALAPPDATA%\Microsoft\WindowsApps`, v7.6.5) now coexist on this machine, and `command -v pwsh`
+resolves to the **WindowsApps** one. Both run the kit's scripts unmodified; all four pre-commit gates
+passed through 7.6.5. The ZIP copy is deliberately kept rather than removed — a Store package can be
+withdrawn or blocked by policy independently of it, and a second working interpreter costs nothing.
 
 `apply-config.ps1` and every starter `deploy.ps1` run unmodified under PowerShell 7 — no
 `#requires -Version` anywhere, and nothing in the kit hardcodes `powershell.exe` in a way that matters.
