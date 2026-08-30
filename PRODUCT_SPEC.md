@@ -2,6 +2,8 @@
 
 **Seminar Hakibbutzim College (SMKB)** · Version 1.0 · 2026-08-26
 
+> הערה: החלטות תפעוליות ועדכונים למסמך זה מתועדים ב-`decisions.md`.
+
 ---
 
 ## Abstract
