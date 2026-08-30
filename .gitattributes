@@ -4,6 +4,11 @@
 .githooks/pre-commit text eol=lf
 *.mjs               text eol=lf
 
+# Same reasoning, different tool: nvm reads .nvmrc literally, so a CRLF byte becomes part of
+# the version string and `nvm use` fails with "version '22^M' not found" on Linux/macOS - on a
+# file whose whole purpose is to stop the local/CI Node skew.
+.nvmrc              text eol=lf
+
 # The vendored @smkbacil/design-ui tarball. Without this, a repo configured with
 # core.autocrlf=true can line-ending-mangle the gzip stream on checkout, and the failure surfaces
 # as an unreadable tarball at install time rather than as anything to do with git.

@@ -190,7 +190,27 @@ jobs:
           # run never depends on folder-name auto-discovery.
           flows="$(dirname "$(dirname "$(dirname "$lint")")")/Workflows"
           echo "Running $lint against $flows"
-          node "$lint" "$flows"
+          # --- TEMPORARY (2026-08-30) - REVERT WHEN PHASE 7 AUTHORING COMPLETES -------------------
+          # Tracked as SOLUTION-SPEC.md X-6. Remove `--pre-commit` from the line below; nothing else.
+          #
+          # WHY: Phase 5 set activate.powerAutomateFlows=true, but Phase 7 has not yet replaced the
+          # starter's example flows. So Workflows/*.json and Other/*.xml still carry `smkb_sol_`,
+          # `[REPLACE` and the placeholder GUIDs BY DESIGN, and the two deploy-time rules
+          # (no-placeholders, xml-no-placeholders) correctly error on them. The comment ~40 lines
+          # above predicted exactly this: "expect CI to go red again at Init Project 6.2a if the
+          # example flows still carry placeholders when the starter is activated - that is correct
+          # signal, not this bug." It was correct signal, and it stayed red for 10 consecutive runs.
+          #
+          # A permanently red job is worse than a narrowed one: it trained us to stop reading CI, so
+          # the config-drift and SPA-install failures in the same window went unnoticed. --pre-commit
+          # skips ONLY those two rules (DEPLOY_TIME_RULE_IDS in rules.mjs); every other rule still
+          # runs here, and the placeholder gate is STILL ENFORCED where it actually blocks damage -
+          # each starter's deploy.ps1 and /pre-deploy-verify. Nothing can deploy with placeholders.
+          #
+          # The scope is wider than Cloud Flows: the solution-wide XML rules also flag the Tables and
+          # Env Vars starters, which carry the same template placeholders until Phase 7 fills them.
+          # ---------------------------------------------------------------------------------------
+          node "$lint" --pre-commit "$flows"
 
   discover-spas:
     name: discover code-app folders

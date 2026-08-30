@@ -183,6 +183,35 @@ request to reach into another project.
 
 ---
 
+## AFTER EVERY PUSH — Check CI
+
+**A push is not finished until CI is checked.** Run this after every `git push`, and report the
+result rather than assuming green:
+
+```bash
+gh run list --limit 3
+gh run view <id> --log-failed    # only if the newest run failed
+```
+
+**Why this is a standing rule and not advice:** CI ran red for **ten consecutive commits**
+(`cd421ca` → `936a593`, 2026-08-30) without anyone noticing, because nothing surfaced it and the
+local gates were all green. Three genuinely different failures came and went inside that window —
+a config-drift failure, a Node-version failure in the SPA installs, and the flow-lint placeholder
+gate. Two fixed themselves as later phases landed; nobody learned anything from any of them.
+
+Two traps that window taught, both worth knowing:
+
+- **Local green ≠ CI green.** The pre-commit hook runs a deliberately narrower rule set than CI
+  (see `DEPLOY_TIME_RULE_IDS`), and the local Node version is not the CI one. `.nvmrc` pins the
+  latter; nothing pins the former.
+- **Pushing several commits at once produces ONE run**, at the head SHA. The earlier commits get
+  no run of their own — so "all my commits are green" can be true and meaningless.
+
+`gh` is installed user-scope. If it is missing on a fresh machine:
+`winget install --id GitHub.cli --exact --scope user`, then `gh auth login` (needs a browser).
+
+---
+
 ## INIT ONBOARDING COMMAND
 
 **Trigger:** User says `init onboarding`, `onboarding`, or `/init-onboarding`

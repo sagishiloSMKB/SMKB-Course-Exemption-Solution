@@ -92,6 +92,19 @@ for FLOWS_DIR in "SMKB - Power Automate Flows Starter" "SMKB - "*" - Cloud Flows
   if command -v node >/dev/null 2>&1 && [ -f "$FLOWS_DIR/tools/flow-lint/lint.mjs" ]; then
     echo "pre-commit: [$FLOWS_DIR] running flow-lint ..."
     node "$FLOWS_DIR/tools/flow-lint/lint.mjs" --pre-commit "$FLOWS_DIR/Workflows" || status=1
+    # ── The deploy-time rules, WARN-ONLY (added 2026-08-30) ─────────────────────
+    # The skip above is deliberate and stays. But it made the placeholder gates INVISIBLE
+    # locally, not merely non-blocking: every local run printed "0 errors, clean" while CI
+    # failed on exactly those two rules for 10 consecutive commits. A skip line nobody reads
+    # is not disclosure.
+    #
+    # So run them again as a REPORT. `|| true` - this must never block a commit, because a
+    # half-built solution legitimately carries placeholders for the whole of Phase 7. The
+    # point is that `smkb_sol_` in an ACTIVATED starter is now visible at the moment you
+    # commit, instead of being discovered in CI days later.
+    echo "pre-commit: [$FLOWS_DIR] deploy-time placeholder rules (warn-only, never blocks) ..."
+    node "$FLOWS_DIR/tools/flow-lint/lint.mjs" \
+         --only=no-placeholders,xml-no-placeholders "$FLOWS_DIR/Workflows" || true
   else
     echo "pre-commit: [$FLOWS_DIR] node/flow-lint unavailable — skipping flow-lint"
   fi
