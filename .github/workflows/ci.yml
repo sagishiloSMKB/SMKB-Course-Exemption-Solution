@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: node scripts/check-template-guards.mjs
 
       # The cleanup audit's manifest coherence, in the same zero-auth zero-install job. This is the
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Doc boundaries
         run: node scripts/check-doc-boundaries.mjs
       # -Check exits 0 on the pristine template ("still the uninitialized starter-kit template")
@@ -76,7 +76,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       # ABSENCE IS LEGITIMATE, and this job used to deny it. It hard-failed with "the Cloud Flows
       # starter should always ship it" - an assumption that is false twice over: a solution may
       # never activate Cloud Flows, and the cleanup audit deletes non-activated starter folders
@@ -132,7 +132,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       # Zero-dependency Node ESM — no install needed. Auto-discover the checker wherever the (renamed)
       # Cloud Flows starter put it; skip if the Flows starter isn't activated.
       #
@@ -235,7 +235,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       # No credential step, and no NPM_TOKEN anywhere: @smkbacil/design-ui resolves from the
       # committed tarball via its `file:` spec. template-guards fails the build if any consumer
       # reverts to a registry spec, so this job cannot silently regain a token dependency.
