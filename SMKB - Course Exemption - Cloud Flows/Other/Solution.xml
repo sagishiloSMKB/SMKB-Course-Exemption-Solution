@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ImportExportXml version="9.2" SolutionPackageVersion="9.2" languagecode="1033" generatedBy="CrmLive" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<ImportExportXml version="9.2.26042.165" SolutionPackageVersion="9.2" languagecode="1033" generatedBy="CrmLive" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <SolutionManifest>
-    <UniqueName>YourSolutionName</UniqueName>
+    <UniqueName>SMKBCourseExemption</UniqueName>
     <LocalizedNames>
-      <LocalizedName description="Your Solution Name" languagecode="1033" />
+      <LocalizedName description="SMKB - Course Exemption" languagecode="1033" />
     </LocalizedNames>
     <Descriptions />
     <Version>1.0.0.0</Version>
@@ -11,11 +11,9 @@
     <Publisher>
       <UniqueName>SKMBCore</UniqueName>
       <LocalizedNames>
-        <LocalizedName description="SMKB - Core" languagecode="1033" />
+        <LocalizedName description="SMKB Core Publisher" languagecode="1033" />
       </LocalizedNames>
-      <Descriptions>
-        <Description description="Core publisher for SKMB Power Platform solutions" languagecode="1033" />
-      </Descriptions>
+      <Descriptions />
       <EMailAddress xsi:nil="true"></EMailAddress>
       <SupportingWebsiteUrl xsi:nil="true"></SupportingWebsiteUrl>
       <CustomizationPrefix>smkb</CustomizationPrefix>
@@ -80,8 +78,25 @@
       </Addresses>
     </Publisher>
     <RootComponents>
-      <RootComponent type="1" schemaName="smkb_sol_ExampleTableA" behavior="0" />
-      <RootComponent type="1" schemaName="smkb_sol_ExampleTableB" behavior="0" />
+      <!--
+        Add a RootComponent entry here for each flow in the Workflows/ folder (the third of the
+        three files that must stay in lockstep - see Other/Customizations.xml).
+        type="29"  = Workflow (Power Automate cloud flow)
+        id         = the Dataverse workflow GUID, i.e. the trailing GUID of the flow's own filename
+                     under Workflows/ (the files are named <schemaName>-<GUID>.json)
+        behavior   = 0 (include sub-components automatically)
+
+        DO NOT write the placeholder schema-name prefix literally anywhere in this comment. Both
+        deploy.ps1 and flow-lint's xml-no-placeholders rule are plain text greps over this file, so
+        naming it here makes them fire on their own documentation and block a correct deploy.
+
+        NOTE: The placeholder GUIDs below are for the two example skeletons only. When you deploy a
+        real flow for the first time, replace with the actual Dataverse workflow GUID assigned by the
+        environment (see README.md "Development Workflow"). Delete the skeleton entries you don't use.
+        Do NOT add connection references here - they live in Customizations.xml, not Solution.xml.
+      -->
+      <RootComponent type="29" id="{00000000-0000-0000-0000-000000000001}" behavior="0" />
+      <RootComponent type="29" id="{00000000-0000-0000-0000-000000000002}" behavior="0" />
     </RootComponents>
     <MissingDependencies />
   </SolutionManifest>

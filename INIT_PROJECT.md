@@ -445,7 +445,7 @@ This is not bookkeeping. Phase 6.3 **mandates a Claude Code restart** when the f
 
 Mark what you **inferred** rather than were told — suffix the sentence with `[inferred]`, or `[inferred from §N]` where it matters which section you reasoned from. The shape is prescribed on purpose: "mark it" without one produced whatever each run felt like, which reads the same as not marking it. And put every unanswered question under **Open questions** instead of guessing a default.
 
-Naming conventions to apply while recording (CLAUDE.md → Critical Rule 3): schema names `smkb_<prefix>_<PascalName>`, display names `PREFIX - Name`. Environment variables use **String with semicolons for lists, never JSON** (Critical Rule 5). Power Pages-triggered flows follow the HTTP 200 + `errorCode` contract — see the [flow-error contract](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/FLOW-ERROR-CONTRACT.md).
+Naming conventions to apply while recording (CLAUDE.md → Critical Rule 3): schema names `smkb_<prefix>_<PascalName>`, display names `PREFIX - Name`. Environment variables use **String with semicolons for lists, never JSON** (Critical Rule 5). Power Pages-triggered flows follow the HTTP 200 + `errorCode` contract — see the [flow-error contract](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/docs/FLOW-ERROR-CONTRACT.md).
 
 ---
 
@@ -513,7 +513,7 @@ Cover:
 
 > **Power Apps — the app record must exist before the first deploy.** `pac code push` does NOT create app records; `pac code init` does, and it has no `--path` flag (run it from inside the folder). The **agent** runs it at 8.6, under the 8.2 deploy authorisation.
 
-> **Cloud Flows — connection references** are shared, environment-level resources. Use the named SMKB connection-reference bank documented in the [Flows README](SMKB%20-%20Power%20Automate%20Flows%20Starter/README.md); only fall back to the export/unpack lookup (CLAUDE.md → "Connection References") if a needed connector is not already in the bank. Do NOT create a new connection reference per solution.
+> **Cloud Flows — connection references** are shared, environment-level resources. Use the named SMKB connection-reference bank documented in the [Flows README](SMKB%20-%20Course%20Exemption%20-%20Cloud%20Flows/README.md); only fall back to the export/unpack lookup (CLAUDE.md → "Connection References") if a needed connector is not already in the bank. Do NOT create a new connection reference per solution.
 
 > **Content display names** follow `[SHORT_NAME_UPPER] - [Name]` (e.g. `EVT - Booking Request`). `apply-config.ps1` handles the ALM env vars; apply the same convention to the tables and flows you author.
 
@@ -798,7 +798,7 @@ Pop-Location
 
 The Code Site provisions and deploys through its own skills — the agent drives them; you run the local `pac`/browser steps they require.
 
-1. **Provision (first time):** run **`/ppcs-provision-site`** — creates the site, runs the starter's `scripts/freshen-site-settings.ps1`, and applies the post-provision settings. Follow the [Getting Started guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/GETTING-STARTED.md).
+1. **Provision (first time):** run **`/ppcs-provision-site`** — creates the site, runs the starter's `scripts/freshen-site-settings.ps1`, and applies the post-provision settings. Follow the [Getting Started guide](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/GETTING-STARTED.md).
 
    > **YOUR TURN — H9: reactivate the site and type the web URL**
    > (the agent cannot do this: browser, and the URL is typed by hand)
@@ -1022,7 +1022,7 @@ Everything deployed above went to **SMKB-Apps-Dev only**. Stage and Production a
 **Phase 10's audits must be green, or their residual risks accepted in writing, before this phase** — that is `audit/README.md`'s stated trigger, and now the flow enforces the order rather than hoping for it.
 
 - **Tables, Env Vars, Flows, Power Apps** travel in the solution — ensure their components are in it (env var `RootComponents`, flow `RootComponents`, the Code App's linked solution) and run the pipeline from the Maker portal.
-- **Power Pages Code Site** promotes on its own two-track model: run **`/ppcs-promote-to-env`** and follow the [Code Site ALM guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/ALM-CODE-SITES.md). Flow GUIDs are environment-specific, so re-register them (`/ppcs-register-flow`) in each target environment after promotion.
+- **Power Pages Code Site** promotes on its own two-track model: run **`/ppcs-promote-to-env`** and follow the [Code Site ALM guide](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/docs/ALM-CODE-SITES.md). Flow GUIDs are environment-specific, so re-register them (`/ppcs-register-flow`) in each target environment after promotion.
 
 > **YOUR TURN — H11: run the Pipeline**
 > (the agent cannot do this: portal-only by policy — the kit's deploy scripts refuse any non-Dev URL)

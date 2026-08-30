@@ -23,11 +23,11 @@ untouched with their template names. Full build/deploy/architecture docs live **
 
 | Starter | What it covers | Docs |
 |--------|---------------|------|
-| `SMKB - Dataverse Tables Starter` | Custom table schemas, forms, views | [README](SMKB%20-%20Dataverse%20Tables%20Starter/README.md) |
-| `SMKB - Environmental Variables Starter` | Environment variable definitions | [README](SMKB%20-%20Environmental%20Variables%20Starter/README.md) |
-| `SMKB - Power Automate Flows Starter` | Cloud flows packaged into a solution zip | [README](SMKB%20-%20Power%20Automate%20Flows%20Starter/README.md) |
-| `SMKB - Power Apps Starter` | Power Apps Code App SPA (Vue 3 + TS), UI-only, flow-backed | [README](SMKB%20-%20Power%20Apps%20Starter/README.md) · [CLAUDE.md](SMKB%20-%20Power%20Apps%20Starter/CLAUDE.md) |
-| `SMKB - Power Pages Code Site Starter` | Power Pages Code Site (Vue 3 SPA uploaded via PAC), flows-backed | [Getting Started](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/GETTING-STARTED.md) · [CLAUDE.md](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/CLAUDE.md) |
+| `SMKB - Dataverse Tables Starter` | Custom table schemas, forms, views | [README](SMKB%20-%20Course%20Exemption%20-%20Dataverse%20Tables/README.md) |
+| `SMKB - Environmental Variables Starter` | Environment variable definitions | [README](SMKB%20-%20Course%20Exemption%20-%20Environmental%20Variables/README.md) |
+| `SMKB - Power Automate Flows Starter` | Cloud flows packaged into a solution zip | [README](SMKB%20-%20Course%20Exemption%20-%20Cloud%20Flows/README.md) |
+| `SMKB - Power Apps Starter` | Power Apps Code App SPA (Vue 3 + TS), UI-only, flow-backed | [README](SMKB%20-%20Exemption%20Review%20-%20Power%20App/README.md) · [CLAUDE.md](SMKB%20-%20Exemption%20Review%20-%20Power%20App/CLAUDE.md) |
+| `SMKB - Power Pages Code Site Starter` | Power Pages Code Site (Vue 3 SPA uploaded via PAC), flows-backed | [Getting Started](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/GETTING-STARTED.md) · [CLAUDE.md](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/CLAUDE.md) |
 
 **Not every solution needs all starters.** A simple data-entry app may only need Tables. A
 background-automation solution may only need Flows and Env Vars.

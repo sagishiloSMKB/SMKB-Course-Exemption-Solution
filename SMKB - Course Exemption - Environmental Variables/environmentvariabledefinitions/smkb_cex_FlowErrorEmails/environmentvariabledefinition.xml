@@ -1,6 +1,6 @@
-<environmentvariabledefinition schemaname="smkb_sol_SecurityAlertEmails">
-  <displayname default="SOL - Security Alert Emails">
-    <label description="SOL - Security Alert Emails" languagecode="1033" />
+<environmentvariabledefinition schemaname="smkb_cex_FlowErrorEmails">
+  <displayname default="CEX - Flow Error Emails">
+    <label description="CEX - Flow Error Emails" languagecode="1033" />
   </displayname>
   <introducedversion>1.0.0.1</introducedversion>
   <iscustomizable>1</iscustomizable>

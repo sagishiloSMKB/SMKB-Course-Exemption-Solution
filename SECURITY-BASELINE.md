@@ -183,12 +183,12 @@ Each of these cost a debugging cycle in a real deployment. Several fail **silent
 
 | Topic | Document |
 |---|---|
-| Flow security patterns (ownership, file validation, anti-enumeration, caps, Secure I/O) | [FLOW_SNIPPETS.md](SMKB%20-%20Power%20Automate%20Flows%20Starter/FLOW_SNIPPETS.md) §15–19 |
-| The lint rules and how to add one | [flow-lint README](SMKB%20-%20Power%20Automate%20Flows%20Starter/tools/flow-lint/README.md) |
-| Shipped site settings, CSP, login lockdown, HSTS | [Code Site CLAUDE.md](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/CLAUDE.md) → Security Configuration |
+| Flow security patterns (ownership, file validation, anti-enumeration, caps, Secure I/O) | [FLOW_SNIPPETS.md](SMKB%20-%20Course%20Exemption%20-%20Cloud%20Flows/FLOW_SNIPPETS.md) §15–19 |
+| The lint rules and how to add one | [flow-lint README](SMKB%20-%20Course%20Exemption%20-%20Cloud%20Flows/tools/flow-lint/README.md) |
+| Shipped site settings, CSP, login lockdown, HSTS | [Code Site CLAUDE.md](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/CLAUDE.md) → Security Configuration |
 | Shared OTP module hardening, session revocation, idle timeout | [OTP RECIPE.md](SMKB%20-%20Component%20Library/OTP%20Auth%20Screen/RECIPE.md) → Security baseline |
-| Bot protection: client, CSP, and the fail-closed server gate | [`/ppcs-add-turnstile`](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/.claude/skills/ppcs-add-turnstile/SKILL.md) |
-| Abuse-threshold env vars | [Env Vars README](SMKB%20-%20Environmental%20Variables%20Starter/README.md) → Security Baseline Variables |
+| Bot protection: client, CSP, and the fail-closed server gate | [`/ppcs-add-turnstile`](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/.claude/skills/ppcs-add-turnstile/SKILL.md) |
+| Abuse-threshold env vars | [Env Vars README](SMKB%20-%20Course%20Exemption%20-%20Environmental%20Variables/README.md) → Security Baseline Variables |
 | Per-solution security record | [docs/07-security.md](docs/07-security.md) · [docs/06-data-privacy.md](docs/06-data-privacy.md) |
 | Pre-go-live audit | [audit/](audit/README.md) · [`/security-audit`](.claude/skills/security-audit/SKILL.md) · Init Project Phases 9–10 |
 | Removing what the solution does not use | [`/cleanup-audit`](.claude/skills/cleanup-audit/SKILL.md) · [cleanup template](audit/TEMPLATE-cleanup-audit.md) |

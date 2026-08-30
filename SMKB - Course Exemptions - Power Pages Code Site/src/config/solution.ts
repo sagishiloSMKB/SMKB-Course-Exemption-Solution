@@ -56,10 +56,10 @@ export interface SolutionConfig {
 }
 
 export const SOLUTION: SolutionConfig = {
-  prefix: 'CHANGEME',
-  siteName: 'CHANGEME-SITE-NAME',
-  appName: { he: 'CHANGEME-APP-NAME-HE', en: 'CHANGEME-APP-NAME-EN' },
-  documentTitle: 'CHANGEME-TITLE',
+  prefix: 'cex',
+  siteName: 'Course Exemptions',
+  appName: { he: 'פטור מקורסים', en: 'Course Exemptions' },
+  documentTitle: 'פטור מקורסים - סמינר הקיבוצים',
   defaultLanguage: 'he',
   languages: [
     { code: 'he', label: 'עברית', shortLabel: 'עב', dir: 'rtl' },
@@ -96,4 +96,4 @@ export const POWER_PAGES_SITE_NAME = `${SOLUTION.prefix.toUpperCase()} - ${SOLUT
  * way to learn the name - `powerpages.config.json` follows a Microsoft schema and
  * must not carry custom keys.
  */
-export const SOLUTION_UNIQUE_NAME = 'CHANGEME-SOLUTION-UNIQUE-NAME'
+export const SOLUTION_UNIQUE_NAME = 'SMKBCourseExemption'

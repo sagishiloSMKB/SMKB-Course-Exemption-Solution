@@ -1,7 +1,7 @@
-<environmentvariabledefinition schemaname="smkb_sol_OtpDailyCap">
+<environmentvariabledefinition schemaname="smkb_cex_OtpDailyCap">
   <defaultvalue>300</defaultvalue>
-  <displayname default="SOL - OTP Daily Cap">
-    <label description="SOL - OTP Daily Cap" languagecode="1033" />
+  <displayname default="CEX - OTP Daily Cap">
+    <label description="CEX - OTP Daily Cap" languagecode="1033" />
   </displayname>
   <introducedversion>1.0.0.1</introducedversion>
   <iscustomizable>1</iscustomizable>

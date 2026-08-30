@@ -1,6 +1,6 @@
 {
   "$schema": "https://www.schemastore.org/powerpages.config.json",
-  "siteName": "MY-SITE-NAME",
+  "siteName": "CEX - Course Exemptions",
   "defaultLandingPage": "index.html",
   "compiledPath": "./dist",
   "bundleFilePatterns": [

@@ -1,0 +1,5 @@
+{
+  "solutionName": "SMKBCourseExemption",
+  "targetEnv": "https://org229c958d.crm4.dynamics.com/",
+  "allowedEnvs": ["https://org229c958d.crm4.dynamics.com/"]
+}

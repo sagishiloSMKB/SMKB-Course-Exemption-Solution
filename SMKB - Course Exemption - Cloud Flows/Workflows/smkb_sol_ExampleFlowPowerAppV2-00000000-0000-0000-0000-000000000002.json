@@ -1,6 +1,15 @@
 {
   "properties": {
     "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "connection": {
+          "connectionReferenceLogicalName": "msdyn_Dataverse"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        },
+        "runtimeSource": "embedded"
+      },
       "shared_office365_sol": {
         "runtimeSource": "embedded",
         "connection": {
@@ -23,19 +32,19 @@
           "defaultValue": {},
           "type": "Object"
         },
-        "ENVIRONMENT_NAME (smkb_sol_EnvironmentName)": {
+        "ENVIRONMENT_NAME (smkb_cex_EnvironmentName)": {
           "defaultValue": "dev",
           "type": "String",
           "metadata": {
-            "schemaName": "smkb_sol_EnvironmentName",
+            "schemaName": "smkb_cex_EnvironmentName",
             "description": "Logical environment name (dev/stage/prod). Prefixes email subjects outside prod."
           }
         },
-        "ERROR_EMAILS (smkb_sol_FlowErrorEmails)": {
+        "ERROR_EMAILS (smkb_cex_FlowErrorEmails)": {
           "defaultValue": "",
           "type": "String",
           "metadata": {
-            "schemaName": "smkb_sol_FlowErrorEmails",
+            "schemaName": "smkb_cex_FlowErrorEmails",
             "description": "Semicolon-separated email addresses for flow error notifications."
           }
         }
@@ -43,26 +52,23 @@
       "triggers": {
         "manual": {
           "metadata": {
-            "operationMetadataId": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+            "operationMetadataId": "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e"
           },
           "type": "Request",
-          "kind": "PowerPages",
-          "description": "Power Pages trigger. Schema property KEYS are PA designer type names (text, text_1, number), NOT the labels. Replace with your fields - see FLOW_SNIPPETS Snippet 7.",
+          "kind": "PowerAppV2",
+          "description": "Power Apps Code App trigger (V2). After deploy, register with pnpm pa add-flow --flow-id <PA flow id>. Replace the input schema with your fields (use PowerAppV2, not PowerApps).",
           "inputs": {
             "schema": {
               "type": "object",
-              "properties": {
-                "text": {
-                  "title": "recipient",
-                  "type": "string",
-                  "x-ms-dynamically-added": true,
-                  "description": "Please enter your input",
-                  "x-ms-content-hint": "TEXT"
-                }
-              },
               "required": [
-                "text"
-              ]
+                "id"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "REPLACE: example input - e.g. a Dataverse row id sent by the Code App"
+                }
+              }
             }
           }
         }
@@ -70,43 +76,39 @@
       "actions": {
         "Main_Flow": {
           "type": "Scope",
-          "description": "Wrap ALL business logic in this Scope so Handle_Flow_Error can catch failures via runAfter. Replace Send_an_email with your logic; keep a final Response.",
+          "description": "Wrap ALL business logic in this Scope so Handle_Flow_Error can catch failures via runAfter. Replace List_records with your logic; keep a final Response.",
           "actions": {
-            "Send_an_email": {
+            "List_records": {
               "type": "OpenApiConnection",
-              "description": "REPLACE the To/Subject/Body for your solution. Subject auto-prefixes (DEV)/(STAGE) outside prod. From is fixed to the SMKB no-reply sender.",
+              "description": "Read rows from Dataverse. entityName is the table PLURAL LOGICAL name (lowercase) - e.g. a table smkb_prc_Placement has the set smkb_prc_placements. Dataverse is the data platform; see CLAUDE.md Critical Rule 6.",
               "inputs": {
                 "host": {
-                  "connectionName": "shared_office365_sol",
-                  "operationId": "SendEmailV2",
-                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
                 },
                 "parameters": {
-                  "emailMessage/To": "@triggerBody()?['text']",
-                  "emailMessage/Subject": "@if(equals(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), 'prod'), '[REPLACE: email subject]', concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [REPLACE: email subject]'))",
-                  "emailMessage/Body": "<p>[REPLACE: email body HTML]</p>",
-                  "emailMessage/From": "noreply@smkb.ac.il",
-                  "emailMessage/Importance": "Normal"
+                  "entityName": "[REPLACE-WITH-YOUR-TABLE-PLURAL-LOGICAL-NAME]",
+                  "$top": 10
                 },
                 "authentication": "@parameters('$authentication')"
               },
               "runAfter": {}
             },
-            "Respond_to_PowerPages": {
+            "Respond_to_caller": {
               "type": "Response",
-              "kind": "PowerPages",
-              "description": "Success response. Power Pages flows ALWAYS return 200; a business error is a 200 body of { errorCode } followed by Terminate (see FLOW_SNIPPETS Snippet 8).",
+              "description": "Return JSON to the Code App. Unlike Power Pages, PowerAppV2 flows may use non-2xx for errors - the Code App reads the HTTP status directly.",
               "inputs": {
                 "statusCode": 200,
                 "headers": {
                   "Content-Type": "application/json"
                 },
                 "body": {
-                  "status": "ok"
+                  "items": "@body('List_records')?['value']"
                 }
               },
               "runAfter": {
-                "Send_an_email": [
+                "List_records": [
                   "Succeeded"
                 ]
               }
@@ -116,11 +118,11 @@
         },
         "Handle_Flow_Error": {
           "type": "Scope",
-          "description": "Error handler - runs ONLY on unexpected failures in Main_Flow. Emails ERROR_EMAILS (if set), then returns 200 + errorCode so the portal can read the failure.",
+          "description": "Error handler - runs ONLY on unexpected failures in Main_Flow. Emails ERROR_EMAILS (if set), then returns 500 so the Code App surfaces the failure.",
           "actions": {
             "Check_Error_Emails_Configured": {
               "type": "If",
-              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)'))))",
+              "expression": "@not(empty(trim(parameters('ERROR_EMAILS (smkb_cex_FlowErrorEmails)'))))",
               "actions": {
                 "Send_error_notification": {
                   "type": "OpenApiConnection",
@@ -131,9 +133,9 @@
                       "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
                     },
                     "parameters": {
-                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_sol_FlowErrorEmails)')",
-                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)')), ') [ERROR] smkb_sol_ExampleFlowPowerPages failed')",
-                      "emailMessage/Body": "@concat('<p><strong>smkb_sol_ExampleFlowPowerPages</strong> failed in <strong>', parameters('ENVIRONMENT_NAME (smkb_sol_EnvironmentName)'), '</strong>.</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",
+                      "emailMessage/To": "@parameters('ERROR_EMAILS (smkb_cex_FlowErrorEmails)')",
+                      "emailMessage/Subject": "@concat('(', toUpper(parameters('ENVIRONMENT_NAME (smkb_cex_EnvironmentName)')), ') [ERROR] smkb_sol_ExampleFlowPowerAppV2 failed')",
+                      "emailMessage/Body": "@concat('<p><strong>smkb_sol_ExampleFlowPowerAppV2</strong> failed in <strong>', parameters('ENVIRONMENT_NAME (smkb_cex_EnvironmentName)'), '</strong>.</p><p><strong>Run ID:</strong> ', workflow()['run']['name'], '</p>')",
                       "emailMessage/From": "noreply@smkb.ac.il",
                       "emailMessage/Importance": "High"
                     },
@@ -149,14 +151,13 @@
             },
             "Respond_with_error": {
               "type": "Response",
-              "kind": "PowerPages",
               "inputs": {
-                "statusCode": 200,
+                "statusCode": 500,
                 "headers": {
                   "Content-Type": "application/json"
                 },
                 "body": {
-                  "errorCode": "ERROR"
+                  "code": "ERROR"
                 }
               },
               "runAfter": {

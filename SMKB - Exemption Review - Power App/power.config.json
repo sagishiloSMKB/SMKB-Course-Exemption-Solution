@@ -1,9 +1,9 @@
 {
   "version": "1.0",
   "appId": "00000000-0000-0000-0000-000000000000",
-  "appDisplayName": "Your App Display Name",
+  "appDisplayName": "SMKB - Exemption Review - Dev",
   "region": "prod",
-  "environmentId": "00000000-0000-0000-0000-000000000001",
+  "environmentId": "63329b6f-93c0-ea79-a29e-3a46daca7653",
   "description": "",
   "buildPath": "./dist",
   "buildEntryPoint": "index.html",

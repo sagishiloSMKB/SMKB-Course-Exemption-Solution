@@ -64,13 +64,13 @@ that owns it:
 
 | Topic | Lives in |
 |-------|----------|
-| Power Apps (UI-only, flow-backed) — build, deploy, architecture | [Power Apps README](SMKB%20-%20Power%20Apps%20Starter/README.md) · [CLAUDE.md](SMKB%20-%20Power%20Apps%20Starter/CLAUDE.md) · [design system](SMKB%20-%20Power%20Apps%20Starter/SMKB-UI.md) |
-| Cloud Flows — authoring, deploy, ALM patterns | [Flows README](SMKB%20-%20Power%20Automate%20Flows%20Starter/README.md) |
-| Flow JSON snippets & pitfalls | [FLOW_SNIPPETS.md](SMKB%20-%20Power%20Automate%20Flows%20Starter/FLOW_SNIPPETS.md) · [reference flows](SMKB%20-%20Power%20Automate%20Flows%20Starter/examples/README.md) · [flow-lint](SMKB%20-%20Power%20Automate%20Flows%20Starter/tools/flow-lint/README.md) |
-| Power Pages Code Site — rules, deploy, security/CSP, skills | [PP CLAUDE.md](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/CLAUDE.md) · [Getting Started](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/GETTING-STARTED.md) · [full guide](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/POWER-PAGES-CODE-SITE-GUIDE.md) |
-| Code Site ALM / promotion, flow-error contract | [ALM](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/ALM-CODE-SITES.md) · [flow errors](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/docs/FLOW-ERROR-CONTRACT.md) |
-| Dataverse tables — schema authoring, deploy | [Tables README](SMKB%20-%20Dataverse%20Tables%20Starter/README.md) |
-| Environment variables — definitions, ALM vars | [Env Vars README](SMKB%20-%20Environmental%20Variables%20Starter/README.md) |
+| Power Apps (UI-only, flow-backed) — build, deploy, architecture | [Power Apps README](SMKB%20-%20Exemption%20Review%20-%20Power%20App/README.md) · [CLAUDE.md](SMKB%20-%20Exemption%20Review%20-%20Power%20App/CLAUDE.md) · [design system](SMKB%20-%20Exemption%20Review%20-%20Power%20App/SMKB-UI.md) |
+| Cloud Flows — authoring, deploy, ALM patterns | [Flows README](SMKB%20-%20Course%20Exemption%20-%20Cloud%20Flows/README.md) |
+| Flow JSON snippets & pitfalls | [FLOW_SNIPPETS.md](SMKB%20-%20Course%20Exemption%20-%20Cloud%20Flows/FLOW_SNIPPETS.md) · [reference flows](SMKB%20-%20Course%20Exemption%20-%20Cloud%20Flows/examples/README.md) · [flow-lint](SMKB%20-%20Course%20Exemption%20-%20Cloud%20Flows/tools/flow-lint/README.md) |
+| Power Pages Code Site — rules, deploy, security/CSP, skills | [PP CLAUDE.md](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/CLAUDE.md) · [Getting Started](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/GETTING-STARTED.md) · [full guide](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/docs/POWER-PAGES-CODE-SITE-GUIDE.md) |
+| Code Site ALM / promotion, flow-error contract | [ALM](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/docs/ALM-CODE-SITES.md) · [flow errors](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/docs/FLOW-ERROR-CONTRACT.md) |
+| Dataverse tables — schema authoring, deploy | [Tables README](SMKB%20-%20Course%20Exemption%20-%20Dataverse%20Tables/README.md) |
+| Environment variables — definitions, ALM vars | [Env Vars README](SMKB%20-%20Course%20Exemption%20-%20Environmental%20Variables/README.md) |
 | **Solution specification** — what this solution must do; captured at init, drives starter activation | [SOLUTION-SPEC.md](SOLUTION-SPEC.md) |
 | Solution documentation (architecture, security, privacy, ALM …) — templates, filled per solution at init | [docs/](docs/README.md) |
 | Testing strategy — the layered testing method | [TESTING-STRATEGY.md](TESTING-STRATEGY.md) |
@@ -380,7 +380,7 @@ The short name is the **middle segment** of every component's schema name and th
 | Resulting Power Pages site name (**derived**, `[PREFIX] - [Name]`) | `[PREFIX] - [Name]` | `EVT - Lecturer Portal` |
 | Power Pages **web URL** (typed by hand at reactivation) | `[prefix]-[kebab-name]` + `-dev` / `-stage` / bare for prod | `evt-lecturer-portal-dev` |
 
-If in doubt about what to name one of these, ask the user what the app or site is *for* — that answer becomes the Component Name. Enter the Power Pages **bare** site name in the Code Site starter's `src/config/solution.ts` `siteName` field (or `powerPages.siteName` in `solution.config.json`); `apply-config.ps1` derives the prefixed `[PREFIX] - [Name]` form — do NOT type the prefix yourself or it doubles (`EVT - EVT - …`). See the [Power Pages starter docs](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/CLAUDE.md).
+If in doubt about what to name one of these, ask the user what the app or site is *for* — that answer becomes the Component Name. Enter the Power Pages **bare** site name in the Code Site starter's `src/config/solution.ts` `siteName` field (or `powerPages.siteName` in `solution.config.json`); `apply-config.ps1` derives the prefixed `[PREFIX] - [Name]` form — do NOT type the prefix yourself or it doubles (`EVT - EVT - …`). See the [Power Pages starter docs](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/CLAUDE.md).
 
 ---
 
@@ -444,7 +444,7 @@ Currently registered short names (update this table when initializing a new solu
 
 Env var and Dataverse table schema names (e.g., `smkb_evt_PortalBaseUrl`, `smkb_evt_Registration`) are globally unique within the entire environment. If two solutions define one with the same name, the second import overwrites the first. Unique short names prevent this — but only if short names are actually unique.
 
-**Env var data types (global rule):** use **String** with semicolon-separated values for lists (e.g. an email list `admin@smkb.ac.il;ops@smkb.ac.il`) — **never JSON type**, which would force `json()` parsing in every expression and cannot be changed by reimport once deployed. The type codes and per-variable guidance live in the [Env Vars README](SMKB%20-%20Environmental%20Variables%20Starter/README.md).
+**Env var data types (global rule):** use **String** with semicolon-separated values for lists (e.g. an email list `admin@smkb.ac.il;ops@smkb.ac.il`) — **never JSON type**, which would force `json()` parsing in every expression and cannot be changed by reimport once deployed. The type codes and per-variable guidance live in the [Env Vars README](SMKB%20-%20Course%20Exemption%20-%20Environmental%20Variables/README.md).
 
 ### Flow names — solution-scoped (NOT a cross-solution conflict risk)
 
@@ -456,7 +456,7 @@ All SMKB solutions use the **same publisher**: `SKMBCore` (prefix `smkb`). This 
 
 ### Power Pages Code Sites — isolated by prefix + site name
 
-Code Sites are namespaced by the publisher prefix and their site name — the canonical `[PREFIX] - [Name]` form is derived by `apply-config.ps1` from the **bare** `siteName` in `solution.ts` (do not pre-prefix it). There is no shared-GUID overwrite hazard like the old portal model. Per-environment site-setting GUIDs are freshened by the starter's own `scripts/freshen-site-settings.ps1` (run by its provisioning skill). See the [Power Pages starter docs](SMKB%20-%20Power%20Pages%20Code%20Site%20Starter/CLAUDE.md).
+Code Sites are namespaced by the publisher prefix and their site name — the canonical `[PREFIX] - [Name]` form is derived by `apply-config.ps1` from the **bare** `siteName` in `solution.ts` (do not pre-prefix it). There is no shared-GUID overwrite hazard like the old portal model. Per-environment site-setting GUIDs are freshened by the starter's own `scripts/freshen-site-settings.ps1` (run by its provisioning skill). See the [Power Pages starter docs](SMKB%20-%20Course%20Exemptions%20-%20Power%20Pages%20Code%20Site/CLAUDE.md).
 
 ---
 
@@ -469,7 +469,7 @@ Power Platform has one intentional exception to "each solution owns its own comp
 - When wiring a flow, use the logical name of an **existing** connection reference already in the environment.
 - Connection references of the same connector type point to the same service account; reusing them across solutions is intentional and correct.
 
-The Flows starter ships a named SMKB connection-reference bank and documents how to discover logical names and re-enable flows after import — see the [Flows README](SMKB%20-%20Power%20Automate%20Flows%20Starter/README.md).
+The Flows starter ships a named SMKB connection-reference bank and documents how to discover logical names and re-enable flows after import — see the [Flows README](SMKB%20-%20Course%20Exemption%20-%20Cloud%20Flows/README.md).
 
 ---
 
