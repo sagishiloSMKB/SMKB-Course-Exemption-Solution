@@ -1,4 +1,8 @@
-# Spike Findings — Dataverse File Columns
+# Spike Findings — Dataverse File Columns and Column Types
+
+> **Two spikes, one file.** §1–§7 are the **File Column** spike (2026-08-30). **§8 is the column-type
+> spike** (2026-08-31, `G-6`) covering `decimal` and organization ownership. Read §8 before authoring
+> any table — it contains a second element-name trap of exactly the kind §7 warns about.
 
 **Run:** 2026-08-30, SMKB-Apps-Dev (`org229c958d`, env `63329b6f-93c0-ea79-a29e-3a46daca7653`)
 **Purpose:** de-risk `D-02` (evidence stored in Dataverse File Columns, not SharePoint) before
@@ -246,14 +250,115 @@ beyond the `pac solution list` inventory used to prove non-interference.
 - **Never assert on a global `fileattachment` count** — other developers write to this environment
   during a session. Filter by `regardingfieldname`.
 
-## 8. Artefacts
+## 8. Second spike — column types (`G-6`, 2026-08-31)
+
+**Question:** `SOLUTION-SPEC.md` §3 warns that `decimal` and `File` have no XML anywhere, and that
+`picklist` / `datetime` exist only as commented examples. The File half was answered above. This
+spike answered the rest — **and found most of it was already documented, just not where §3 looked.**
+
+### 9.1 What actually needed spiking — far less than assumed
+
+| Type | Precedent found | Where |
+|---|---|---|
+| `ntext` | ✅ documented | `Entity.xml` quick-reference: `<MaxLength>`, **no `<Format>`**, and **not** `memo` |
+| `nvarchar` | ✅ documented | `<MaxLength>` + `<Format>text</Format>` |
+| `int` | ✅ documented | `<Format>none</Format>` + `<MinValue>` + `<MaxValue>` |
+| `bit` | ✅ documented | `<DefaultValue>0</DefaultValue>` |
+| `datetime` (date+time) | ✅ documented | `<Format>DateAndTime.UserLocal</Format>`, `<Behavior>1</Behavior>` |
+| **date-only** | ✅ documented | **`<Format>date</Format>` + `<Behavior>3</Behavior>`** — no timezone conversion |
+| `picklist` | ✅ documented | Full commented `<optionset>` example; option values use publisher option-prefix `39041` + suffix |
+| `lookup` | ✅ documented | `/dvt-add-lookup` skill carries the XML and the `EntityRelationship` entry |
+| **`decimal`** | ❌ **absent** | Type name only, empty Notes cell in `README.md`. **Spiked.** |
+| **organization ownership** | ❌ **absent** | No occurrence anywhere. **Spiked.** |
+
+**The §3 warning was accurate about live *custom columns* and misleading about documentation.** Only
+`nvarchar` ships as a live custom column, but the commented quick-reference block and the starter
+skills document nearly every type. Checking those first cut this spike from five types to two.
+
+### 9.2 ⚠️ `decimal` — the element is `<Accuracy>`, not `<Precision>`
+
+```xml
+<attribute PhysicalName="smkb_cex_Credits">
+  <Type>decimal</Type>
+  <Name>smkb_cex_credits</Name>
+  <LogicalName>smkb_cex_credits</LogicalName>
+  <RequiredLevel>none</RequiredLevel>
+  <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+  <ImeMode>disabled</ImeMode>
+  ... standard block ...
+  <MinValue>0</MinValue>
+  <MaxValue>100</MaxValue>
+  <Accuracy>2</Accuracy>        ← decimal places. NOT <Precision>
+  <displaynames>
+    <displayname description="CEX - Credits" languagecode="1033" />
+  </displaynames>
+</attribute>
+```
+
+**The Web API property is `Precision`; the solution XML element is `<Accuracy>`.** `<Precision>`
+appears nowhere in an export. This is the same trap as `<MaxSizeInKB>` → `<MaxValue>` in §2 (F2), and
+it would have shipped into five columns across four tables.
+
+Proven read, not merely tolerated: two columns authored at `Precision` 2 and 4 came back as
+`<Accuracy>2</Accuracy>` and `<Accuracy>4</Accuracy>`.
+
+⚠️ **`<MaxValue>` means different things on different types.** On `decimal` it is the numeric upper
+bound (100). On a File column it is the **size cap in KB** (4096). Same element, unrelated meanings —
+do not pattern-match one onto the other.
+
+### 9.3 ⚠️ Organization ownership — the XML value is `OrgOwned`
+
+```xml
+<OwnershipTypeMask>OrgOwned</OwnershipTypeMask>      <!-- NOT "OrganizationOwned" -->
+```
+
+The Web API value is `OrganizationOwned`; the XML value is **`OrgOwned`**. Third naming mismatch of
+the same family.
+
+**And the structural consequence:** an organization-owned table has **no `OwnerId`, `OwningUser`,
+`OwningTeam` or `OwningBusinessUnit` attributes at all** — they are absent from the export, not merely
+empty. Anything that assumes every table carries an owner will break on `EvidenceAccessLog`, which is
+the only organization-owned table in the model.
+
+### 9.4 Tooling
+
+`pac solution pack` / `unpack` round-trips both new shapes **losslessly** — `diff -r` on
+unpack→pack→unpack is identical, matching F11.
+
+**Not re-tested per type: the full import round-trip.** F12–F14 established generally that XML import
+*creates* attributes, *reads* their authored values, and *upserts* non-destructively; those are
+properties of the import mechanism, not of a particular type. Re-proving them for `decimal` would
+have required either a portal handoff or bypassing the `pac solution import` deny rule, for
+marginal signal. Flagged so the gap is known rather than assumed away.
+
+### 9.5 Incidental — two publishers share the `smkb` prefix
+
+| Unique name | Prefix | Option-value prefix |
+|---|---|---|
+| `SKMBCore` | `smkb` | **39041** ← the correct one (Critical Rule 5, matches the starter's optionset example) |
+| `PubSMKB` | `smkb` | 11111 |
+
+Creating a solution under the wrong one yields option values in the 11111 range while every documented
+example uses 39041. **Always bind explicitly to `SKMBCore`
+(`22160bb4-61c5-4f59-bb17-663b13a1daa2`)**, never pick from a dropdown.
+
+### 9.6 Teardown
+
+Two tables and the container removed via Web API; `entity where logicalname like 'smkb_cex_%'` →
+**No results**, `SMKBCexSpike` absent from `pac solution list`. Environment back to its pre-spike
+state. The solution was also **created** via Web API this time — no portal step was needed at all.
+
+---
+
+## 9. Artefacts
 
 Scratchpad only; nothing but this file entered the repo.
 
 ```
-scratchpad/s2/   first export + unpacked canonical XML
-scratchpad/s3/   post-import re-export + roundtrip.diff
-scratchpad/s4/   test files, upload/download outputs, row ids
+scratchpad/s2/   File spike — first export + unpacked canonical XML
+scratchpad/s3/   File spike — post-import re-export + roundtrip.diff
+scratchpad/s4/   File spike — test files, upload/download outputs, row ids
+scratchpad/g6/   Type spike — export, unpacked XML, repack idempotency check
 scratchpad/spike-working-notes.md
 ```
 

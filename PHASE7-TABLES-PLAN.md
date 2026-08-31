@@ -47,7 +47,7 @@ with `RuleSet` reduced to a stable core so `Rule` can still evolve.
 
 ---
 
-## 2. The 17 tables
+## 2. The 18 tables
 
 ### Group A — Portal identity
 
@@ -369,7 +369,23 @@ consumers noted at table 13 — both are additive when they return.
 Symmetric with evidence. One limit to remember rather than two, and a generated certificate will not
 approach it.
 
-**G-6 ✅ DECIDED — run a short type spike before Wave 1.** ⭐ *was blocking*
+**G-6 ✅ DECIDED AND DONE — type spike run 2026-08-31, results in
+[`SPIKE-FINDINGS.md` §8](SPIKE-FINDINGS.md).** ⭐ *was the blocker; no longer blocking*
+
+**Scope turned out far smaller than assumed.** `ntext`, `nvarchar`, `int`, `bit`, `datetime`,
+**date-only** (`<Format>date</Format>` + `<Behavior>3</Behavior>`), `picklist` (full `<optionset>`)
+and `lookup` are **all already documented** — in `Entity.xml`'s commented quick-reference block and
+the `/dvt-add-lookup` skill. §3's warning was accurate about *live custom columns* and misleading
+about documentation. Only two things genuinely needed spiking:
+
+- **`decimal` → the element is `<Accuracy>`, NOT `<Precision>`.** Same trap family as
+  `<MaxSizeInKB>`/`<MaxValue>`. Would have shipped into five columns. Also note `<MaxValue>` is the
+  numeric bound here but the **size cap in KB** on a File column — same element, unrelated meanings.
+- **Organization ownership → `<OwnershipTypeMask>OrgOwned</OwnershipTypeMask>`**, not
+  `OrganizationOwned`. And such tables have **no `OwnerId`/`OwningUser`/`OwningTeam`/
+  `OwningBusinessUnit` attributes at all** — relevant only to `EvidenceAccessLog`.
+
+Original text, kept for the reasoning:
 §3 says so explicitly: *"`decimal` and `File` have no XML anywhere"*. The spike solved `File`; it did
 **not** solve `decimal`, and five columns need it: `Requirement.Credits`, `PriorStudy.Credits`,
 `Suggestion.Strength`, `Rule.Strength`, `RuleFiring.Contribution`. Precision and scale are
